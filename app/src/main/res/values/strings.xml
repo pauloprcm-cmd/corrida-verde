@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="descricao_servico">Lê a oferta de corrida no app de motorista da Uber e mostra se ela vale a pena comparada ao taxímetro de SP. Só lê a tela: não toca, não aceita e não recusa corridas.</string>
+</resources>

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Corrida Verde"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Compara a oferta da Uber com o taxímetro de SP. Só lê a tela: nunca toca, nunca aceita nem recusa." />
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/ativar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ativar leitura (Acessibilidade)" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Se o Android bloquear: Configurações › Apps › Corrida Verde › ⋮ › Permitir configurações restritas."
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Tabela do taxímetro"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/comum"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Comum" />
+
+            <RadioButton
+                android:id="@+id/luxo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="Luxo" />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Verde a partir de (% do taxímetro)" />
+
+        <EditText
+            android:id="@+id/limiteVerde"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Amarelo a partir de (% do taxímetro)" />
+
+        <EditText
+            android:id="@+id/limiteAmarelo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Busca acima de (km) rebaixa um nível" />
+
+        <EditText
+            android:id="@+id/buscaMax"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Distância do popup ao topo da tela (dp)" />
+
+        <EditText
+            android:id="@+id/posicaoY"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number" />
+
+        <CheckBox
+            android:id="@+id/diagnostico"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Modo diagnóstico (guarda os textos lidos)" />
+
+        <Button
+            android:id="@+id/salvar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Salvar" />
+
+        <Button
+            android:id="@+id/testar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Testar popup" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Última leitura (diagnóstico)"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/textoDiagnostico"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/compartilhar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Enviar diagnóstico" />
+    </LinearLayout>
+</ScrollView>
