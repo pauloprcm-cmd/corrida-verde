@@ -39,6 +39,20 @@ class LeitorOfertaTest {
     }
 
     @Test
+    fun leOfertaUberXComSelecionar() {
+        // Oferta do print de 24/09/2026, 21:23 (botão "Selecionar" em vez de "Aceitar").
+        val o = LeitorOferta.ler(listOf(
+            "UberX", "R$ 14,36", "R\$2,02/km aprox.", "4,87 (153)", "Verificado",
+            "10 min (3.0 km)", "Rua A, Brasilandia, São Paulo", "13 minutos (4.1 km)", "Rua B, 6, Brasilandia, São Paulo",
+            "Selecionar",
+        ))!!
+        assertEquals(14.36, o.valor, 0.001)
+        assertEquals(3.0, o.buscaKm, 0.001)
+        assertEquals(4.1, o.viagemKm, 0.001)
+        assertEquals(13, o.viagemMin)
+    }
+
+    @Test
     fun ignoraGanhosDoDiaAntesDaOferta() {
         val o = LeitorOferta.ler(listOf("R$ 1.234,56") + print)!!
         assertEquals(62.10, o.valor, 0.001)

@@ -18,7 +18,12 @@ class LeitorService : AccessibilityService() {
     private var chaveAtual: String? = null
     private var ultimoDiagnostico = ""
 
-    private val lerTela = Runnable { ler() }
+    private var leituraAgendada = false
+    private val lerTela = Runnable {
+        leituraAgendada = false
+        // Um nó que some no meio da leitura não pode derrubar o serviço.
+        runCatching { ler() }
+    }
     private val esconder = Runnable {
         popup.esconder()
         chaveAtual = null
@@ -40,7 +45,10 @@ class LeitorService : AccessibilityService() {
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (e.packageName?.toString() != UBER) return
-        handler.removeCallbacks(lerTela)
+        // Não adia a leitura a cada evento: a barra do botão e o mapa da oferta
+        // mudam o tempo todo, e adiar a cada mudança fazia a leitura nunca acontecer.
+        if (leituraAgendada) return
+        leituraAgendada = true
         handler.postDelayed(lerTela, 150)
     }
 
