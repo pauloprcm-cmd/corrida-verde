@@ -26,8 +26,8 @@ class Popup(private val ctx: Context) {
         val linhas = listOf(
             "R$ ${br(o.valor)} · taxímetro R$ ${br(r.taximetro)}${if (r.bandeira2) " (B2)" else ""}",
             "R$ ${br(r.rsKm)}/km" + (r.rsHora?.let { " · R$ ${br(it)}/h" } ?: ""),
-            "busca ${km(o.buscaKm)} · viagem ${km(o.viagemKm)}",
-        ) + (if (r.buscaLonga) listOf("⚠ busca longa") else emptyList())
+            "busca ${km(o.buscaKm)} · viagem ${km(o.viagemKm)} ${o.viagemMin} min",
+        ) + (if (r.minParado > 0) listOf("trânsito: ~${r.minParado} min parado no taxímetro") else emptyList()) + (if (r.buscaLonga) listOf("⚠ busca longa") else emptyList())
         exibir(cfg, cor, "${r.pct}%", linhas)
     }
 

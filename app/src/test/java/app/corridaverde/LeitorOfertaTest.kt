@@ -30,8 +30,10 @@ class LeitorOfertaTest {
     fun avaliaOfertaDoPrint() {
         val quintaDeManha = LocalDateTime.of(2026, 9, 24, 8, 46)
         val r = Avaliador.avaliar(LeitorOferta.ler(print)!!, Config(), quintaDeManha)
-        assertEquals(30.07, r.taximetro, 0.001)
-        assertEquals(207, r.pct)
+        // 4,9 km em 35 min: ~23 min de trânsito cobrados pela hora parada.
+        assertEquals(51.57, r.taximetro, 0.005)
+        assertEquals(23, r.minParado)
+        assertEquals(120, r.pct)
         assertEquals(Cor.VERDE, r.cor)
         assertEquals(9.86, r.rsKm, 0.005)
         assertEquals(86.65, r.rsHora!!, 0.005)
@@ -81,13 +83,26 @@ class LeitorOfertaTest {
     }
 
     @Test
+    fun corridasReaisDe25DeSetembro() {
+        val sextaDeManha = LocalDateTime.of(2026, 9, 25, 8, 37)
+        // Táxi Promo R$ 32,24, 20 minutos (6.7 km): o taxímetro deu R$ 40,85.
+        val semTransito = Avaliador.avaliar(Oferta(32.24, 0.4, 3, 6.7, 20, null), Config(), sextaDeManha)
+        assertEquals(40.85, semTransito.taximetro, 40.85 * 0.05)
+        assertEquals(Cor.VERMELHO, semTransito.cor)
+        // R$ 36,71, 7,24 km que levaram 32 min: o taxímetro deu R$ 57,65.
+        val comTransito = Avaliador.avaliar(Oferta(36.71, 1.0, 4, 7.24, 32, null), Config(), sextaDeManha)
+        assertEquals(57.65, comTransito.taximetro, 57.65 * 0.05)
+        assertEquals(Cor.VERMELHO, comTransito.cor)
+    }
+
+    @Test
     fun bandeira2() {
         assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 9, 24, 21, 0)))  // quinta à noite
         assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 9, 27, 12, 0)))  // domingo
         assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 20, 12, 0))) // Consciência Negra
         assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 9, 26, 12, 0))) // sábado de dia
         assertEquals(LocalDate.of(2026, 4, 5), Feriados.pascoa(2026))
-        assertEquals(9.83 + 10 * 7.20 * 1.3, Tarifa.taximetro(10.0, luxo = true, bandeira2 = true), 0.001)
+        assertEquals(9.83 + 10 * 7.20 * 1.3, Tarifa.taximetro(10.0, 24, luxo = true, bandeira2 = true), 0.001)
     }
 
     @Test

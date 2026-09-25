@@ -10,6 +10,7 @@ enum class Cor { VERDE, AMARELO, VERMELHO }
 data class Resultado(
     val oferta: Oferta,
     val taximetro: Double,
+    val minParado: Int,
     val pct: Int,
     val cor: Cor,
     val rsKm: Double,
@@ -25,6 +26,15 @@ object Tarifa {
     const val BANDEIRADA_LUXO = 9.83
     const val KM_LUXO = 7.20
     const val ACRESCIMO_BANDEIRA2 = 1.30
+    const val HORA_COMUM = 55.50
+    const val HORA_LUXO = 83.25
+
+    /**
+     * Velocidade média com o carro andando. O tempo que a Uber prevê além de km / essa velocidade é trânsito,
+     * que o taxímetro cobra pela hora parada (parado ou abaixo de 15 km/h). Calibrada nos prints de 25/09/2026:
+     * 6,7 km em 20 min deu R$ 40,85 no taxímetro; 7,24 km em 32 min deu R$ 57,65.
+     */
+    const val KMH_ANDANDO = 25.0
 
     /** Bandeira 2: das 20h às 6h de segunda a sábado, e o dia todo em domingos e feriados. */
     fun bandeira2(agora: LocalDateTime): Boolean {
@@ -33,17 +43,21 @@ object Tarifa {
         return agora.hour >= 20 || agora.hour < 6
     }
 
-    /** O taxímetro usa só os km da viagem, sem a busca. */
-    fun taximetro(km: Double, luxo: Boolean, bandeira2: Boolean): Double {
+    /** Minutos da viagem que o taxímetro deve cobrar como hora parada. */
+    fun minutosParado(km: Double, min: Int): Double = maxOf(0.0, min - km / KMH_ANDANDO * 60)
+
+    /** O taxímetro usa só a viagem, sem a busca. A bandeira 2 aumenta o km, não a hora parada. */
+    fun taximetro(km: Double, min: Int, luxo: Boolean, bandeira2: Boolean): Double {
         val porKm = (if (luxo) KM_LUXO else KM_COMUM) * (if (bandeira2) ACRESCIMO_BANDEIRA2 else 1.0)
-        return (if (luxo) BANDEIRADA_LUXO else BANDEIRADA_COMUM) + km * porKm
+        val porHora = if (luxo) HORA_LUXO else HORA_COMUM
+        return (if (luxo) BANDEIRADA_LUXO else BANDEIRADA_COMUM) + km * porKm + minutosParado(km, min) * porHora / 60
     }
 }
 
 object Avaliador {
     fun avaliar(o: Oferta, cfg: Config, agora: LocalDateTime = LocalDateTime.now()): Resultado {
         val b2 = Tarifa.bandeira2(agora)
-        val taximetro = Tarifa.taximetro(o.viagemKm, cfg.luxo, b2)
+        val taximetro = Tarifa.taximetro(o.viagemKm, o.viagemMin, cfg.luxo, b2)
         val pct = (o.valor / taximetro * 100).roundToInt()
         var cor = when {
             pct >= cfg.limiteVerde -> Cor.VERDE
@@ -57,6 +71,7 @@ object Avaliador {
         return Resultado(
             oferta = o,
             taximetro = taximetro,
+            minParado = Tarifa.minutosParado(o.viagemKm, o.viagemMin).roundToInt(),
             pct = pct,
             cor = cor,
             rsKm = if (kmTotal > 0) o.valor / kmTotal else 0.0,
