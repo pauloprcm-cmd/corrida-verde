@@ -58,6 +58,10 @@ class MainActivity : Activity() {
         campo(R.id.status, TextView::class.java).text =
             if (ativo) "✅ Leitura ativa" else "❌ Leitura desligada: toque em \"Ativar leitura\""
         campo(R.id.textoDiagnostico, TextView::class.java).text = diagnostico()
+
+        val versao = campo(R.id.versao, TextView::class.java)
+        versao.text = "Versão ${Atualizador.versaoAtual}"
+        Atualizador.verificar(this, perguntar = true) { runOnUiThread { versao.text = it } }
     }
 
     private fun diagnostico(): String {

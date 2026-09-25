@@ -21,3 +21,10 @@ https://github.com/pauloprcm-cmd/corrida-verde/releases/latest/download/corrida-
 
 Depois abra o app e toque em **Ativar leitura**. Se o Android bloquear a Acessibilidade, vá em
 Configurações › Apps › Corrida Verde › ⋮ › Permitir configurações restritas.
+
+## Atualização
+
+Ao abrir, o app busca a release mais nova no GitHub e instala por cima (o Android pede confirmação e,
+na primeira vez, permissão para "instalar apps desconhecidos" do Corrida Verde). No Android 12 ou mais novo,
+o serviço também verifica a cada 6 horas e atualiza em silêncio quando o Android permite; se o Android
+exigir confirmação, ele espera o app ser aberto, sem abrir nada por cima da Uber.

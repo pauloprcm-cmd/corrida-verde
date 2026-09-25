@@ -1,6 +1,7 @@
 package app.corridaverde
 
 import android.accessibilityservice.AccessibilityService
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
@@ -24,6 +25,13 @@ class LeitorService : AccessibilityService() {
         // Um nó que some no meio da leitura não pode derrubar o serviço.
         runCatching { ler() }
     }
+    /** Em segundo plano só dá para atualizar sem perguntar a partir do Android 12. */
+    private val buscarAtualizacao = object : Runnable {
+        override fun run() {
+            if (chaveAtual == null && Build.VERSION.SDK_INT >= 31) Atualizador.verificar(this@LeitorService, perguntar = false)
+            handler.postDelayed(this, 6 * 60 * 60_000L)
+        }
+    }
     private val esconder = Runnable {
         popup.esconder()
         chaveAtual = null
@@ -32,6 +40,7 @@ class LeitorService : AccessibilityService() {
     override fun onServiceConnected() {
         popup = Popup(this)
         instancia = this
+        handler.postDelayed(buscarAtualizacao, 60_000)
     }
 
     override fun onDestroy() {

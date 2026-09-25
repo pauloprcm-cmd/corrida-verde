@@ -89,4 +89,10 @@ class LeitorOfertaTest {
         assertEquals(LocalDate.of(2026, 4, 5), Feriados.pascoa(2026))
         assertEquals(9.83 + 10 * 7.20 * 1.3, Tarifa.taximetro(10.0, luxo = true, bandeira2 = true), 0.001)
     }
+
+    @Test
+    fun leNumeroDaTagDaRelease() {
+        assertEquals(12, Atualizador.numeroDaTag("""{"url":"x","tag_name": "v1.12","name":"Corrida Verde 1.12"}"""))
+        assertNull(Atualizador.numeroDaTag("""{"message":"Not Found"}"""))
+    }
 }
