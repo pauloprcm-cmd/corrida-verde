@@ -3,6 +3,7 @@ package app.corridaverde
 import android.accessibilityservice.AccessibilityService
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -11,28 +12,46 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 /**
- * Lê a tela do app de motorista da Uber e mostra o popup.
+ * Lê a oferta do app de motorista da Uber e mostra o popup.
  * Só lê: não toca na tela, não aceita nem recusa corridas.
+ *
+ * O cartão da oferta não aparece na árvore da janela da Uber: ele só chega pelos
+ * eventos (o texto e o nó de origem de cada um). Por isso a oferta é lida no próprio
+ * evento, e para saber se ela sumiu o app olha de novo o nó de onde ela veio.
  */
 class LeitorService : AccessibilityService() {
+    /** Tela: popup e chaveAtual. */
     private val handler = Handler(Looper.getMainLooper())
+    /** Leitura dos nós, que é lenta (cada nó é uma consulta à Uber), fica fora da tela. */
+    private val trabalho = HandlerThread("leitor").apply { start() }
+    private val fundo = Handler(trabalho.looper)
+
     private lateinit var popup: Popup
     private var chaveAtual: String? = null
+
+    // Só usados na linha de trabalho.
+    private var noOferta: AccessibilityNodeInfo? = null
     private var ultimoDiagnostico = ""
     private var ultimoStatus = 0L
     private var eventosDaUber = 0
-
-    /** Textos que vieram junto com os eventos da Uber nos últimos segundos (tempo, textos). */
-    private val textosDosEventos = ArrayDeque<Pair<Long, List<String>>>()
     private val ultimosEventos = ArrayDeque<String>()
     private val historicoJanelas = ArrayDeque<String>()
 
-    private var leituraAgendada = false
-    private val lerTela = Runnable {
-        leituraAgendada = false
-        // Um nó que some no meio da leitura não pode derrubar o serviço.
-        runCatching { ler() }
+    /** Confere se a oferta ainda está na tela; se sumiu, esconde o popup. */
+    private val conferir = object : Runnable {
+        override fun run() {
+            val no = noOferta ?: return
+            val oferta = runCatching { if (no.refresh()) LeitorOferta.ler(textosDo(no)) else null }.getOrNull()
+            if (oferta == null) {
+                noOferta = null
+                handler.post(esconder)
+                return
+            }
+            mostrar(oferta)
+            fundo.postDelayed(this, 400)
+        }
     }
+
     /** Em segundo plano só dá para atualizar sem perguntar a partir do Android 12. */
     private val buscarAtualizacao = object : Runnable {
         override fun run() {
@@ -54,6 +73,8 @@ class LeitorService : AccessibilityService() {
     override fun onDestroy() {
         instancia = null
         handler.removeCallbacksAndMessages(null)
+        fundo.removeCallbacksAndMessages(null)
+        trabalho.quitSafely()
         if (::popup.isInitialized) popup.esconder()
         super.onDestroy()
     }
@@ -62,100 +83,81 @@ class LeitorService : AccessibilityService() {
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (e.packageName?.toString() != UBER) return
-        guardarEvento(e)
-        // Não adia a leitura a cada evento: a barra do botão e o mapa da oferta
-        // mudam o tempo todo, e adiar a cada mudança fazia a leitura nunca acontecer.
-        if (leituraAgendada) return
-        leituraAgendada = true
-        handler.postDelayed(lerTela, 150)
-    }
-
-    /**
-     * Guarda os textos do próprio evento. Se o cartão da oferta estiver numa janela
-     * que não aparece na lista de janelas, é por aqui que ele chega.
-     */
-    private fun guardarEvento(e: AccessibilityEvent) {
-        eventosDaUber++
+        // O evento é reciclado quando esta função volta: copia o que interessa antes.
         val textos = mutableListOf<String>()
         e.text.mapNotNullTo(textos) { it?.toString()?.takeIf { t -> t.isNotBlank() } }
         e.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let { textos += it }
-        runCatching { e.source?.let { coletar(it, textos, limite = 300) } }
-
-        val agora = System.currentTimeMillis()
-        while (textosDosEventos.isNotEmpty() && agora - textosDosEventos.first().first > 3_000) textosDosEventos.removeFirst()
-        if (textos.isNotEmpty()) textosDosEventos.addLast(agora to textos)
-        while (textosDosEventos.size > 20) textosDosEventos.removeFirst()
-
-        // O mapa gera eventos sem texto o tempo todo: esses não entram no registro.
-        if (textos.isEmpty() && e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        val tipo = AccessibilityEvent.eventTypeToString(e.eventType).removePrefix("TYPE_")
-        ultimosEventos.addLast("${LocalTime.now().withNano(0)} $tipo ${e.className?.toString()?.substringAfterLast('.')} ${textos.take(4).joinToString(" | ").take(120)}")
-        while (ultimosEventos.size > 40) ultimosEventos.removeFirst()
+        val fonte = e.source
+        val tipo = e.eventType
+        val classe = e.className?.toString()
+        fundo.post { runCatching { processar(textos, fonte, tipo, classe) } }
     }
 
-    private fun ler() {
-        val textos = textosDaUber()
-        val dosEventos = textosDosEventos.flatMap { it.second }.distinct()
-        val oferta = LeitorOferta.ler(textos) ?: LeitorOferta.ler(dosEventos)
-        val cfg = Config.carregar(this)
-        if (cfg.diagnostico) salvarDiagnostico(textos, dosEventos, oferta)
-
-        if (oferta == null) {
-            // A oferta sumiu (aceita, recusada ou expirou).
-            if (chaveAtual != null) {
-                handler.removeCallbacks(esconder)
-                handler.postDelayed(esconder, 800)
-            }
-            return
+    private fun processar(textosDoEvento: List<String>, fonte: AccessibilityNodeInfo?, tipo: Int, classe: String?) {
+        eventosDaUber++
+        val textos = textosDoEvento + (fonte?.let { textosDo(it) } ?: emptyList())
+        val oferta = LeitorOferta.ler(textos)
+        if (oferta != null) {
+            noOferta = fonte
+            mostrar(oferta)
+            fundo.removeCallbacks(conferir)
+            fundo.postDelayed(conferir, 400)
         }
-        handler.removeCallbacks(esconder)
-        handler.postDelayed(esconder, 60_000)
-        if (oferta.chave == chaveAtual) return
-        chaveAtual = oferta.chave
-        popup.mostrar(Avaliador.avaliar(oferta, cfg), cfg)
+        val cfg = Config.carregar(this)
+        if (cfg.diagnostico) salvarDiagnostico(textos, oferta, tipo, classe)
     }
 
-    /** Textos só das janelas da Uber, ignorando os cards de outros apps por cima. */
-    private fun textosDaUber(): List<String> {
-        val raizes = windows.mapNotNull { it.root }.filter { it.packageName?.toString() == UBER }
-            .ifEmpty { listOfNotNull(rootInActiveWindow?.takeIf { it.packageName?.toString() == UBER }) }
+    private fun mostrar(oferta: Oferta) {
+        val cfg = Config.carregar(this)
+        handler.post {
+            if (oferta.chave != chaveAtual) {
+                chaveAtual = oferta.chave
+                popup.mostrar(Avaliador.avaliar(oferta, cfg), cfg)
+            }
+        }
+    }
+
+    private fun textosDo(no: AccessibilityNodeInfo): List<String> {
         val textos = mutableListOf<String>()
-        for (r in raizes) coletar(r, textos)
+        coletar(no, textos, IntArray(1))
         return textos
     }
 
-    private fun coletar(n: AccessibilityNodeInfo, textos: MutableList<String>, limite: Int = Int.MAX_VALUE) {
-        if (!n.isVisibleToUser || textos.size >= limite) return
+    /** Lê no máximo [LIMITE_NOS] nós: um evento do mapa pode vir com a tela inteira. */
+    private fun coletar(n: AccessibilityNodeInfo, textos: MutableList<String>, visitados: IntArray) {
+        if (!n.isVisibleToUser || ++visitados[0] > LIMITE_NOS) return
         n.text?.toString()?.takeIf { it.isNotBlank() }?.let { textos += it }
         n.contentDescription?.toString()?.takeIf { it.isNotBlank() && it != n.text?.toString() }?.let { textos += it }
-        for (i in 0 until n.childCount) n.getChild(i)?.let { coletar(it, textos, limite) }
+        for (i in 0 until n.childCount) n.getChild(i)?.let { coletar(it, textos, visitados) }
     }
 
-    private fun salvarDiagnostico(textos: List<String>, dosEventos: List<String>, oferta: Oferta?) {
+    private fun salvarDiagnostico(textos: List<String>, oferta: Oferta?, tipo: Int, classe: String?) {
+        if (textos.isNotEmpty() || tipo == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val nome = AccessibilityEvent.eventTypeToString(tipo).removePrefix("TYPE_")
+            ultimosEventos.addLast("${LocalTime.now().withNano(0)} $nome ${classe?.substringAfterLast('.')} ${textos.take(4).joinToString(" | ").take(120)}")
+            while (ultimosEventos.size > 40) ultimosEventos.removeFirst()
+        }
         salvarStatus()
-        if ((textos + dosEventos).none { it.contains("R$") }) return
+        if (textos.none { it.contains("R$") }) return
         val texto = buildString {
             appendLine("Leitura de ${LocalDateTime.now().withNano(0)}")
             appendLine(if (oferta != null) "Oferta reconhecida: $oferta" else "Oferta NÃO reconhecida")
-            appendLine("--- textos da tela da Uber ---")
+            appendLine("--- textos do evento da Uber ---")
             textos.forEach { appendLine(it) }
-            appendLine("--- textos dos eventos da Uber ---")
-            dosEventos.forEach { appendLine(it) }
         }
         if (texto == ultimoDiagnostico) return
         ultimoDiagnostico = texto
         File(filesDir, ARQUIVO_DIAGNOSTICO).writeText(texto)
     }
 
-    /** Janelas na tela e últimos eventos da Uber, gravados no máximo uma vez por segundo. */
+    /** Janelas na tela e últimos eventos da Uber. Lê a tela inteira, então só a cada 5 s. */
     private fun salvarStatus() {
         val agora = System.currentTimeMillis()
-        if (agora - ultimoStatus < 1_000) return
+        if (agora - ultimoStatus < 5_000) return
         ultimoStatus = agora
         val janelas = windows.joinToString("\n") { w ->
             val r = w.root
-            val n = mutableListOf<String>()
-            r?.let { runCatching { coletar(it, n) } }
+            val n = r?.let { runCatching { textosDo(it) }.getOrNull() } ?: emptyList()
             "tipo ${w.type} · ${r?.packageName ?: "sem acesso"} · ${w.title ?: ""} · ${n.size} textos"
         }
         if (historicoJanelas.lastOrNull()?.substringAfter('\n') != janelas) {
@@ -187,6 +189,7 @@ class LeitorService : AccessibilityService() {
         const val UBER = "com.ubercab.driver"
         const val ARQUIVO_DIAGNOSTICO = "diagnostico.txt"
         const val ARQUIVO_STATUS = "status.txt"
+        private const val LIMITE_NOS = 400
         var instancia: LeitorService? = null
             private set
     }
