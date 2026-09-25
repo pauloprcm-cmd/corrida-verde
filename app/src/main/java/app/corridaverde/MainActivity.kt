@@ -65,8 +65,10 @@ class MainActivity : Activity() {
     }
 
     private fun diagnostico(): String {
+        val status = File(filesDir, LeitorService.ARQUIVO_STATUS).takeIf { it.exists() }?.readText() ?: ""
         val f = File(filesDir, LeitorService.ARQUIVO_DIAGNOSTICO)
-        return if (f.exists()) f.readText() else "Nenhuma leitura ainda. Ligue o modo diagnóstico e abra uma oferta na Uber."
+        val leitura = if (f.exists()) f.readText() else "Nenhuma leitura com R$ ainda. Ligue o modo diagnóstico e abra uma oferta na Uber."
+        return status + "\n" + leitura
     }
 
     private fun lerCampos(): Config? {
