@@ -17,6 +17,8 @@ data class Resultado(
     val rsHora: Double?,
     val bandeira2: Boolean,
     val buscaLonga: Boolean,
+    /** Pegadinhas da oferta, numa linha só do popup. Não mudam a cor (só a busca longa muda). */
+    val avisos: List<String>,
 )
 
 /** Tabela do táxi de SP (Prefeitura, vigente desde 11/08/2025). */
@@ -78,7 +80,15 @@ object Avaliador {
             rsHora = if (minTotal > 0) o.valor / minTotal * 60 else null,
             bandeira2 = b2,
             buscaLonga = buscaLonga,
+            avisos = avisos(o, cfg, buscaLonga),
         )
+    }
+
+    private fun avisos(o: Oferta, cfg: Config, buscaLonga: Boolean) = buildList {
+        if (o.paradas > 0) add(if (o.paradas == 1) "1 parada" else "${o.paradas} paradas")
+        if (buscaLonga) add("busca longa")
+        o.nota?.takeIf { it < cfg.notaMinima }?.let { add("nota ${String.format(java.util.Locale("pt", "BR"), "%.2f", it)}") }
+        if (o.viagemKm > cfg.viagemLongaKm) add("viagem longa")
     }
 }
 

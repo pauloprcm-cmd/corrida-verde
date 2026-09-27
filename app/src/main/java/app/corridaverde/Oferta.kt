@@ -8,6 +8,7 @@ data class Oferta(
     val viagemKm: Double,
     val viagemMin: Int,
     val nota: Double?,
+    val paradas: Int = 0,
 ) {
     val chave get() = "$valor|$buscaKm|$viagemKm"
 }
@@ -22,6 +23,7 @@ object LeitorOferta {
     private val HORAS = Regex("""(\d+)\s*h""", RegexOption.IGNORE_CASE)
     private val MINUTOS = Regex("""(\d+)\s*min""", RegexOption.IGNORE_CASE)
     private val NOTA = Regex("""\b([1-5][,.]\d{1,2})\s*\(\s*\d+\s*\)""")
+    private val PARADAS = Regex("""\b(\d+)\s*paradas?\b""", RegexOption.IGNORE_CASE)
 
     /** Lê os textos da tela (na ordem da árvore). Devolve null se não houver oferta. */
     fun ler(textos: List<String>): Oferta? {
@@ -45,6 +47,8 @@ object LeitorOferta {
             viagemKm = viagem.sumOf { km(it) },
             viagemMin = viagem.sumOf { minutos(it.groupValues[1]) },
             nota = NOTA.find(tela)?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull(),
+            // A Uber escreve "1 parada"; sem o texto, cada trecho a mais depois da busca e da viagem é uma parada.
+            paradas = PARADAS.find(tela)?.groupValues?.get(1)?.toInt() ?: maxOf(0, trechos.size - 2),
         )
     }
 

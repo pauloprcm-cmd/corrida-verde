@@ -67,6 +67,35 @@ class LeitorOfertaTest {
         assertEquals(0.8, o.buscaKm, 0.001)
         assertEquals(48.3, o.viagemKm, 0.001)
         assertEquals(75, o.viagemMin)
+        assertEquals(1, o.paradas)
+    }
+
+    @Test
+    fun ofertaExclusivaComParadaAvisaNoPopup() {
+        // Textos do print Chamada Uber Black Exclusiva de 27/09/2026 (endereços trocados).
+        val o = LeitorOferta.ler(listOf(
+            "Black", "Exclusivo", "R$ 85,13", "R\$6,81/km aprox.", "4,94 (1511)", "Verificado",
+            "3 min (0.6 km)", "Rua A, São Paulo", "1 parada", "37 minutos (11.9 km)", "Rua B, Liberdade, São Paulo", "Aceitar",
+        ))!!
+        assertEquals(85.13, o.valor, 0.001)
+        assertEquals(11.9, o.viagemKm, 0.001)
+        assertEquals(1, o.paradas)
+        val r = Avaliador.avaliar(o, Config(luxo = true), LocalDateTime.of(2026, 9, 27, 23, 35))
+        assertEquals(listOf("1 parada"), r.avisos)
+    }
+
+    @Test
+    fun semPegadinhaNaoTemAviso() {
+        val r = Avaliador.avaliar(LeitorOferta.ler(print)!!, Config(), LocalDateTime.of(2026, 9, 24, 8, 46))
+        assertEquals(0, r.oferta.paradas)
+        assertTrue(r.avisos.isEmpty())
+    }
+
+    @Test
+    fun avisosJuntosNumaLinha() {
+        val o = Oferta(valor = 150.0, buscaKm = 3.5, buscaMin = 12, viagemKm = 30.0, viagemMin = 50, nota = 4.6, paradas = 2)
+        val r = Avaliador.avaliar(o, Config(), LocalDateTime.of(2026, 9, 24, 8, 46))
+        assertEquals(listOf("2 paradas", "busca longa", "nota 4,60", "viagem longa"), r.avisos)
     }
 
     @Test

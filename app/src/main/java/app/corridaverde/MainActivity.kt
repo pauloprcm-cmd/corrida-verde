@@ -23,6 +23,8 @@ class MainActivity : Activity() {
         campo(R.id.limiteVerde, EditText::class.java).setText(cfg.limiteVerde.toString())
         campo(R.id.limiteAmarelo, EditText::class.java).setText(cfg.limiteAmarelo.toString())
         campo(R.id.buscaMax, EditText::class.java).setText(cfg.buscaMaxKm.toString().replace('.', ','))
+        campo(R.id.notaMinima, EditText::class.java).setText(cfg.notaMinima.toString().replace('.', ','))
+        campo(R.id.viagemLonga, EditText::class.java).setText(cfg.viagemLongaKm.toString().replace('.', ','))
         campo(R.id.posicaoY, EditText::class.java).setText(cfg.posicaoY.toString())
         campo(R.id.diagnostico, CheckBox::class.java).isChecked = cfg.diagnostico
 
@@ -76,8 +78,10 @@ class MainActivity : Activity() {
         val verde = num(R.id.limiteVerde)?.toInt()
         val amarelo = num(R.id.limiteAmarelo)?.toInt()
         val busca = num(R.id.buscaMax)
+        val nota = num(R.id.notaMinima)
+        val viagem = num(R.id.viagemLonga)
         val y = num(R.id.posicaoY)?.toInt()
-        if (verde == null || amarelo == null || busca == null || y == null || amarelo > verde) {
+        if (verde == null || amarelo == null || busca == null || nota == null || viagem == null || y == null || amarelo > verde) {
             Toast.makeText(this, "Confira os números (o amarelo não pode passar do verde)", Toast.LENGTH_LONG).show()
             return null
         }
@@ -86,6 +90,8 @@ class MainActivity : Activity() {
             limiteVerde = verde,
             limiteAmarelo = amarelo,
             buscaMaxKm = busca,
+            notaMinima = nota,
+            viagemLongaKm = viagem,
             posicaoY = y,
             diagnostico = campo(R.id.diagnostico, CheckBox::class.java).isChecked,
         )

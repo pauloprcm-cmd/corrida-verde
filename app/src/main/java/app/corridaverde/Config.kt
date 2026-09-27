@@ -7,6 +7,8 @@ data class Config(
     val limiteVerde: Int = 100,
     val limiteAmarelo: Int = 85,
     val buscaMaxKm: Double = 3.0,
+    val notaMinima: Double = 4.7,
+    val viagemLongaKm: Double = 25.0,
     val posicaoY: Int = 60,
     val diagnostico: Boolean = false,
 ) {
@@ -16,6 +18,8 @@ data class Config(
             .putInt("limiteVerde", limiteVerde)
             .putInt("limiteAmarelo", limiteAmarelo)
             .putFloat("buscaMaxKm", buscaMaxKm.toFloat())
+            .putFloat("notaMinima", notaMinima.toFloat())
+            .putFloat("viagemLongaKm", viagemLongaKm.toFloat())
             .putInt("posicaoY", posicaoY)
             .putBoolean("diagnostico", diagnostico)
             .apply()
@@ -32,6 +36,8 @@ data class Config(
                 limiteVerde = p.getInt("limiteVerde", d.limiteVerde),
                 limiteAmarelo = p.getInt("limiteAmarelo", d.limiteAmarelo),
                 buscaMaxKm = p.getFloat("buscaMaxKm", d.buscaMaxKm.toFloat()).toDouble(),
+                notaMinima = p.getFloat("notaMinima", d.notaMinima.toFloat()).toDouble(),
+                viagemLongaKm = p.getFloat("viagemLongaKm", d.viagemLongaKm.toFloat()).toDouble(),
                 posicaoY = p.getInt("posicaoY", d.posicaoY),
                 diagnostico = p.getBoolean("diagnostico", d.diagnostico),
             )

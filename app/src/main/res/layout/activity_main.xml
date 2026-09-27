@@ -112,6 +112,28 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="Avisar nota do passageiro abaixo de" />
+
+        <EditText
+            android:id="@+id/notaMinima"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Avisar viagem longa acima de (km)" />
+
+        <EditText
+            android:id="@+id/viagemLonga"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="Distância do popup ao topo da tela (dp)" />
 
         <EditText

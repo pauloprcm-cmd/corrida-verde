@@ -178,7 +178,7 @@ class LeitorService : AccessibilityService() {
     /** Mostra um popup de exemplo para conferir a posição. */
     fun testar() {
         val cfg = Config.carregar(this)
-        val exemplo = Oferta(valor = 62.10, buscaKm = 1.4, buscaMin = 8, viagemKm = 4.9, viagemMin = 35, nota = 4.95)
+        val exemplo = Oferta(valor = 62.10, buscaKm = 1.4, buscaMin = 8, viagemKm = 4.9, viagemMin = 35, nota = 4.95, paradas = 1)
         chaveAtual = "teste"
         popup.mostrar(Avaliador.avaliar(exemplo, cfg), cfg)
         handler.removeCallbacks(esconder)
