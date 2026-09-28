@@ -59,6 +59,13 @@ class LeitorService : AccessibilityService() {
             handler.postDelayed(this, 6 * 60 * 60_000L)
         }
     }
+    /** Refaz a notificação: o total do dia vira à meia-noite e, no Android 14, ela pode ser dispensada. */
+    private val notificar = object : Runnable {
+        override fun run() {
+            Notificacao.atualizar(this@LeitorService)
+            handler.postDelayed(this, 60 * 60_000L)
+        }
+    }
     private val esconder = Runnable {
         popup.esconder()
         chaveAtual = null
@@ -68,10 +75,12 @@ class LeitorService : AccessibilityService() {
         popup = Popup(this)
         instancia = this
         handler.postDelayed(buscarAtualizacao, 60_000)
+        handler.post(notificar)
     }
 
     override fun onDestroy() {
         instancia = null
+        Notificacao.remover(this)
         handler.removeCallbacksAndMessages(null)
         fundo.removeCallbacksAndMessages(null)
         trabalho.quitSafely()

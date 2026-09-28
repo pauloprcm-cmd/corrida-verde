@@ -165,6 +165,32 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
+            android:text="Gastos"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Com a leitura ligada, desça a barra do topo e toque em Registrar gasto na notificação do Corrida Verde. Ex.: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”."
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/gastosHoje"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/registrarGasto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Registrar gasto por voz" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
             android:text="Última leitura (diagnóstico)"
             android:textStyle="bold" />
 

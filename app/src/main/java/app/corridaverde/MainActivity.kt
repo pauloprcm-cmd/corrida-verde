@@ -1,7 +1,10 @@
 package app.corridaverde
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
@@ -11,6 +14,8 @@ import android.widget.RadioButton
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
+import java.time.LocalDate
+import java.util.Locale
 
 class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,6 +51,13 @@ class MainActivity : Activity() {
                 servico.testar()
             }
         }
+        campo(R.id.registrarGasto, Button::class.java).setOnClickListener {
+            startActivity(Intent(this, GastoActivity::class.java))
+        }
+        // A notificação com o botão "Registrar gasto" precisa desta permissão no Android 13 ou mais novo.
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
         campo(R.id.compartilhar, Button::class.java).setOnClickListener {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
@@ -60,10 +72,24 @@ class MainActivity : Activity() {
         campo(R.id.status, TextView::class.java).text =
             if (ativo) "✅ Leitura ativa" else "❌ Leitura desligada: toque em \"Ativar leitura\""
         campo(R.id.textoDiagnostico, TextView::class.java).text = diagnostico()
+        campo(R.id.gastosHoje, TextView::class.java).text = resumoGastos()
+        Notificacao.atualizar(this)
 
         val versao = campo(R.id.versao, TextView::class.java)
         versao.text = "Versão ${Atualizador.versaoAtual}"
         Atualizador.verificar(this, perguntar = true) { runOnUiThread { versao.text = it } }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        Notificacao.atualizar(this)
+    }
+
+    private fun resumoGastos(): String {
+        val gastos = Gastos.todos(this)
+        val hoje = "Hoje: R$ ${Popup.br(Gastos.totalDoDia(gastos, LocalDate.now()))} em gastos"
+        val c = Gastos.consumo(gastos) ?: return hoje
+        return hoje + "\nÚltimo consumo: ${String.format(Locale("pt", "BR"), "%.1f", c.kmPorLitro)} km/${c.unidade.lowercase()} · R$ ${Popup.br(c.custoKm)}/km"
     }
 
     private fun diagnostico(): String {
