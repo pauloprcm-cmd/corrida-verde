@@ -9,7 +9,7 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import java.time.LocalDate
 
-/** Notificação fixa enquanto a leitura está ligada, com o saldo do dia e o botão "Registrar gasto". */
+/** Notificação fixa enquanto a leitura está ligada, com o saldo do dia e os botões "Registrar gasto" e "Gravar corrida". */
 object Notificacao {
     private const val CANAL = "gastos"
     private const val ID = 1
@@ -27,7 +27,7 @@ object Notificacao {
         val registrar = PendingIntent.getActivity(
             ctx, 1, Intent(ctx, GastoActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), flags,
         )
-        val n = Notification.Builder(ctx, CANAL)
+        val b = Notification.Builder(ctx, CANAL)
             .setSmallIcon(R.drawable.ic_microfone)
             .setContentTitle("Leitor de ofertas ligado")
             .setContentText("Hoje: ganhos R$ ${Popup.br(ganhos)} · gastos R$ ${Popup.br(gastos)} · sobra R$ ${Popup.br(ganhos - gastos)}")
@@ -35,8 +35,13 @@ object Notificacao {
             .setShowWhen(false)
             .setContentIntent(abrirApp)
             .addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_microfone), "Registrar gasto", registrar).build())
-            .build()
-        runCatching { nm.notify(ID, n) }
+        if (Config.carregar(ctx).gravar && !GravacaoService.gravando) {
+            val gravar = PendingIntent.getActivity(
+                ctx, 2, Intent(ctx, GravarActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), flags,
+            )
+            b.addAction(Notification.Action.Builder(null, "Gravar corrida", gravar).build())
+        }
+        runCatching { nm.notify(ID, b.build()) }
     }
 
     fun remover(ctx: Context) {

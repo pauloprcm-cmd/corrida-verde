@@ -38,8 +38,11 @@ class LeitorService : AccessibilityService() {
     private var ultimoDiagnostico = ""
     private var ultimoStatus = 0L
     private var eventosDaUber = 0
+    private var eventosDa99 = 0
     private val ultimosEventos = ArrayDeque<String>()
     private val historicoJanelas = ArrayDeque<String>()
+    /** Cada tela diferente e a hora em que apareceu pela primeira vez, para achar o início e o fim da corrida. */
+    private val telas = LinkedHashMap<String, String>()
     private var ultimoVoiceAccess = "nenhum toque ainda"
     private var ultimaSessao: Sessao? = null
     private var chave99: String? = null
@@ -114,12 +117,24 @@ class LeitorService : AccessibilityService() {
 
     /** Na 99 não tem popup: só liga o Voice Access, uma vez por oferta, se o motorista pediu. */
     private fun lerOferta99(e: AccessibilityEvent) {
-        val textos = e.text.mapNotNull { it?.toString() }
+        val textos = mutableListOf<String>()
+        e.text.mapNotNullTo(textos) { it?.toString()?.takeIf { t -> t.isNotBlank() } }
+        e.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let { textos += it }
         val fonte = e.source
+        val tipo = e.eventType
+        val classe = e.className?.toString()
         fundo.post {
             runCatching {
-                if (!Config.carregar(this).voiceAccess) return@runCatching
-                val chave = LeitorOferta.ler(textos + (fonte?.let { textosDo(it) } ?: emptyList()))?.chave ?: return@runCatching
+                eventosDa99++
+                val todos = textos + (fonte?.let { textosDo(it) } ?: emptyList())
+                val oferta = LeitorOferta.ler(todos)
+                val cfg = Config.carregar(this)
+                if (cfg.diagnostico) salvarDiagnostico("99", todos, oferta, tipo, classe)
+                val chave = oferta?.chave ?: return@runCatching
+                if (!cfg.voiceAccess) {
+                    ultimoVoiceAccess = "${LocalTime.now().withNano(0)} oferta da 99 lida, mas o Voice Access está desligado no Corrida Verde"
+                    return@runCatching
+                }
                 val agora = System.currentTimeMillis()
                 if (chave == chave99 && agora - hora99 < 60_000) return@runCatching
                 chave99 = chave
@@ -141,7 +156,7 @@ class LeitorService : AccessibilityService() {
         }
         if (textos.any { "Resumo da sessão" in it || "Viagens concluídas" in it }) lerResumoDaSessao(textos)
         val cfg = Config.carregar(this)
-        if (cfg.diagnostico) salvarDiagnostico(textos, oferta, tipo, classe)
+        if (cfg.diagnostico) salvarDiagnostico("Uber", textos, oferta, tipo, classe)
     }
 
     /** Ao ficar offline, a Uber mostra o ganho da sessão: guarda para somar o dia. */
@@ -213,18 +228,27 @@ class LeitorService : AccessibilityService() {
         for (i in 0 until n.childCount) n.getChild(i)?.let { coletar(it, textos, visitados) }
     }
 
-    private fun salvarDiagnostico(textos: List<String>, oferta: Oferta?, tipo: Int, classe: String?) {
+    private fun salvarDiagnostico(app: String, textos: List<String>, oferta: Oferta?, tipo: Int, classe: String?) {
         if (textos.isNotEmpty() || tipo == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val nome = AccessibilityEvent.eventTypeToString(tipo).removePrefix("TYPE_")
-            ultimosEventos.addLast("${LocalTime.now().withNano(0)} $nome ${classe?.substringAfterLast('.')} ${textos.take(4).joinToString(" | ").take(120)}")
+            ultimosEventos.addLast("${LocalTime.now().withNano(0)} $app $nome ${classe?.substringAfterLast('.')} ${textos.take(4).joinToString(" | ").take(120)}")
             while (ultimosEventos.size > 40) ultimosEventos.removeFirst()
+        }
+        if (textos.isNotEmpty()) {
+            val tela = "$app ${textos.take(6).joinToString(" | ").take(160)}"
+            // Números (hora, distância, minutos) mudam o tempo todo: não contam como tela nova.
+            val chave = tela.replace(Regex("\\d+"), "#")
+            if (chave !in telas) {
+                telas[chave] = "${LocalTime.now().withNano(0)} $tela"
+                if (telas.size > 80) telas.remove(telas.keys.first())
+            }
         }
         salvarStatus()
         if (textos.none { it.contains("R$") }) return
         val texto = buildString {
             appendLine("Leitura de ${LocalDateTime.now().withNano(0)}")
             appendLine(if (oferta != null) "Oferta reconhecida: $oferta" else "Oferta NÃO reconhecida")
-            appendLine("--- textos do evento da Uber ---")
+            appendLine("--- textos do evento da $app ---")
             textos.forEach { appendLine(it) }
         }
         if (texto == ultimoDiagnostico) return
@@ -232,7 +256,7 @@ class LeitorService : AccessibilityService() {
         File(filesDir, ARQUIVO_DIAGNOSTICO).writeText(texto)
     }
 
-    /** Janelas na tela e últimos eventos da Uber. Lê a tela inteira, então só a cada 5 s. */
+    /** Janelas na tela e últimos eventos da Uber e da 99. Lê a tela inteira, então só a cada 5 s. */
     private fun salvarStatus() {
         val agora = System.currentTimeMillis()
         if (agora - ultimoStatus < 5_000) return
@@ -248,12 +272,15 @@ class LeitorService : AccessibilityService() {
         }
         val texto = buildString {
             appendLine("Estado de ${LocalDateTime.now().withNano(0)} · versão ${Atualizador.versaoAtual} · Android ${Build.VERSION.SDK_INT}")
-            appendLine("Eventos da Uber recebidos: $eventosDaUber")
+            appendLine("Eventos recebidos: Uber $eventosDaUber · 99 $eventosDa99")
             appendLine("Voice Access: $ultimoVoiceAccess")
+            appendLine("Gravação: ${GravacaoService.situacao}")
             appendLine("--- janelas (cada vez que mudaram) ---")
             historicoJanelas.forEach { appendLine(it) }
-            appendLine("--- últimos eventos da Uber com texto ---")
+            appendLine("--- últimos eventos com texto ---")
             ultimosEventos.forEach { appendLine(it) }
+            appendLine("--- telas diferentes (primeira vez de cada) ---")
+            telas.values.forEach { appendLine(it) }
         }
         File(filesDir, ARQUIVO_STATUS).writeText(texto)
     }

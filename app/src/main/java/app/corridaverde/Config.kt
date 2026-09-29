@@ -12,6 +12,7 @@ data class Config(
     val posicaoY: Int = 60,
     val diagnostico: Boolean = false,
     val voiceAccess: Boolean = false,
+    val gravar: Boolean = false,
 ) {
     fun salvar(ctx: Context) {
         ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE).edit()
@@ -24,6 +25,7 @@ data class Config(
             .putInt("posicaoY", posicaoY)
             .putBoolean("diagnostico", diagnostico)
             .putBoolean("voiceAccess", voiceAccess)
+            .putBoolean("gravar", gravar)
             .apply()
     }
 
@@ -43,6 +45,7 @@ data class Config(
                 posicaoY = p.getInt("posicaoY", d.posicaoY),
                 diagnostico = p.getBoolean("diagnostico", d.diagnostico),
                 voiceAccess = p.getBoolean("voiceAccess", d.voiceAccess),
+                gravar = p.getBoolean("gravar", d.gravar),
             )
         }
     }

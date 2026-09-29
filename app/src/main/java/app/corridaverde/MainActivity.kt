@@ -33,6 +33,7 @@ class MainActivity : Activity() {
         campo(R.id.posicaoY, EditText::class.java).setText(cfg.posicaoY.toString())
         campo(R.id.diagnostico, CheckBox::class.java).isChecked = cfg.diagnostico
         campo(R.id.voiceAccess, CheckBox::class.java).isChecked = cfg.voiceAccess
+        campo(R.id.gravar, CheckBox::class.java).isChecked = cfg.gravar
 
         campo(R.id.ativar, Button::class.java).setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -41,6 +42,9 @@ class MainActivity : Activity() {
             lerCampos()?.let {
                 it.salvar(this)
                 Toast.makeText(this, "Salvo", Toast.LENGTH_SHORT).show()
+                // Pede agora, e não no meio de uma corrida.
+                if (it.gravar && !GravarActivity.permitido(this)) requestPermissions(GravarActivity.PERMISSOES, 2)
+                Notificacao.atualizar(this)
             }
         }
         campo(R.id.testar, Button::class.java).setOnClickListener {
@@ -126,6 +130,7 @@ class MainActivity : Activity() {
             posicaoY = y,
             diagnostico = campo(R.id.diagnostico, CheckBox::class.java).isChecked,
             voiceAccess = campo(R.id.voiceAccess, CheckBox::class.java).isChecked,
+            gravar = campo(R.id.gravar, CheckBox::class.java).isChecked,
         )
     }
 
