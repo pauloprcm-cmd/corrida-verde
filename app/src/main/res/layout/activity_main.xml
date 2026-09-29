@@ -21,7 +21,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Compara a oferta da Uber com o taxímetro de SP. Só lê a tela: nunca toca, nunca aceita nem recusa." />
+            android:text="Compara a oferta da Uber com o taxímetro de SP. Só lê a tela: nunca aceita nem recusa corridas." />
 
         <TextView
             android:id="@+id/status"
@@ -148,6 +148,18 @@
             android:layout_height="wrap_content"
             android:text="Modo diagnóstico (guarda os textos lidos)" />
 
+        <CheckBox
+            android:id="@+id/voiceAccess"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ligar o microfone do Voice Access quando chegar oferta" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="O Corrida Verde só toca no botão azul do Voice Access. Quem toca em Aceitar ou Selecionar é o Voice Access, pelo seu comando de voz."
+            android:textSize="13sp" />
+
         <Button
             android:id="@+id/salvar"
             android:layout_width="match_parent"
@@ -165,13 +177,13 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="Gastos"
+            android:text="Ganhos e gastos"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Com a leitura ligada, desça a barra do topo e toque em Registrar gasto na notificação do Corrida Verde. Ex.: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”."
+            android:text="Os ganhos entram sozinhos: ao ficar offline, a Uber mostra o Resumo da sessão e o app guarda o valor. Para os gastos, com a leitura ligada, desça a barra do topo e toque em Registrar gasto na notificação do Corrida Verde. Ex.: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”."
             android:textSize="13sp" />
 
         <TextView

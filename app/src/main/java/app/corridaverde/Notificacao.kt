@@ -9,7 +9,7 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import java.time.LocalDate
 
-/** Notificação fixa enquanto a leitura está ligada, com o botão "Registrar gasto". */
+/** Notificação fixa enquanto a leitura está ligada, com o saldo do dia e o botão "Registrar gasto". */
 object Notificacao {
     private const val CANAL = "gastos"
     private const val ID = 1
@@ -20,7 +20,8 @@ object Notificacao {
         nm.createNotificationChannel(NotificationChannel(CANAL, "Registro de gastos", NotificationManager.IMPORTANCE_LOW).apply {
             setShowBadge(false)
         })
-        val hoje = Gastos.totalDoDia(Gastos.todos(ctx), LocalDate.now())
+        val gastos = Gastos.totalDoDia(Gastos.todos(ctx), LocalDate.now())
+        val ganhos = Sessoes.totalDoDia(Sessoes.todas(ctx), LocalDate.now())
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         val abrirApp = PendingIntent.getActivity(ctx, 0, Intent(ctx, MainActivity::class.java), flags)
         val registrar = PendingIntent.getActivity(
@@ -29,7 +30,7 @@ object Notificacao {
         val n = Notification.Builder(ctx, CANAL)
             .setSmallIcon(R.drawable.ic_microfone)
             .setContentTitle("Leitor de ofertas ligado")
-            .setContentText("Hoje: R$ ${Popup.br(hoje)} em gastos")
+            .setContentText("Hoje: ganhos R$ ${Popup.br(ganhos)} · gastos R$ ${Popup.br(gastos)} · sobra R$ ${Popup.br(ganhos - gastos)}")
             .setOngoing(true)
             .setShowWhen(false)
             .setContentIntent(abrirApp)

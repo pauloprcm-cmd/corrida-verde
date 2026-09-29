@@ -32,6 +32,7 @@ class MainActivity : Activity() {
         campo(R.id.viagemLonga, EditText::class.java).setText(cfg.viagemLongaKm.toString().replace('.', ','))
         campo(R.id.posicaoY, EditText::class.java).setText(cfg.posicaoY.toString())
         campo(R.id.diagnostico, CheckBox::class.java).isChecked = cfg.diagnostico
+        campo(R.id.voiceAccess, CheckBox::class.java).isChecked = cfg.voiceAccess
 
         campo(R.id.ativar, Button::class.java).setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -87,7 +88,11 @@ class MainActivity : Activity() {
 
     private fun resumoGastos(): String {
         val gastos = Gastos.todos(this)
-        val hoje = "Hoje: R$ ${Popup.br(Gastos.totalDoDia(gastos, LocalDate.now()))} em gastos"
+        val sessoes = Sessoes.todas(this).filter { it.inicio.toLocalDate() == LocalDate.now() }
+        val ganhos = sessoes.sumOf { it.valor }
+        val gasto = Gastos.totalDoDia(gastos, LocalDate.now())
+        val hoje = "Hoje: ganhos R$ ${Popup.br(ganhos)} (${sessoes.size} sessões) − gastos R$ ${Popup.br(gasto)}" +
+            " = R$ ${Popup.br(ganhos - gasto)}"
         val c = Gastos.consumo(gastos) ?: return hoje
         return hoje + "\nÚltimo consumo: ${String.format(Locale("pt", "BR"), "%.1f", c.kmPorLitro)} km/${c.unidade.lowercase()} · R$ ${Popup.br(c.custoKm)}/km"
     }
@@ -120,6 +125,7 @@ class MainActivity : Activity() {
             viagemLongaKm = viagem,
             posicaoY = y,
             diagnostico = campo(R.id.diagnostico, CheckBox::class.java).isChecked,
+            voiceAccess = campo(R.id.voiceAccess, CheckBox::class.java).isChecked,
         )
     }
 

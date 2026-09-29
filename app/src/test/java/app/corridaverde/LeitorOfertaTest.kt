@@ -139,4 +139,13 @@ class LeitorOfertaTest {
         assertEquals(12, Atualizador.numeroDaTag("""{"url":"x","tag_name": "v1.12","name":"Corrida Verde 1.12"}"""))
         assertNull(Atualizador.numeroDaTag("""{"message":"Not Found"}"""))
     }
+
+    @Test
+    fun leOfertaDa99() {
+        val o = LeitorOferta.ler(listOf("Táxi", "R\$13,01", "1,0x", "4,97", "125 corridas", "Perfil Premium",
+            "5 min (705 m)", "Rua Dr. Araújo Castro, 194, Jardim Peri", "4 min (1,1 km)", "Rua Várzea Grande, 153, Jardim Peri"))!!
+        assertEquals(13.01, o.valor, 0.001)
+        assertEquals(0.705, o.buscaKm, 0.001)
+        assertEquals(1.1, o.viagemKm, 0.001)
+    }
 }
