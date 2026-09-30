@@ -1,6 +1,8 @@
 package app.corridaverde
 
 import android.accessibilityservice.AccessibilityService
+import android.app.Notification
+import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
@@ -56,6 +58,14 @@ class LeitorService : AccessibilityService() {
     private val eventosDosNavegadores = ConcurrentHashMap<String, Int>()
     /** Textos que falam de radar ou limite, para descobrir o que cada navegador mostra. */
     private val textosDeRadar = ConcurrentLinkedDeque<String>()
+    /** Notificações da 99 e da Uber: a oferta da 99 pode vir por elas. */
+    private val notificacoes = ArrayDeque<String>()
+    /**
+     * Estrutura das janelas da 99 (tipo, id e texto de cada nó, inclusive os invisíveis), uma por
+     * formato de tela: o cartão da oferta da 99 chega sem texto e é aqui que se procura o valor.
+     */
+    private val estruturas99 = LinkedHashMap<String, String>()
+    private var ultimaEstrutura99 = 0L
 
     /** Confere se a oferta ainda está na tela; se sumiu, esconde o popup. */
     private val conferir = object : Runnable {
@@ -117,6 +127,7 @@ class LeitorService : AccessibilityService() {
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         val app = e.packageName?.toString() ?: return
+        if (e.eventType == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) return notificacao(app, e)
         agendarRadar(app)
         if (app in NAVEGADORES) return
         if (app == NOVENTA_E_NOVE) return lerOferta99(e)
@@ -191,9 +202,73 @@ class LeitorService : AccessibilityService() {
                 val oferta = LeitorOferta.ler(todos)
                 acompanhar(corrida99, oferta, todos)
                 val cfg = Config.carregar(this)
-                if (cfg.diagnostico) salvarDiagnostico("99", todos, oferta, tipo, classe)
+                if (cfg.diagnostico) {
+                    guardarEstrutura99()
+                    salvarDiagnostico("99", todos, oferta, tipo, classe)
+                }
             }
         }
+    }
+
+    /** Guarda o título e o texto da notificação; se for oferta da 99, ela entra na soma. */
+    private fun notificacao(app: String, e: AccessibilityEvent) {
+        if (app != UBER && app != NOVENTA_E_NOVE) return
+        val textos = mutableListOf<String>()
+        e.text.mapNotNullTo(textos) { it?.toString()?.takeIf { t -> t.isNotBlank() } }
+        (e.parcelableData as? Notification)?.extras?.let { x ->
+            listOf(Notification.EXTRA_TITLE, Notification.EXTRA_TEXT, Notification.EXTRA_SUB_TEXT, Notification.EXTRA_BIG_TEXT, Notification.EXTRA_INFO_TEXT)
+                .mapNotNullTo(textos) { k -> x.getCharSequence(k)?.toString()?.takeIf { it.isNotBlank() } }
+            x.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.mapNotNullTo(textos) { it?.toString() }
+        }
+        fundo.post {
+            runCatching {
+                val unicos = textos.distinct()
+                val oferta = LeitorOferta.ler(unicos)
+                if (app == NOVENTA_E_NOVE && oferta != null) corrida99.oferta(oferta, LocalDateTime.now())
+                if (!Config.carregar(this).diagnostico) return@runCatching
+                val nome = NOMES[app] ?: app
+                notificacoes.addLast("${LocalTime.now().withNano(0)} $nome ${if (oferta != null) "(oferta) " else ""}${unicos.joinToString(" | ").replace('\n', ' ').take(200)}")
+                while (notificacoes.size > 15) notificacoes.removeFirst()
+            }
+        }
+    }
+
+    /** No máximo a cada 2 s, guarda a estrutura das janelas da 99 se o formato for novo. */
+    private fun guardarEstrutura99() {
+        val agora = System.currentTimeMillis()
+        if (agora - ultimaEstrutura99 < 2_000) return
+        ultimaEstrutura99 = agora
+        windows.forEach { w ->
+            val raiz = w.root?.takeIf { it.packageName?.toString() == NOVENTA_E_NOVE } ?: return@forEach
+            val linhas = mutableListOf<String>()
+            val formato = StringBuilder()
+            estrutura(raiz, linhas, formato, 0, IntArray(1))
+            // O formato é só tipo e id dos nós: a mesma tela com outra rua ou outro valor não conta de novo.
+            val chave = "${w.type} $formato"
+            if (chave in estruturas99) return@forEach
+            estruturas99[chave] = "${LocalTime.now().withNano(0)} janela tipo ${w.type} · ${linhas.size} nós\n" + linhas.joinToString("\n")
+            while (estruturas99.size > 10) estruturas99.remove(estruturas99.keys.first())
+        }
+    }
+
+    private fun estrutura(n: AccessibilityNodeInfo, linhas: MutableList<String>, formato: StringBuilder, nivel: Int, visitados: IntArray) {
+        if (++visitados[0] > LIMITE_NOS_ESTRUTURA) return
+        val classe = n.className?.toString()?.substringAfterLast('.') ?: "?"
+        val id = n.viewIdResourceName?.substringAfter(":id/")
+        formato.append(classe).append(id ?: "").append(';')
+        val r = Rect().also { n.getBoundsInScreen(it) }
+        val partes = listOfNotNull(
+            classe,
+            id?.let { "#$it" },
+            n.text?.toString()?.takeIf { it.isNotBlank() }?.let { "\"${it.replace('\n', ' ').take(50)}\"" },
+            n.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let { "desc=\"${it.take(50)}\"" },
+            n.hintText?.toString()?.takeIf { it.isNotBlank() }?.let { "dica=\"${it.take(30)}\"" },
+            "clicável".takeIf { n.isClickable },
+            "invisível".takeIf { !n.isVisibleToUser },
+            "[${r.left},${r.top} ${r.width()}x${r.height()}]",
+        )
+        linhas += "  ".repeat(minOf(nivel, 10)) + partes.joinToString(" ")
+        for (i in 0 until n.childCount) n.getChild(i)?.let { estrutura(it, linhas, formato, nivel + 1, visitados) }
     }
 
     private fun processar(textosDoEvento: List<String>, fonte: AccessibilityNodeInfo?, tipo: Int, classe: String?) {
@@ -270,7 +345,8 @@ class LeitorService : AccessibilityService() {
             }
         }
         salvarStatus()
-        if (textos.none { it.contains("R$") }) return
+        // Só telas com cara de oferta (valor e tempo ou distância), para a de Missões não apagar a última oferta.
+        if (oferta == null && (textos.none { it.contains("R$") } || textos.none { PARECE_OFERTA.containsMatchIn(it) })) return
         val texto = buildString {
             appendLine("Leitura de ${LocalDateTime.now().withNano(0)}")
             appendLine(if (oferta != null) "Oferta reconhecida: $oferta" else "Oferta NÃO reconhecida")
@@ -287,6 +363,8 @@ class LeitorService : AccessibilityService() {
         val agora = System.currentTimeMillis()
         if (agora - ultimoStatus < 5_000) return
         ultimoStatus = agora
+        // A janela flutuante da 99 pode aparecer sem mandar evento próprio.
+        guardarEstrutura99()
         val janelas = windows.joinToString("\n") { w ->
             val r = w.root
             val n = r?.let { runCatching { textosDo(it) }.getOrNull() } ?: emptyList()
@@ -310,6 +388,10 @@ class LeitorService : AccessibilityService() {
             telas.values.forEach { appendLine(it) }
             appendLine("--- textos sobre radar e limite ---")
             textosDeRadar.forEach { appendLine(it) }
+            appendLine("--- notificações da Uber e da 99 ---")
+            notificacoes.forEach { appendLine(it) }
+            appendLine("--- estrutura das janelas da 99 (cada formato novo) ---")
+            estruturas99.values.forEach { appendLine(it) }
         }
         File(filesDir, ARQUIVO_STATUS).writeText(texto)
     }
@@ -346,6 +428,8 @@ class LeitorService : AccessibilityService() {
         const val ARQUIVO_STATUS = "status.txt"
         private const val LIMITE_NOS = 400
         private const val LIMITE_NOS_RADAR = 1500
+        private const val LIMITE_NOS_ESTRUTURA = 120
+        private val PARECE_OFERTA = Regex("""\d\s*(min|km|m\b)""")
         var instancia: LeitorService? = null
             private set
     }
