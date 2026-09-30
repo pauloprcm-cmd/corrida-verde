@@ -26,6 +26,17 @@ class SessaoTest {
     }
 
     @Test
+    fun leOutraSessaoDoMesmoDia() {
+        val s = LeitorSessao.ler(
+            listOf("Resumo da sessão", "28 de set., 15:16 – 28 de set., 16:00", "R$ 10,18", "Viagens concluídas", "1",
+                "Viagens oferecidas", "1", "Abrir \"Histórico de ganhos\""),
+            agora,
+        )!!
+        assertEquals(LocalDateTime.of(2026, 9, 28, 15, 16), s.inicio)
+        assertEquals(10.18, s.valor, 0.001)
+    }
+
+    @Test
     fun leComMilharETextosJuntos() {
         val s = LeitorSessao.ler(listOf("Resumo da sessão\n27 de set., 20:00 - 28 de set., 03:10\nR$ 1.234,50"), agora)!!
         assertEquals(LocalDateTime.of(2026, 9, 27, 20, 0), s.inicio)

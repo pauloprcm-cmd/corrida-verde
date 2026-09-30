@@ -21,7 +21,7 @@ object Notificacao {
             setShowBadge(false)
         })
         val gastos = Gastos.totalDoDia(Gastos.todos(ctx), LocalDate.now())
-        val ganhos = Sessoes.totalDoDia(Sessoes.todas(ctx), LocalDate.now())
+        val ganhos = Ganhos.doDia(ctx)
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         val abrirApp = PendingIntent.getActivity(ctx, 0, Intent(ctx, MainActivity::class.java), flags)
         val registrar = PendingIntent.getActivity(

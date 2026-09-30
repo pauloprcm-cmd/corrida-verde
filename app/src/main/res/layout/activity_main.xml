@@ -183,7 +183,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Os ganhos entram sozinhos: ao ficar offline, a Uber mostra o Resumo da sessão e o app guarda o valor. Para os gastos, com a leitura ligada, desça a barra do topo e toque em Registrar gasto na notificação do Corrida Verde. Ex.: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”."
+            android:text="Os ganhos entram sozinhos: cada corrida soma o valor da oferta quando o passageiro embarca (Encerrar na Uber, Finalizar corrida na 99). Ao ficar offline, o Resumo da sessão da Uber troca essas corridas pelo valor oficial. Para os gastos, com a leitura ligada, desça a barra do topo e toque em Registrar gasto na notificação do Corrida Verde. Ex.: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”."
             android:textSize="13sp" />
 
         <TextView

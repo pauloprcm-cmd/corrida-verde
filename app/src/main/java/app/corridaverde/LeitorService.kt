@@ -40,6 +40,9 @@ class LeitorService : AccessibilityService() {
     /** Cada tela diferente e a hora em que apareceu pela primeira vez, para achar o início e o fim da corrida. */
     private val telas = LinkedHashMap<String, String>()
     private var ultimaSessao: Sessao? = null
+    private var ultimaCorrida = "nenhuma ainda"
+    private val corridaUber = AcompanhaCorrida("Uber")
+    private val corrida99 = AcompanhaCorrida("99")
 
     /** Confere se a oferta ainda está na tela; se sumiu, esconde o popup. */
     private val conferir = object : Runnable {
@@ -108,7 +111,7 @@ class LeitorService : AccessibilityService() {
         fundo.post { runCatching { processar(textos, fonte, tipo, classe) } }
     }
 
-    /** Na 99 não tem popup: os eventos só entram no diagnóstico. */
+    /** Na 99 não tem popup: os eventos servem para somar as corridas e para o diagnóstico. */
     private fun lerOferta99(e: AccessibilityEvent) {
         val textos = mutableListOf<String>()
         e.text.mapNotNullTo(textos) { it?.toString()?.takeIf { t -> t.isNotBlank() } }
@@ -121,6 +124,7 @@ class LeitorService : AccessibilityService() {
                 eventosDa99++
                 val todos = textos + (fonte?.let { textosDo(it) } ?: emptyList())
                 val oferta = LeitorOferta.ler(todos)
+                acompanhar(corrida99, oferta, todos)
                 val cfg = Config.carregar(this)
                 if (cfg.diagnostico) salvarDiagnostico("99", todos, oferta, tipo, classe)
             }
@@ -137,9 +141,19 @@ class LeitorService : AccessibilityService() {
             fundo.removeCallbacks(conferir)
             fundo.postDelayed(conferir, 400)
         }
-        if (textos.any { "Resumo da sessão" in it || "Viagens concluídas" in it }) lerResumoDaSessao(textos)
+        acompanhar(corridaUber, oferta, textos)
+        if (textos.any { t -> TELA_RESUMO.any { it in t } }) lerResumoDaSessao(textos)
         val cfg = Config.carregar(this)
         if (cfg.diagnostico) salvarDiagnostico("Uber", textos, oferta, tipo, classe)
+    }
+
+    private fun acompanhar(a: AcompanhaCorrida, oferta: Oferta?, textos: List<String>) {
+        val agora = LocalDateTime.now()
+        if (oferta != null) return a.oferta(oferta, agora)
+        val corrida = a.tela(textos, agora) ?: return
+        Corridas.guardar(this, corrida)
+        ultimaCorrida = "${agora.toLocalTime().withNano(0)} ${corrida.app} R$ ${Popup.br(corrida.valor)}"
+        handler.post { Notificacao.atualizar(this) }
     }
 
     /** Ao ficar offline, a Uber mostra o ganho da sessão: guarda para somar o dia. */
@@ -220,6 +234,7 @@ class LeitorService : AccessibilityService() {
         val texto = buildString {
             appendLine("Estado de ${LocalDateTime.now().withNano(0)} · versão ${Atualizador.versaoAtual} · Android ${Build.VERSION.SDK_INT}")
             appendLine("Eventos recebidos: Uber $eventosDaUber · 99 $eventosDa99")
+            appendLine("Última corrida somada: $ultimaCorrida")
             appendLine("Gravação: ${GravacaoService.situacao}")
             appendLine("--- janelas (cada vez que mudaram) ---")
             historicoJanelas.forEach { appendLine(it) }
@@ -243,6 +258,7 @@ class LeitorService : AccessibilityService() {
 
     companion object {
         const val UBER = "com.ubercab.driver"
+        private val TELA_RESUMO = listOf("Resumo da sessão", "Viagens concluídas", "Viagens oferecidas", "Histórico de ganhos")
         const val NOVENTA_E_NOVE = "com.app99.driver"
         const val ARQUIVO_DIAGNOSTICO = "diagnostico.txt"
         const val ARQUIVO_STATUS = "status.txt"

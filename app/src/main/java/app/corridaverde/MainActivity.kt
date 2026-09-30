@@ -91,10 +91,9 @@ class MainActivity : Activity() {
 
     private fun resumoGastos(): String {
         val gastos = Gastos.todos(this)
-        val sessoes = Sessoes.todas(this).filter { it.inicio.toLocalDate() == LocalDate.now() }
-        val ganhos = sessoes.sumOf { it.valor }
+        val ganhos = Ganhos.doDia(this)
         val gasto = Gastos.totalDoDia(gastos, LocalDate.now())
-        val hoje = "Hoje: ganhos R$ ${Popup.br(ganhos)} (${sessoes.size} sessões) − gastos R$ ${Popup.br(gasto)}" +
+        val hoje = "Hoje: ganhos R$ ${Popup.br(ganhos)} (${Ganhos.corridasDoDia(this)} corridas) − gastos R$ ${Popup.br(gasto)}" +
             " = R$ ${Popup.br(ganhos - gasto)}"
         val c = Gastos.consumo(gastos) ?: return hoje
         return hoje + "\nÚltimo consumo: ${String.format(Locale("pt", "BR"), "%.1f", c.kmPorLitro)} km/${c.unidade.lowercase()} · R$ ${Popup.br(c.custoKm)}/km"
