@@ -33,6 +33,8 @@ class MainActivity : Activity() {
         campo(R.id.posicaoY, EditText::class.java).setText(cfg.posicaoY.toString())
         campo(R.id.diagnostico, CheckBox::class.java).isChecked = cfg.diagnostico
         campo(R.id.gravar, CheckBox::class.java).isChecked = cfg.gravar
+        campo(R.id.radar, CheckBox::class.java).isChecked = cfg.radar
+        campo(R.id.radarSom, CheckBox::class.java).isChecked = cfg.radarSom
 
         campo(R.id.ativar, Button::class.java).setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -53,6 +55,15 @@ class MainActivity : Activity() {
                 Toast.makeText(this, "Ative a leitura primeiro", Toast.LENGTH_LONG).show()
             } else {
                 servico.testar()
+            }
+        }
+        campo(R.id.testarRadar, Button::class.java).setOnClickListener {
+            lerCampos()?.salvar(this) ?: return@setOnClickListener
+            val servico = LeitorService.instancia
+            if (servico == null) {
+                Toast.makeText(this, "Ative a leitura primeiro", Toast.LENGTH_LONG).show()
+            } else {
+                servico.testarRadar()
             }
         }
         campo(R.id.registrarGasto, Button::class.java).setOnClickListener {
@@ -128,6 +139,8 @@ class MainActivity : Activity() {
             posicaoY = y,
             diagnostico = campo(R.id.diagnostico, CheckBox::class.java).isChecked,
             gravar = campo(R.id.gravar, CheckBox::class.java).isChecked,
+            radar = campo(R.id.radar, CheckBox::class.java).isChecked,
+            radarSom = campo(R.id.radarSom, CheckBox::class.java).isChecked,
         )
     }
 

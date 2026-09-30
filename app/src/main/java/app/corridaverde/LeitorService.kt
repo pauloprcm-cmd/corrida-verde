@@ -8,11 +8,14 @@ import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedDeque
 import java.time.LocalDateTime
 import java.time.LocalTime
 
 /**
- * Lê a oferta do app de motorista da Uber e mostra o popup.
+ * Lê a oferta do app de motorista da Uber e mostra o popup. Também lê o aviso de
+ * radar do Waze e da 99 e mostra o alerta de radar.
  * Só lê: não toca na tela, não aceita nem recusa corridas.
  *
  * O cartão da oferta não aparece na árvore da janela da Uber: ele só chega pelos
@@ -25,8 +28,12 @@ class LeitorService : AccessibilityService() {
     /** Leitura dos nós, que é lenta (cada nó é uma consulta à Uber), fica fora da tela. */
     private val trabalho = HandlerThread("leitor").apply { start() }
     private val fundo = Handler(trabalho.looper)
+    /** O radar lê a tela inteira do navegador: fica numa linha própria para não atrasar a oferta. */
+    private val trabalhoRadar = HandlerThread("radar").apply { start() }
+    private val fundoRadar = Handler(trabalhoRadar.looper)
 
     private lateinit var popup: Popup
+    private lateinit var radarPopup: RadarPopup
     private var chaveAtual: String? = null
 
     // Só usados na linha de trabalho.
@@ -43,6 +50,12 @@ class LeitorService : AccessibilityService() {
     private var ultimaCorrida = "nenhuma ainda"
     private val corridaUber = AcompanhaCorrida("Uber")
     private val corrida99 = AcompanhaCorrida("99")
+    private val acompanhaRadar = AcompanhaRadar()
+    /** Apps com leitura de radar já marcada: no máximo uma leitura da tela a cada meio segundo. */
+    private val radarAgendado = mutableSetOf<String>()
+    private val eventosDosNavegadores = ConcurrentHashMap<String, Int>()
+    /** Textos que falam de radar ou limite, para descobrir o que cada navegador mostra. */
+    private val textosDeRadar = ConcurrentLinkedDeque<String>()
 
     /** Confere se a oferta ainda está na tela; se sumiu, esconde o popup. */
     private val conferir = object : Runnable {
@@ -73,6 +86,7 @@ class LeitorService : AccessibilityService() {
             handler.postDelayed(this, 60 * 60_000L)
         }
     }
+    private val esconderRadar = Runnable { radarPopup.esconder() }
     private val esconder = Runnable {
         popup.esconder()
         chaveAtual = null
@@ -80,6 +94,7 @@ class LeitorService : AccessibilityService() {
 
     override fun onServiceConnected() {
         popup = Popup(this)
+        radarPopup = RadarPopup(this)
         instancia = this
         handler.postDelayed(buscarAtualizacao, 60_000)
         handler.post(notificar)
@@ -91,14 +106,19 @@ class LeitorService : AccessibilityService() {
         handler.removeCallbacksAndMessages(null)
         fundo.removeCallbacksAndMessages(null)
         trabalho.quitSafely()
+        fundoRadar.removeCallbacksAndMessages(null)
+        trabalhoRadar.quitSafely()
         if (::popup.isInitialized) popup.esconder()
+        if (::radarPopup.isInitialized) radarPopup.esconder()
         super.onDestroy()
     }
 
     override fun onInterrupt() {}
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
-        val app = e.packageName?.toString()
+        val app = e.packageName?.toString() ?: return
+        agendarRadar(app)
+        if (app in NAVEGADORES) return
         if (app == NOVENTA_E_NOVE) return lerOferta99(e)
         if (app != UBER) return
         // O evento é reciclado quando esta função volta: copia o que interessa antes.
@@ -109,6 +129,51 @@ class LeitorService : AccessibilityService() {
         val tipo = e.eventType
         val classe = e.className?.toString()
         fundo.post { runCatching { processar(textos, fonte, tipo, classe) } }
+    }
+
+    private fun agendarRadar(app: String) {
+        fundoRadar.post {
+            eventosDosNavegadores.merge(app, 1) { a, b -> a + b }
+            if (!radarAgendado.add(app)) return@post
+            fundoRadar.postDelayed({
+                radarAgendado.remove(app)
+                runCatching { lerRadar(app) }
+            }, 500)
+        }
+    }
+
+    /**
+     * Lê a tela inteira do navegador atrás do aviso de radar. Enquanto ele aparece, o alerta
+     * fica na tela; 4 s depois de sumir (radar passou), o alerta some também.
+     */
+    private fun lerRadar(app: String) {
+        val cfg = Config.carregar(this)
+        if (!cfg.radar && !cfg.diagnostico) return
+        // Na navegação da Uber o radar é só desenho no mapa: só lê para o diagnóstico.
+        if (app == UBER && !cfg.diagnostico) return
+        val tela = windows.firstNotNullOfOrNull { w -> w.root?.takeIf { it.packageName?.toString() == app } } ?: return
+        val textos = textosDo(tela, LIMITE_NOS_RADAR)
+        if (cfg.diagnostico) guardarTextosDeRadar(app, textos)
+        if (!cfg.radar) return
+        val radar = LeitorRadar.ler(textos) ?: return
+        val novo = acompanhaRadar.visto(radar, System.currentTimeMillis())
+        handler.post {
+            radarPopup.mostrar(radar, novo)
+            if (novo && cfg.radarSom) RadarPopup.tocar()
+            handler.removeCallbacks(esconderRadar)
+            handler.postDelayed(esconderRadar, 4_000)
+        }
+    }
+
+    private fun guardarTextosDeRadar(app: String, textos: List<String>) {
+        val nome = NOMES[app] ?: app
+        textos.filter { t -> PALAVRAS_DE_RADAR.any { t.contains(it, ignoreCase = true) } }.forEach { t ->
+            val linha = "$nome: ${t.replace('\n', ' ').take(120)}"
+            if (textosDeRadar.none { it.substringAfter(' ') == linha }) {
+                textosDeRadar.addLast("${LocalTime.now().withNano(0)} $linha")
+                while (textosDeRadar.size > 20) textosDeRadar.pollFirst()
+            }
+        }
     }
 
     /** Na 99 não tem popup: os eventos servem para somar as corridas e para o diagnóstico. */
@@ -175,18 +240,18 @@ class LeitorService : AccessibilityService() {
         }
     }
 
-    private fun textosDo(no: AccessibilityNodeInfo): List<String> {
+    private fun textosDo(no: AccessibilityNodeInfo, limite: Int = LIMITE_NOS): List<String> {
         val textos = mutableListOf<String>()
-        coletar(no, textos, IntArray(1))
+        coletar(no, textos, IntArray(1), limite)
         return textos
     }
 
     /** Lê no máximo [LIMITE_NOS] nós: um evento do mapa pode vir com a tela inteira. */
-    private fun coletar(n: AccessibilityNodeInfo, textos: MutableList<String>, visitados: IntArray) {
-        if (!n.isVisibleToUser || ++visitados[0] > LIMITE_NOS) return
+    private fun coletar(n: AccessibilityNodeInfo, textos: MutableList<String>, visitados: IntArray, limite: Int) {
+        if (!n.isVisibleToUser || ++visitados[0] > limite) return
         n.text?.toString()?.takeIf { it.isNotBlank() }?.let { textos += it }
         n.contentDescription?.toString()?.takeIf { it.isNotBlank() && it != n.text?.toString() }?.let { textos += it }
-        for (i in 0 until n.childCount) n.getChild(i)?.let { coletar(it, textos, visitados) }
+        for (i in 0 until n.childCount) n.getChild(i)?.let { coletar(it, textos, visitados, limite) }
     }
 
     private fun salvarDiagnostico(app: String, textos: List<String>, oferta: Oferta?, tipo: Int, classe: String?) {
@@ -233,7 +298,8 @@ class LeitorService : AccessibilityService() {
         }
         val texto = buildString {
             appendLine("Estado de ${LocalDateTime.now().withNano(0)} · versão ${Atualizador.versaoAtual} · Android ${Build.VERSION.SDK_INT}")
-            appendLine("Eventos recebidos: Uber $eventosDaUber · 99 $eventosDa99")
+            appendLine("Eventos recebidos: Uber $eventosDaUber · 99 $eventosDa99 · " +
+                NAVEGADORES.joinToString(" · ") { "${NOMES[it]} ${eventosDosNavegadores[it] ?: 0}" })
             appendLine("Última corrida somada: $ultimaCorrida")
             appendLine("Gravação: ${GravacaoService.situacao}")
             appendLine("--- janelas (cada vez que mudaram) ---")
@@ -242,6 +308,8 @@ class LeitorService : AccessibilityService() {
             ultimosEventos.forEach { appendLine(it) }
             appendLine("--- telas diferentes (primeira vez de cada) ---")
             telas.values.forEach { appendLine(it) }
+            appendLine("--- textos sobre radar e limite ---")
+            textosDeRadar.forEach { appendLine(it) }
         }
         File(filesDir, ARQUIVO_STATUS).writeText(texto)
     }
@@ -256,13 +324,28 @@ class LeitorService : AccessibilityService() {
         handler.postDelayed(esconder, 5_000)
     }
 
+    /** Mostra um alerta de radar de exemplo, com o som. */
+    fun testarRadar() {
+        val cfg = Config.carregar(this)
+        radarPopup.mostrar(Radar(210, 60, "velocidade"), novo = true)
+        if (cfg.radarSom) RadarPopup.tocar()
+        handler.removeCallbacks(esconderRadar)
+        handler.postDelayed(esconderRadar, 5_000)
+    }
+
     companion object {
         const val UBER = "com.ubercab.driver"
+        const val WAZE = "com.waze"
+        const val MAPS = "com.google.android.apps.maps"
+        private val NAVEGADORES = listOf(WAZE, MAPS)
+        private val NOMES = mapOf(UBER to "Uber", "com.app99.driver" to "99", WAZE to "Waze", MAPS to "Maps")
+        private val PALAVRAS_DE_RADAR = listOf("radar", "câmera", "camera", "fiscaliza", "limite", "velocidade")
         private val TELA_RESUMO = listOf("Resumo da sessão", "Viagens concluídas", "Viagens oferecidas", "Histórico de ganhos")
         const val NOVENTA_E_NOVE = "com.app99.driver"
         const val ARQUIVO_DIAGNOSTICO = "diagnostico.txt"
         const val ARQUIVO_STATUS = "status.txt"
         private const val LIMITE_NOS = 400
+        private const val LIMITE_NOS_RADAR = 1500
         var instancia: LeitorService? = null
             private set
     }

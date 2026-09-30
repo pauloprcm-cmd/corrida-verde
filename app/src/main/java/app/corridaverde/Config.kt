@@ -12,6 +12,8 @@ data class Config(
     val posicaoY: Int = 60,
     val diagnostico: Boolean = false,
     val gravar: Boolean = false,
+    val radar: Boolean = true,
+    val radarSom: Boolean = true,
 ) {
     fun salvar(ctx: Context) {
         ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE).edit()
@@ -24,6 +26,8 @@ data class Config(
             .putInt("posicaoY", posicaoY)
             .putBoolean("diagnostico", diagnostico)
             .putBoolean("gravar", gravar)
+            .putBoolean("radar", radar)
+            .putBoolean("radarSom", radarSom)
             .apply()
     }
 
@@ -43,6 +47,8 @@ data class Config(
                 posicaoY = p.getInt("posicaoY", d.posicaoY),
                 diagnostico = p.getBoolean("diagnostico", d.diagnostico),
                 gravar = p.getBoolean("gravar", d.gravar),
+                radar = p.getBoolean("radar", d.radar),
+                radarSom = p.getBoolean("radarSom", d.radarSom),
             )
         }
     }

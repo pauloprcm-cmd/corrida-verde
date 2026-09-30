@@ -177,6 +177,37 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
+            android:text="Alerta de radar"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Quando o Waze ou a 99 avisam de um radar, a tela ganha uma borda amarela e aparece a placa do limite com a distância. No Google Maps e na navegação da Uber o radar é só um desenho no mapa, sem texto, e o app ainda não consegue ler."
+            android:textSize="13sp" />
+
+        <CheckBox
+            android:id="@+id/radar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mostrar alerta de radar" />
+
+        <CheckBox
+            android:id="@+id/radarSom"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tocar som baixo (três batidinhas) no radar novo" />
+
+        <Button
+            android:id="@+id/testarRadar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Testar alerta de radar" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
             android:text="Ganhos e gastos"
             android:textStyle="bold" />
 
