@@ -268,5 +268,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Enviar diagnóstico" />
+
+        <Button
+            android:id="@+id/limparDiagnostico"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Limpar diagnóstico" />
     </LinearLayout>
 </ScrollView>

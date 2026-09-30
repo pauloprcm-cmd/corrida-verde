@@ -82,6 +82,16 @@ class MainActivity : Activity() {
                 putExtra(Intent.EXTRA_TEXT, diagnostico())
             }, "Enviar diagnóstico"))
         }
+        campo(R.id.limparDiagnostico, Button::class.java).setOnClickListener {
+            AlertDialog.Builder(this)
+                .setMessage("Apagar tudo o que o diagnóstico juntou até agora?")
+                .setPositiveButton("Limpar") { _, _ ->
+                    LeitorService.instancia?.limparDiagnostico() ?: LeitorService.apagarArquivosDoDiagnostico(this)
+                    campo(R.id.textoDiagnostico, TextView::class.java).text = "Diagnóstico limpo."
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        }
     }
 
     /** Passo a passo para ligar a leitura, com atalho para as duas telas do Android que ela usa. */

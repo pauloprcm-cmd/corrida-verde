@@ -66,6 +66,8 @@ class LeitorService : AccessibilityService() {
      */
     private val estruturas99 = LinkedHashMap<String, String>()
     private var ultimaEstrutura99 = 0L
+    /** Cada texto com R$ que a Uber e a 99 mostram, com o texto de antes e o de depois: é daí que sai o ganho do dia. */
+    private val textosComValor = LinkedHashMap<String, String>()
 
     /** Confere se a oferta ainda está na tela; se sumiu, esconde o popup. */
     private val conferir = object : Runnable {
@@ -182,7 +184,7 @@ class LeitorService : AccessibilityService() {
             val linha = "$nome: ${t.replace('\n', ' ').take(120)}"
             if (textosDeRadar.none { it.substringAfter(' ') == linha }) {
                 textosDeRadar.addLast("${LocalTime.now().withNano(0)} $linha")
-                while (textosDeRadar.size > 20) textosDeRadar.pollFirst()
+                while (textosDeRadar.size > 60) textosDeRadar.pollFirst()
             }
         }
     }
@@ -335,6 +337,15 @@ class LeitorService : AccessibilityService() {
             ultimosEventos.addLast("${LocalTime.now().withNano(0)} $app $nome ${classe?.substringAfterLast('.')} ${textos.take(4).joinToString(" | ").take(120)}")
             while (ultimosEventos.size > 40) ultimosEventos.removeFirst()
         }
+        textos.forEachIndexed { i, t ->
+            if ("R$" !in t) return@forEachIndexed
+            val vizinhos = listOfNotNull(textos.getOrNull(i - 1), t, textos.getOrNull(i + 1)).joinToString(" | ").replace('\n', ' ').take(160)
+            val chave = "$app ${vizinhos.replace(Regex("\\d+"), "#")}"
+            if (chave !in textosComValor) {
+                textosComValor[chave] = "${LocalTime.now().withNano(0)} $app $vizinhos"
+                if (textosComValor.size > 40) textosComValor.remove(textosComValor.keys.first())
+            }
+        }
         if (textos.isNotEmpty()) {
             val tela = "$app ${textos.take(6).joinToString(" | ").take(160)}"
             // Números (hora, distância, minutos) mudam o tempo todo: não contam como tela nova.
@@ -388,12 +399,34 @@ class LeitorService : AccessibilityService() {
             telas.values.forEach { appendLine(it) }
             appendLine("--- textos sobre radar e limite ---")
             textosDeRadar.forEach { appendLine(it) }
+            appendLine("--- textos com R$ (com o de antes e o de depois) ---")
+            textosComValor.values.forEach { appendLine(it) }
             appendLine("--- notificações da Uber e da 99 ---")
             notificacoes.forEach { appendLine(it) }
             appendLine("--- estrutura das janelas da 99 (cada formato novo) ---")
             estruturas99.values.forEach { appendLine(it) }
         }
         File(filesDir, ARQUIVO_STATUS).writeText(texto)
+    }
+
+    /** Apaga o que o diagnóstico juntou até agora (os arquivos e as listas na memória). */
+    fun limparDiagnostico() {
+        textosDeRadar.clear()
+        eventosDosNavegadores.clear()
+        fundo.post {
+            eventosDaUber = 0
+            eventosDa99 = 0
+            ultimosEventos.clear()
+            historicoJanelas.clear()
+            telas.clear()
+            notificacoes.clear()
+            estruturas99.clear()
+            textosComValor.clear()
+            ultimoDiagnostico = ""
+            ultimoStatus = 0
+            ultimaEstrutura99 = 0
+            apagarArquivosDoDiagnostico(this)
+        }
     }
 
     /** Mostra um popup de exemplo para conferir a posição. */
@@ -432,5 +465,10 @@ class LeitorService : AccessibilityService() {
         private val PARECE_OFERTA = Regex("""\d\s*(min|km|m\b)""")
         var instancia: LeitorService? = null
             private set
+
+        fun apagarArquivosDoDiagnostico(ctx: android.content.Context) {
+            File(ctx.filesDir, ARQUIVO_STATUS).delete()
+            File(ctx.filesDir, ARQUIVO_DIAGNOSTICO).delete()
+        }
     }
 }
