@@ -2,8 +2,10 @@ package app.corridaverde
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -39,6 +41,7 @@ class MainActivity : Activity() {
         campo(R.id.ativar, Button::class.java).setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
+        campo(R.id.ajudaAtivar, Button::class.java).setOnClickListener { ajudaAtivar() }
         campo(R.id.salvar, Button::class.java).setOnClickListener {
             lerCampos()?.let {
                 it.salvar(this)
@@ -79,6 +82,27 @@ class MainActivity : Activity() {
                 putExtra(Intent.EXTRA_TEXT, diagnostico())
             }, "Enviar diagnóstico"))
         }
+    }
+
+    /** Passo a passo para ligar a leitura, com atalho para as duas telas do Android que ela usa. */
+    private fun ajudaAtivar() {
+        AlertDialog.Builder(this)
+            .setTitle("Como ativar a leitura")
+            .setMessage(
+                "1. Toque em Ativar leitura. Abre a tela Acessibilidade do Android.\n\n" +
+                    "2. Procure Apps instalados (em alguns celulares: Serviços instalados ou Aplicativos baixados).\n\n" +
+                    "3. Toque em Corrida Verde e ligue a chave.\n\n" +
+                    "4. O Android avisa que o app pode ver a tela. Toque em Permitir. O Corrida Verde só lê a oferta e o aviso de radar: não toca em nada.\n\n" +
+                    "5. Volte para este app. No topo deve aparecer ✅ Leitura ativa.\n\n" +
+                    "Apareceu \"Configuração restrita\" e a chave não liga?\n" +
+                    "Isso acontece com apps instalados fora da Play Store. Toque em Liberar configuração abaixo, depois no ⋮ (canto de cima, à direita) e em Permitir configurações restritas. Confirme com o PIN ou a digital e repita os passos de 1 a 4."
+            )
+            .setPositiveButton("Ir para Acessibilidade") { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            .setNeutralButton("Liberar configuração") { _, _ ->
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)))
+            }
+            .setNegativeButton("Fechar", null)
+            .show()
     }
 
     override fun onResume() {

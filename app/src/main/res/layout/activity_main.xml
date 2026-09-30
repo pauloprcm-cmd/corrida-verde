@@ -37,11 +37,29 @@
             android:layout_height="wrap_content"
             android:textSize="13sp" />
 
-        <Button
-            android:id="@+id/ativar"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Ativar leitura (Acessibilidade)" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/ativar"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Ativar leitura (Acessibilidade)" />
+
+            <Button
+                android:id="@+id/ajudaAtivar"
+                android:layout_width="56dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:contentDescription="Como ativar a leitura, passo a passo"
+                android:text="\?"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
