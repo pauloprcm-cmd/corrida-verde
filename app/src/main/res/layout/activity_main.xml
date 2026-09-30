@@ -21,7 +21,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Compara a oferta da Uber com o taxímetro de SP. Só lê a tela: nunca aceita nem recusa corridas." />
+            android:text="Compara a oferta da Uber com o taxímetro de SP. Só lê a tela: nunca toca, nunca aceita nem recusa." />
 
         <TextView
             android:id="@+id/status"
@@ -149,27 +149,15 @@
             android:text="Modo diagnóstico (guarda os textos lidos)" />
 
         <CheckBox
-            android:id="@+id/voiceAccess"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Ligar o microfone do Voice Access quando chegar oferta" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="O Corrida Verde só toca no botão azul do Voice Access. Quem toca em Aceitar ou Selecionar é o Voice Access, pelo seu comando de voz."
-            android:textSize="13sp" />
-
-        <CheckBox
             android:id="@+id/gravar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Gravar as corridas (câmera da frente e microfone)" />
+            android:text="Mostrar o botão Gravar corrida na notificação" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Grava em 480p, uns 300 MB por hora, na pasta Movies/Corrida Verde. Passando de 5 GB, apaga os vídeos mais antigos. Por enquanto, comece e pare pelo botão Gravar corrida da notificação."
+            android:text="Grava em 480p, uns 300 MB por hora, na pasta Movies/Corrida Verde. Passando de 5 GB, apaga os vídeos mais antigos. Nunca começa sozinho: você começa e para pelo botão da notificação. Enquanto grava, a câmera fica ocupada e a gravação da própria Uber pode não funcionar, então use só quando precisar."
             android:textSize="13sp" />
 
         <Button

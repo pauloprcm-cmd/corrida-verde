@@ -11,7 +11,6 @@ data class Config(
     val viagemLongaKm: Double = 25.0,
     val posicaoY: Int = 60,
     val diagnostico: Boolean = false,
-    val voiceAccess: Boolean = false,
     val gravar: Boolean = false,
 ) {
     fun salvar(ctx: Context) {
@@ -24,7 +23,6 @@ data class Config(
             .putFloat("viagemLongaKm", viagemLongaKm.toFloat())
             .putInt("posicaoY", posicaoY)
             .putBoolean("diagnostico", diagnostico)
-            .putBoolean("voiceAccess", voiceAccess)
             .putBoolean("gravar", gravar)
             .apply()
     }
@@ -44,7 +42,6 @@ data class Config(
                 viagemLongaKm = p.getFloat("viagemLongaKm", d.viagemLongaKm.toFloat()).toDouble(),
                 posicaoY = p.getInt("posicaoY", d.posicaoY),
                 diagnostico = p.getBoolean("diagnostico", d.diagnostico),
-                voiceAccess = p.getBoolean("voiceAccess", d.voiceAccess),
                 gravar = p.getBoolean("gravar", d.gravar),
             )
         }

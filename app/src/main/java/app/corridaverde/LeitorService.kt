@@ -1,9 +1,6 @@
 package app.corridaverde
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.GestureDescription
-import android.graphics.Path
-import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
@@ -16,8 +13,7 @@ import java.time.LocalTime
 
 /**
  * Lê a oferta do app de motorista da Uber e mostra o popup.
- * Não aceita nem recusa corridas. O único toque é no botão do Voice Access, se o
- * motorista pedir: quem toca em Aceitar é o Voice Access, pelo comando de voz dele.
+ * Só lê: não toca na tela, não aceita nem recusa corridas.
  *
  * O cartão da oferta não aparece na árvore da janela da Uber: ele só chega pelos
  * eventos (o texto e o nó de origem de cada um). Por isso a oferta é lida no próprio
@@ -43,10 +39,7 @@ class LeitorService : AccessibilityService() {
     private val historicoJanelas = ArrayDeque<String>()
     /** Cada tela diferente e a hora em que apareceu pela primeira vez, para achar o início e o fim da corrida. */
     private val telas = LinkedHashMap<String, String>()
-    private var ultimoVoiceAccess = "nenhum toque ainda"
     private var ultimaSessao: Sessao? = null
-    private var chave99: String? = null
-    private var hora99 = 0L
 
     /** Confere se a oferta ainda está na tela; se sumiu, esconde o popup. */
     private val conferir = object : Runnable {
@@ -115,7 +108,7 @@ class LeitorService : AccessibilityService() {
         fundo.post { runCatching { processar(textos, fonte, tipo, classe) } }
     }
 
-    /** Na 99 não tem popup: só liga o Voice Access, uma vez por oferta, se o motorista pediu. */
+    /** Na 99 não tem popup: os eventos só entram no diagnóstico. */
     private fun lerOferta99(e: AccessibilityEvent) {
         val textos = mutableListOf<String>()
         e.text.mapNotNullTo(textos) { it?.toString()?.takeIf { t -> t.isNotBlank() } }
@@ -130,16 +123,6 @@ class LeitorService : AccessibilityService() {
                 val oferta = LeitorOferta.ler(todos)
                 val cfg = Config.carregar(this)
                 if (cfg.diagnostico) salvarDiagnostico("99", todos, oferta, tipo, classe)
-                val chave = oferta?.chave ?: return@runCatching
-                if (!cfg.voiceAccess) {
-                    ultimoVoiceAccess = "${LocalTime.now().withNano(0)} oferta da 99 lida, mas o Voice Access está desligado no Corrida Verde"
-                    return@runCatching
-                }
-                val agora = System.currentTimeMillis()
-                if (chave == chave99 && agora - hora99 < 60_000) return@runCatching
-                chave99 = chave
-                hora99 = agora
-                ligarVoiceAccess()
             }
         }
     }
@@ -174,44 +157,8 @@ class LeitorService : AccessibilityService() {
             if (oferta.chave != chaveAtual) {
                 chaveAtual = oferta.chave
                 popup.mostrar(Avaliador.avaliar(oferta, cfg), cfg)
-                if (cfg.voiceAccess) fundo.post { runCatching { ligarVoiceAccess() } }
             }
         }
-    }
-
-    /**
-     * Toca no botão flutuante do Voice Access para ele começar a ouvir. Procura a janela
-     * dele entre as da tela; se o botão não aceitar o clique, toca no centro dele.
-     */
-    private fun ligarVoiceAccess() {
-        val janela = windows.firstOrNull { w ->
-            w.root?.packageName?.toString() == VOICE_ACCESS ||
-                w.title?.toString()?.lowercase()?.let { "voice access" in it || "acesso por voz" in it } == true
-        }
-        if (janela == null) {
-            ultimoVoiceAccess = "${LocalTime.now().withNano(0)} botão do Voice Access não encontrado"
-            return
-        }
-        val botao = janela.root?.let { acharClicavel(it) }
-        val descricao = listOfNotNull(botao?.contentDescription, botao?.text).joinToString(" · ")
-        // Se ele já está ouvindo, o toque desligaria o microfone.
-        if (listOf("parar", "pausar", "stop", "pause").any { descricao.lowercase().contains(it) }) {
-            ultimoVoiceAccess = "${LocalTime.now().withNano(0)} já estava ouvindo ($descricao)"
-            return
-        }
-        val clicou = botao?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
-        val area = Rect().also { if (botao != null) botao.getBoundsInScreen(it) else janela.getBoundsInScreen(it) }
-        if (!clicou && !area.isEmpty) {
-            val toque = Path().apply { moveTo(area.exactCenterX(), area.exactCenterY()) }
-            dispatchGesture(GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(toque, 0, 50)).build(), null, null)
-        }
-        ultimoVoiceAccess = "${LocalTime.now().withNano(0)} ${if (clicou) "clique" else "toque em $area"} no botão ($descricao)"
-    }
-
-    private fun acharClicavel(n: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        if (n.isClickable && n.isVisibleToUser) return n
-        for (i in 0 until n.childCount) n.getChild(i)?.let { acharClicavel(it) }?.let { return it }
-        return null
     }
 
     private fun textosDo(no: AccessibilityNodeInfo): List<String> {
@@ -273,7 +220,6 @@ class LeitorService : AccessibilityService() {
         val texto = buildString {
             appendLine("Estado de ${LocalDateTime.now().withNano(0)} · versão ${Atualizador.versaoAtual} · Android ${Build.VERSION.SDK_INT}")
             appendLine("Eventos recebidos: Uber $eventosDaUber · 99 $eventosDa99")
-            appendLine("Voice Access: $ultimoVoiceAccess")
             appendLine("Gravação: ${GravacaoService.situacao}")
             appendLine("--- janelas (cada vez que mudaram) ---")
             historicoJanelas.forEach { appendLine(it) }
@@ -291,7 +237,6 @@ class LeitorService : AccessibilityService() {
         val exemplo = Oferta(valor = 62.10, buscaKm = 1.4, buscaMin = 8, viagemKm = 4.9, viagemMin = 35, nota = 4.95, paradas = 1)
         chaveAtual = "teste"
         popup.mostrar(Avaliador.avaliar(exemplo, cfg), cfg)
-        if (cfg.voiceAccess) fundo.post { runCatching { ligarVoiceAccess() } }
         handler.removeCallbacks(esconder)
         handler.postDelayed(esconder, 5_000)
     }
@@ -299,7 +244,6 @@ class LeitorService : AccessibilityService() {
     companion object {
         const val UBER = "com.ubercab.driver"
         const val NOVENTA_E_NOVE = "com.app99.driver"
-        const val VOICE_ACCESS = "com.google.android.apps.accessibility.voiceaccess"
         const val ARQUIVO_DIAGNOSTICO = "diagnostico.txt"
         const val ARQUIVO_STATUS = "status.txt"
         private const val LIMITE_NOS = 400
