@@ -44,7 +44,8 @@ jobs:
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
+          NOTAS: ${{ github.event.head_commit.message || 'Build manual' }}
         run: |
           gh release create "v1.${{ github.run_number }}" corrida-verde.apk \
             --title "Corrida Verde 1.${{ github.run_number }}" \
-            --notes "${{ github.event.head_commit.message || 'Build manual' }}"
+            --notes "$NOTAS"
