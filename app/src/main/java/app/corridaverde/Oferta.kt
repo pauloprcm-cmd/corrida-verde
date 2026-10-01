@@ -17,7 +17,7 @@ object LeitorOferta {
     private val VALOR = Regex("""R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})""")
     private val POR_UNIDADE = Regex("""^\s*/\s*(km|h|min)""", RegexOption.IGNORE_CASE)
     private val TRECHO = Regex(
-        """((?:\d+\s*h(?:oras?|r)?\s*)?(?:\d+\s*min(?:utos?)?)?)\s*\(\s*(\d+(?:[.,]\d+)?)\s*(km|m)\s*\)""",
+        """((?:\d+\s*h(?:oras?|r)?\s*(?:e\s+)?)?(?:\d+\s*min(?:utos?)?)?)\s*\(\s*(\d+(?:[.,]\d+)?)\s*(km|m)\s*\)""",
         RegexOption.IGNORE_CASE,
     )
     private val HORAS = Regex("""(\d+)\s*h""", RegexOption.IGNORE_CASE)

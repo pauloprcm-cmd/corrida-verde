@@ -61,6 +61,15 @@ class LeitorOfertaTest {
     }
 
     @Test
+    fun leHoraComE() {
+        val o = LeitorOferta.ler(listOf("Black", "R$ 173,39", "R$3,09/km aprox.", "4,79 (840)", "Verificado", "5 min (1.2 km)",
+            "Av Parada Pinto, Cachoeirinha, São Paulo", "1 parada", "1 h e 29 min (54.9 km)", "Rua Imbituba, 66", "Selecionar"))!!
+        assertEquals(173.39, o.valor, 0.001)
+        assertEquals(89, o.viagemMin)
+        assertEquals(54.9, o.viagemKm, 0.001)
+    }
+
+    @Test
     fun leHorasMetrosEParadas() {
         val o = LeitorOferta.ler(listOf("R$ 1.180,00", "3 min (800 m)", "1 h 5 min (45.2 km)", "10 min (3.1 km)"))!!
         assertEquals(1180.0, o.valor, 0.001)

@@ -285,6 +285,7 @@ class LeitorService : AccessibilityService() {
         }
         acompanhar(corridaUber, oferta, textos)
         if (textos.any { t -> TELA_RESUMO.any { it in t } }) lerResumoDaSessao(textos)
+        TotaisUber.ler(textos)?.let { if (TotaisUber.guardar(this, it)) handler.post { Notificacao.atualizar(this) } }
         val cfg = Config.carregar(this)
         if (cfg.diagnostico) salvarDiagnostico("Uber", textos, oferta, tipo, classe)
     }
