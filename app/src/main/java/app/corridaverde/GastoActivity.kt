@@ -82,7 +82,8 @@ class GastoActivity : Activity() {
         val rotuloApp = rotulo("App")
         val app = Spinner(this).apply {
             adapter = ArrayAdapter(this@GastoActivity, android.R.layout.simple_spinner_dropdown_item, apps)
-            setSelection(apps.indexOf(g.app ?: "99"))
+            // Sem o nome do app é passageiro de rua.
+            setSelection(apps.indexOf(g.app ?: "Táxi"))
         }
         caixa.addView(app)
         val rotuloValorGanho = rotulo("Valor (R$)")

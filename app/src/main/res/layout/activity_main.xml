@@ -201,7 +201,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Quando o Waze ou a 99 avisam de um radar, a tela ganha uma borda amarela e aparece a placa do limite com a distância. No Google Maps e na navegação da Uber o radar é só um desenho no mapa, sem texto, e o app ainda não consegue ler."
+            android:text="Quando o Waze, a 99 ou o Google Maps avisam de um radar, a tela ganha uma borda amarela e aparece a placa do limite com a distância. Na navegação da Uber o radar é só um desenho no mapa, sem texto, e o app não consegue ler."
             android:textSize="13sp" />
 
         <CheckBox
@@ -232,7 +232,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Ganhos e gastos entram por voz. Com a leitura ligada, desça a barra do topo e toque em Registrar por voz na notificação do Corrida Verde. Ganhos: “fiz 200 na 99” ou “faturei 240 na Uber” (total do dia), “corrida da Uber 23 e 50” (soma uma corrida). Gastos: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”. Errou? Apague em Lançamentos de hoje."
+            android:text="Ganhos e gastos entram por voz. Com a leitura ligada, desça a barra do topo e toque em Registrar por voz na notificação do Corrida Verde. Ganhos: fale o total que a tela do app mostra, como “ganhei 346 na 99” — ele substitui o que você já tinha falado da 99 hoje. Para somar uma corrida só, diga “corrida”: “corrida da Uber 23 e 50”. Sem dizer o app (passageiro de rua), soma: “ganhei 50”. Táxi e particular também somam. Gastos: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”. Errou? Apague em Lançamentos de hoje."
             android:textSize="13sp" />
 
         <TextView

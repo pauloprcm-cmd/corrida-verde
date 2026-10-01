@@ -27,8 +27,7 @@ object LeitorFala {
     private val GASTO = Regex("""\b(gastei|gasto|paguei|pagar|abasteci|abastecer|comprei|custou|despesa)""")
     private val GANHO = Regex("""\b(ganhei|ganho|ganhos|fatur\w*|recebi|receb\w*|corridas?|viagens?|entrou|lucrei|rendeu|fiz|tirei|bati|fechei|fechou)\b""")
     private val TOTAL = Regex("""\b(total|faturei|faturamento|fechei|fechou|no dia|do dia|dia todo|ate agora|hoje deu)\b""")
-    // "fiz 200 na 99" fala do dia; "fiz uma corrida de 30" fala de uma corrida.
-    private val TOTAL_SEM_CORRIDA = Regex("""\b(fiz|bati|tirei|lucrei|rendeu)\b""")
+    private val SEM_TOTAL_NA_TELA = listOf("Táxi", "Particular")
     private val CORRIDA = Regex("""\b(corridas?|viagens?|entrega)\b""")
     private val REAIS_E_CENTAVOS = Regex("""(\d+)\s*(?:reais\s*)?e\s*(\d{1,2})\s*(?:centavos)?\b""")
     private val NUMERO = Regex("""\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?""")
@@ -41,13 +40,16 @@ object LeitorFala {
         return app(t) != null || GANHO.containsMatchIn(t)
     }
 
-    /** Ex.: "faturei 240 na Uber", "fiz 200 na 99", "corrida da 99, 23 e 50", "ganhei R$ 18,90 no inDrive". */
+    /** Ex.: "faturei 240 na Uber", "ganhei 346 na 99" (total do dia), "corrida da 99, 23 e 50" (soma uma corrida). */
     fun lerGanho(fala: String): Ganho {
         val t = normal(fala)
         val app = app(t)
         // O "99" que é o nome do app não é o valor.
         val semApp = if (app == "99") NOMES.first { it.first == "99" }.second.replace(t) { " ${it.groupValues[1].trim()} app " } else t
-        val total = TOTAL.containsMatchIn(t) || (TOTAL_SEM_CORRIDA.containsMatchIn(t) && !CORRIDA.containsMatchIn(t))
+        // Com o nome do app, o motorista fala o que a tela dele mostra, que já é a soma do dia: "ganhei 146
+        // na 99" de manhã e "ganhei 346 na 99" à tarde dão 346, não 492. Soma quando diz "corrida"/"viagem",
+        // quando não diz o app (passageiro de rua) e no táxi e na particular, que não têm tela com o total.
+        val total = app != null && app !in SEM_TOTAL_NA_TELA && (TOTAL.containsMatchIn(t) || !CORRIDA.containsMatchIn(t))
         return Ganho(app, valor(semApp), total)
     }
 

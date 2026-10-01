@@ -31,6 +31,19 @@ class FalaTest {
     }
 
     @Test
+    fun ganheiNaTelaDoAppEOTotalDoDia() {
+        // De manhã 146, à tarde a tela da 99 mostra 346: o segundo substitui o primeiro.
+        val g = ganho("ganhei 346 na 99")
+        assertEquals("99", g.app)
+        assertEquals(346.0, g.valor!!, 0.001)
+        assertTrue(g.total)
+        assertTrue(ganho("recebi 180 na Uber").total)
+        // Táxi e corrida particular não têm tela com o total: somam.
+        assertFalse(ganho("taxímetro deu 62 reais").total)
+        assertFalse(ganho("particular 80 reais").total)
+    }
+
+    @Test
     fun corridaDa99NaoConfundeONomeComOValor() {
         val g = ganho("corrida da 99 23 e 50")
         assertEquals("99", g.app)
@@ -52,6 +65,14 @@ class FalaTest {
         val semApp = ganho("ganhei 50 reais")
         assertNull(semApp.app)
         assertEquals(50.0, semApp.valor!!, 0.001)
+    }
+
+    @Test
+    fun semONomeDoAppSoma() {
+        // Passageiro de rua: sem app, cada valor dito soma.
+        assertFalse(ganho("ganhei 50 reais").total)
+        assertFalse(ganho("fiz 80").total)
+        assertFalse(ganho("faturei 120").total)
     }
 
     @Test
