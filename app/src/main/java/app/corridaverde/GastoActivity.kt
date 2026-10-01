@@ -13,6 +13,8 @@ import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
@@ -21,8 +23,8 @@ import java.time.LocalDateTime
 import java.util.Locale
 
 /**
- * Aberta pelo botão "Registrar gasto" da notificação: ouve a fala, mostra o que entendeu
- * para o motorista conferir e salva. Depois de um tanque cheio, mostra o consumo.
+ * Aberta pelo botão "Registrar por voz" da notificação: ouve a fala, decide se é gasto ou ganho,
+ * mostra o que entendeu para o motorista conferir e salva. Depois de um tanque cheio, mostra o consumo.
  */
 class GastoActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,12 +36,12 @@ class GastoActivity : Activity() {
         val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pt-BR")
-            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Ex.: abasteci 120 reais de etanol, 22 litros, tanque cheio, km 45.320")
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Ex.: fiz 200 na 99 · corrida da Uber 23 e 50 · abasteci 120 de etanol, tanque cheio")
         try {
             startActivityForResult(i, OUVIR)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, "Este celular não tem reconhecimento de voz. Preencha à mão.", Toast.LENGTH_LONG).show()
-            formulario(Leitura(), null)
+            formulario(null)
         }
     }
 
@@ -51,10 +53,12 @@ class GastoActivity : Activity() {
             finish()
             return
         }
-        formulario(LeitorGasto.ler(fala), fala)
+        formulario(fala)
     }
 
-    private fun formulario(l: Leitura, fala: String?) {
+    private fun formulario(fala: String?) {
+        val l = fala?.let { LeitorGasto.ler(it) } ?: Leitura()
+        val g = fala?.let { LeitorFala.lerGanho(it) } ?: Ganho(null, null, false)
         val tipos = Tipo.entries
         val caixa = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -65,13 +69,38 @@ class GastoActivity : Activity() {
         val decimal = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
 
         if (fala != null) caixa.addView(TextView(this).apply { text = "Você disse: “$fala”"; setTypeface(typeface, android.graphics.Typeface.ITALIC) })
-        rotulo("Tipo")
+        val ehGasto = RadioButton(this).apply { text = "Gasto"; id = View.generateViewId() }
+        val ehGanho = RadioButton(this).apply { text = "Ganho"; id = View.generateViewId() }
+        caixa.addView(RadioGroup(this).apply {
+            orientation = RadioGroup.HORIZONTAL
+            addView(ehGasto)
+            addView(ehGanho)
+        })
+
+        // Ganho: app, valor e se é o total do dia.
+        val apps = (LeitorFala.APPS + listOfNotNull(g.app)).distinct()
+        val rotuloApp = rotulo("App")
+        val app = Spinner(this).apply {
+            adapter = ArrayAdapter(this@GastoActivity, android.R.layout.simple_spinner_dropdown_item, apps)
+            setSelection(apps.indexOf(g.app ?: "99"))
+        }
+        caixa.addView(app)
+        val rotuloValorGanho = rotulo("Valor (R$)")
+        val valorGanho = campo(g.valor?.let { Popup.br(it) } ?: "", decimal)
+        val total = CheckBox(this).apply {
+            text = "É o total do dia deste app (substitui o que já tinha)"
+            isChecked = g.total
+        }
+        caixa.addView(total)
+        val soGanho = listOf(rotuloApp, app, rotuloValorGanho, valorGanho, total)
+
+        val rotuloTipo = rotulo("Tipo")
         val tipo = Spinner(this).apply {
             adapter = ArrayAdapter(this@GastoActivity, android.R.layout.simple_spinner_dropdown_item, tipos.map { it.nome })
             setSelection(tipos.indexOf(l.tipo ?: Tipo.OUTRO))
         }
         caixa.addView(tipo)
-        rotulo("Valor (R$)")
+        val rotuloValor = rotulo("Valor (R$)")
         val valor = campo(l.valor?.let { Popup.br(it) } ?: "", decimal)
 
         val rotuloLitros = rotulo("Quantidade")
@@ -82,17 +111,25 @@ class GastoActivity : Activity() {
         caixa.addView(cheio)
 
         val soCombustivel = listOf(rotuloLitros, litros, rotuloKm, km, cheio)
+        val soGasto = listOf(rotuloTipo, tipo, rotuloValor, valor)
+        fun mostrar() {
+            val gasto = ehGasto.isChecked
+            soGanho.forEach { it.visibility = if (gasto) View.GONE else View.VISIBLE }
+            soGasto.forEach { it.visibility = if (gasto) View.VISIBLE else View.GONE }
+            val t = tipos[tipo.selectedItemPosition]
+            soCombustivel.forEach { it.visibility = if (gasto && t.combustivel) View.VISIBLE else View.GONE }
+            rotuloLitros.text = if (t == Tipo.GNV) "Metros cúbicos (m³)" else "Litros"
+        }
         tipo.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                val t = tipos[pos]
-                soCombustivel.forEach { it.visibility = if (t.combustivel) View.VISIBLE else View.GONE }
-                rotuloLitros.text = if (t == Tipo.GNV) "Metros cúbicos (m³)" else "Litros"
-            }
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) = mostrar()
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
+        if (fala != null && LeitorFala.ehGanho(fala)) ehGanho.isChecked = true else ehGasto.isChecked = true
+        ehGasto.setOnCheckedChangeListener { _, _ -> mostrar() }
+        mostrar()
 
         val dialogo = AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
-            .setTitle("Confere o gasto?")
+            .setTitle("Confere?")
             .setView(ScrollView(this).apply { addView(caixa) })
             .setPositiveButton("Salvar", null)
             .setNeutralButton("Falar de novo") { _, _ -> ouvir() }
@@ -104,13 +141,24 @@ class GastoActivity : Activity() {
                 val s = e.text.toString().trim()
                 return (if (',' in s) s.replace(".", "").replace(',', '.') else s).toDoubleOrNull()
             }
+            if (ehGanho.isChecked) {
+                val v = num(valorGanho)
+                if (v == null || v <= 0) {
+                    valorGanho.error = "Informe o valor"
+                    return@setOnClickListener
+                }
+                dialogo.setOnCancelListener(null)
+                dialogo.dismiss()
+                salvarGanho(apps[app.selectedItemPosition], v, total.isChecked)
+                return@setOnClickListener
+            }
             val t = tipos[tipo.selectedItemPosition]
             val v = num(valor)
             if (v == null || v <= 0) {
                 valor.error = "Informe o valor"
                 return@setOnClickListener
             }
-            val g = Gasto(
+            val gasto = Gasto(
                 quando = LocalDateTime.now().withNano(0),
                 tipo = t,
                 valor = v,
@@ -120,8 +168,17 @@ class GastoActivity : Activity() {
             )
             dialogo.setOnCancelListener(null)
             dialogo.dismiss()
-            salvar(g)
+            salvar(gasto)
         }
+    }
+
+    private fun salvarGanho(app: String, valor: Double, total: Boolean) {
+        val agora = LocalDateTime.now().withNano(0)
+        if (total) Totais.guardar(this, TotalDoDia(agora, valor, app)) else Corridas.guardar(this, Corrida(agora, app, valor))
+        Notificacao.atualizar(this)
+        val doApp = Ganhos.porApp(this)[app] ?: valor
+        Toast.makeText(this, "Ganho salvo: $app R$ ${Popup.br(valor)}. $app hoje: R$ ${Popup.br(doApp)}", Toast.LENGTH_LONG).show()
+        finish()
     }
 
     private fun salvar(g: Gasto) {

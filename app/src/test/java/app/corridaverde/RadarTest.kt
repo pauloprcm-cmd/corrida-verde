@@ -46,4 +46,45 @@ class RadarTest {
         // Mesmo radar, mas o aviso ficou sumido por mais de 15 s.
         assertTrue(a.visto(Radar(650, 60, "velocidade"), 30_000))
     }
+
+    @Test
+    fun mapsIgnoraPuloEContinuaSemAviso() {
+        val e = EstimaRadar()
+        val radar = { m: Int -> Radar(m, null, "velocidade") }
+        assertEquals(550, e.atualizar(radar(550), 44, 0)!!.metros)
+        // 7 s depois o Maps diz 80 m, mas a 44 km/h só deu para andar ~86 m.
+        val pulo = e.atualizar(radar(80), 45, 7_000)!!.metros
+        assertTrue(pulo in 450..480)
+        // O aviso some e o carro para no farol: o alerta fica e a distância não anda.
+        e.atualizar(null, 4, 8_000)
+        val parado = e.atualizar(null, 4, 20_000)!!.metros
+        assertTrue(parado in 430..470)
+        // Volta a andar a 36 km/h (10 m/s): ~45 s depois passou do radar.
+        assertTrue(e.atualizar(null, 36, 21_000) != null)
+        assertTrue(e.atualizar(null, 36, 60_000) != null)
+        assertNull(e.atualizar(null, 36, 70_000))
+    }
+
+    @Test
+    fun mapsAceitaLeituraCoerenteEOutroRadar() {
+        val e = EstimaRadar()
+        e.atualizar(Radar(850, null, "velocidade"), 36, 0)
+        assertEquals(750, e.atualizar(Radar(750, null, "velocidade"), 36, 10_000)!!.metros)
+        // Outro radar bem mais longe que a conta.
+        assertEquals(1500, e.atualizar(Radar(1500, null, "velocidade"), 36, 11_000)!!.metros)
+    }
+
+    @Test
+    fun mapsDesisteSemAvisoPorMuitoTempo() {
+        val e = EstimaRadar()
+        e.atualizar(Radar(500, null, "velocidade"), 0, 0)
+        assertTrue(e.atualizar(null, 0, 80_000) != null)
+        assertNull(e.atualizar(null, 0, 91_000))
+    }
+
+    @Test
+    fun leVelocidadeDoMaps() {
+        assertEquals(44, LeitorVelocidade.ler(listOf("Radar de velocidade em 550 m", "Velocidade atual 44 quilômetros por hora")))
+        assertNull(LeitorVelocidade.ler(listOf("44", "km/h")))
+    }
 }

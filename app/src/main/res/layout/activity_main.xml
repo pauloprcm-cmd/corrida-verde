@@ -232,7 +232,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Os ganhos entram sozinhos: cada corrida soma o valor da oferta quando o passageiro embarca (Encerrar na Uber, Finalizar corrida na 99). Ao ficar offline, o Resumo da sessão da Uber troca essas corridas pelo valor oficial. Para os gastos, com a leitura ligada, desça a barra do topo e toque em Registrar gasto na notificação do Corrida Verde. Ex.: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”."
+            android:text="Ganhos e gastos entram por voz. Com a leitura ligada, desça a barra do topo e toque em Registrar por voz na notificação do Corrida Verde. Ganhos: “fiz 200 na 99” ou “faturei 240 na Uber” (total do dia), “corrida da Uber 23 e 50” (soma uma corrida). Gastos: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”. Errou? Apague em Lançamentos de hoje."
             android:textSize="13sp" />
 
         <TextView
@@ -246,7 +246,13 @@
             android:id="@+id/registrarGasto"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Registrar gasto por voz" />
+            android:text="Registrar ganho ou gasto por voz" />
+
+        <Button
+            android:id="@+id/lancamentos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Lançamentos de hoje" />
 
         <TextView
             android:layout_width="wrap_content"

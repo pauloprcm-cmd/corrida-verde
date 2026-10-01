@@ -72,7 +72,8 @@ class MainActivity : Activity() {
         campo(R.id.registrarGasto, Button::class.java).setOnClickListener {
             startActivity(Intent(this, GastoActivity::class.java))
         }
-        // A notificação com o botão "Registrar gasto" precisa desta permissão no Android 13 ou mais novo.
+        campo(R.id.lancamentos, Button::class.java).setOnClickListener { lancamentos() }
+        // A notificação com o botão "Registrar por voz" precisa desta permissão no Android 13 ou mais novo.
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
@@ -136,12 +137,47 @@ class MainActivity : Activity() {
 
     private fun resumoGastos(): String {
         val gastos = Gastos.todos(this)
-        val ganhos = Ganhos.doDia(this)
+        val porApp = Ganhos.porApp(this)
+        val ganhos = porApp.values.sum()
         val gasto = Gastos.totalDoDia(gastos, LocalDate.now())
-        val hoje = "Hoje: ganhos R$ ${Popup.br(ganhos)} (${Ganhos.corridasDoDia(this)} corridas) − gastos R$ ${Popup.br(gasto)}" +
-            " = R$ ${Popup.br(ganhos - gasto)}"
+        var hoje = "Hoje: ganhos R$ ${Popup.br(ganhos)} − gastos R$ ${Popup.br(gasto)} = R$ ${Popup.br(ganhos - gasto)}"
+        if (porApp.isNotEmpty()) hoje += "\n" + porApp.entries.joinToString(" · ") { "${it.key} R$ ${Popup.br(it.value)}" }
         val c = Gastos.consumo(gastos) ?: return hoje
         return hoje + "\nÚltimo consumo: ${String.format(Locale("pt", "BR"), "%.1f", c.kmPorLitro)} km/${c.unidade.lowercase()} · R$ ${Popup.br(c.custoKm)}/km"
+    }
+
+    /** Os ganhos e gastos lançados hoje; tocar num deles pergunta se quer apagar. */
+    private fun lancamentos() {
+        val hoje = LocalDate.now()
+        fun hora(t: java.time.LocalDateTime) = t.toLocalTime().toString().take(5)
+        val itens = mutableListOf<Pair<String, () -> Unit>>()
+        Totais.todos(this).filter { it.hora.toLocalDate() == hoje }.forEach { t ->
+            itens += "${hora(t.hora)} ${t.app}: total do dia R$ ${Popup.br(t.valor)}" to { Totais.apagar(this, t) }
+        }
+        Corridas.todas(this).filter { it.hora.toLocalDate() == hoje }.forEach { c ->
+            itens += "${hora(c.hora)} ${c.app}: corrida R$ ${Popup.br(c.valor)}" to { Corridas.apagar(this, c) }
+        }
+        Gastos.todos(this).filter { it.quando.toLocalDate() == hoje }.forEach { g ->
+            itens += "${hora(g.quando)} Gasto ${g.tipo.nome}: R$ ${Popup.br(g.valor)}" to { Gastos.apagar(this, g) }
+        }
+        itens.sortBy { it.first }
+        val b = AlertDialog.Builder(this).setTitle("Lançamentos de hoje").setNegativeButton("Fechar", null)
+        if (itens.isEmpty()) {
+            b.setMessage("Nada lançado hoje.").show()
+            return
+        }
+        b.setItems(itens.map { it.first }.toTypedArray()) { _, i ->
+            AlertDialog.Builder(this)
+                .setMessage("Apagar \"${itens[i].first}\"?")
+                .setPositiveButton("Apagar") { _, _ ->
+                    itens[i].second()
+                    campo(R.id.gastosHoje, TextView::class.java).text = resumoGastos()
+                    Notificacao.atualizar(this)
+                    lancamentos()
+                }
+                .setNegativeButton("Cancelar") { _, _ -> lancamentos() }
+                .show()
+        }.show()
     }
 
     private fun diagnostico(): String {

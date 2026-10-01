@@ -27,7 +27,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Aberta pelo botão "Registrar gasto" da notificação, por cima do que estiver na tela. -->
+        <!-- Aberta pelo botão "Registrar por voz" da notificação, por cima do que estiver na tela. -->
         <activity
             android:name=".GastoActivity"
             android:excludeFromRecents="true"

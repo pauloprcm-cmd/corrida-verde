@@ -48,11 +48,8 @@ class LeitorService : AccessibilityService() {
     private val historicoJanelas = ArrayDeque<String>()
     /** Cada tela diferente e a hora em que apareceu pela primeira vez, para achar o início e o fim da corrida. */
     private val telas = LinkedHashMap<String, String>()
-    private var ultimaSessao: Sessao? = null
-    private var ultimaCorrida = "nenhuma ainda"
-    private val corridaUber = AcompanhaCorrida("Uber")
-    private val corrida99 = AcompanhaCorrida("99")
     private val acompanhaRadar = AcompanhaRadar()
+    private val estimaRadarMaps = EstimaRadar()
     /** Apps com leitura de radar já marcada: no máximo uma leitura da tela a cada meio segundo. */
     private val radarAgendado = mutableSetOf<String>()
     private val eventosDosNavegadores = ConcurrentHashMap<String, Int>()
@@ -66,7 +63,7 @@ class LeitorService : AccessibilityService() {
      */
     private val estruturas99 = LinkedHashMap<String, String>()
     private var ultimaEstrutura99 = 0L
-    /** Cada texto com R$ que a Uber e a 99 mostram, com o texto de antes e o de depois: é daí que sai o ganho do dia. */
+    /** Cada texto com R$ que a Uber e a 99 mostram, com o texto de antes e o de depois. */
     private val textosComValor = LinkedHashMap<String, String>()
 
     /** Confere se a oferta ainda está na tela; se sumiu, esconde o popup. */
@@ -147,28 +144,42 @@ class LeitorService : AccessibilityService() {
     private fun agendarRadar(app: String) {
         fundoRadar.post {
             eventosDosNavegadores.merge(app, 1) { a, b -> a + b }
-            if (!radarAgendado.add(app)) return@post
-            fundoRadar.postDelayed({
-                radarAgendado.remove(app)
-                runCatching { lerRadar(app) }
-            }, 500)
+            marcarLeituraDoRadar(app, 500)
         }
+    }
+
+    /** Só na linha do radar. */
+    private fun marcarLeituraDoRadar(app: String, atrasoMs: Long) {
+        if (!radarAgendado.add(app)) return
+        fundoRadar.postDelayed({
+            radarAgendado.remove(app)
+            runCatching { lerRadar(app) }
+        }, atrasoMs)
     }
 
     /**
      * Lê a tela inteira do navegador atrás do aviso de radar. Enquanto ele aparece, o alerta
-     * fica na tela; 4 s depois de sumir (radar passou), o alerta some também.
+     * fica na tela; 4 s depois de sumir (radar passou), o alerta some também. No Maps o aviso
+     * some antes do radar: lá quem decide é a conta do [EstimaRadar].
      */
     private fun lerRadar(app: String) {
         val cfg = Config.carregar(this)
         if (!cfg.radar && !cfg.diagnostico) return
         // Na navegação da Uber o radar é só desenho no mapa: só lê para o diagnóstico.
         if (app == UBER && !cfg.diagnostico) return
-        val tela = windows.firstNotNullOfOrNull { w -> w.root?.takeIf { it.packageName?.toString() == app } } ?: return
-        val textos = textosDo(tela, LIMITE_NOS_RADAR)
+        val tela = windows.firstNotNullOfOrNull { w -> w.root?.takeIf { it.packageName?.toString() == app } }
+        // No Maps o alerta segue pela conta mesmo sem a janela dele (outro app por cima).
+        if (tela == null && app != MAPS) return
+        val textos = tela?.let { textosDo(it, LIMITE_NOS_RADAR) } ?: emptyList()
         if (cfg.diagnostico) guardarTextosDeRadar(app, textos)
         if (!cfg.radar) return
-        val radar = LeitorRadar.ler(textos) ?: return
+        val lido = LeitorRadar.ler(textos)
+        val radar = if (app == MAPS) {
+            estimaRadarMaps.atualizar(lido, LeitorVelocidade.ler(textos), System.currentTimeMillis())
+                // O Maps só manda evento quando a tela muda: enquanto há radar, a conta anda sozinha.
+                ?.also { marcarLeituraDoRadar(app, 1_000) }
+        } else lido
+        if (radar == null) return
         val novo = acompanhaRadar.visto(radar, System.currentTimeMillis())
         handler.post {
             radarPopup.mostrar(radar, novo)
@@ -189,7 +200,7 @@ class LeitorService : AccessibilityService() {
         }
     }
 
-    /** Na 99 não tem popup: os eventos servem para somar as corridas e para o diagnóstico. */
+    /** Na 99 não tem popup: os eventos servem só para o diagnóstico. */
     private fun lerOferta99(e: AccessibilityEvent) {
         val textos = mutableListOf<String>()
         e.text.mapNotNullTo(textos) { it?.toString()?.takeIf { t -> t.isNotBlank() } }
@@ -202,7 +213,6 @@ class LeitorService : AccessibilityService() {
                 eventosDa99++
                 val todos = textos + (fonte?.let { textosDo(it) } ?: emptyList())
                 val oferta = LeitorOferta.ler(todos)
-                acompanhar(corrida99, oferta, todos)
                 val cfg = Config.carregar(this)
                 if (cfg.diagnostico) {
                     guardarEstrutura99()
@@ -212,7 +222,7 @@ class LeitorService : AccessibilityService() {
         }
     }
 
-    /** Guarda o título e o texto da notificação; se for oferta da 99, ela entra na soma. */
+    /** Guarda o título e o texto da notificação da Uber e da 99, para o diagnóstico. */
     private fun notificacao(app: String, e: AccessibilityEvent) {
         if (app != UBER && app != NOVENTA_E_NOVE) return
         val textos = mutableListOf<String>()
@@ -226,7 +236,6 @@ class LeitorService : AccessibilityService() {
             runCatching {
                 val unicos = textos.distinct()
                 val oferta = LeitorOferta.ler(unicos)
-                if (app == NOVENTA_E_NOVE && oferta != null) corrida99.oferta(oferta, LocalDateTime.now())
                 if (!Config.carregar(this).diagnostico) return@runCatching
                 val nome = NOMES[app] ?: app
                 notificacoes.addLast("${LocalTime.now().withNano(0)} $nome ${if (oferta != null) "(oferta) " else ""}${unicos.joinToString(" | ").replace('\n', ' ').take(200)}")
@@ -283,29 +292,8 @@ class LeitorService : AccessibilityService() {
             fundo.removeCallbacks(conferir)
             fundo.postDelayed(conferir, 400)
         }
-        acompanhar(corridaUber, oferta, textos)
-        if (textos.any { t -> TELA_RESUMO.any { it in t } }) lerResumoDaSessao(textos)
-        TotaisUber.ler(textos)?.let { if (TotaisUber.guardar(this, it)) handler.post { Notificacao.atualizar(this) } }
         val cfg = Config.carregar(this)
         if (cfg.diagnostico) salvarDiagnostico("Uber", textos, oferta, tipo, classe)
-    }
-
-    private fun acompanhar(a: AcompanhaCorrida, oferta: Oferta?, textos: List<String>) {
-        val agora = LocalDateTime.now()
-        if (oferta != null) return a.oferta(oferta, agora)
-        val corrida = a.tela(textos, agora) ?: return
-        Corridas.guardar(this, corrida)
-        ultimaCorrida = "${agora.toLocalTime().withNano(0)} ${corrida.app} R$ ${Popup.br(corrida.valor)}"
-        handler.post { Notificacao.atualizar(this) }
-    }
-
-    /** Ao ficar offline, a Uber mostra o ganho da sessão: guarda para somar o dia. */
-    private fun lerResumoDaSessao(textosDoEvento: List<String>) {
-        val tela = windows.firstNotNullOfOrNull { w -> w.root?.takeIf { it.packageName?.toString() == UBER } }
-        val sessao = LeitorSessao.ler(textosDoEvento + (tela?.let { textosDo(it) } ?: emptyList())) ?: return
-        if (sessao == ultimaSessao) return
-        ultimaSessao = sessao
-        if (Sessoes.guardar(this, sessao)) handler.post { Notificacao.atualizar(this) }
     }
 
     private fun mostrar(oferta: Oferta) {
@@ -390,7 +378,6 @@ class LeitorService : AccessibilityService() {
             appendLine("Estado de ${LocalDateTime.now().withNano(0)} · versão ${Atualizador.versaoAtual} · Android ${Build.VERSION.SDK_INT}")
             appendLine("Eventos recebidos: Uber $eventosDaUber · 99 $eventosDa99 · " +
                 NAVEGADORES.joinToString(" · ") { "${NOMES[it]} ${eventosDosNavegadores[it] ?: 0}" })
-            appendLine("Última corrida somada: $ultimaCorrida")
             appendLine("Gravação: ${GravacaoService.situacao}")
             appendLine("--- janelas (cada vez que mudaram) ---")
             historicoJanelas.forEach { appendLine(it) }
@@ -456,7 +443,6 @@ class LeitorService : AccessibilityService() {
         private val NAVEGADORES = listOf(WAZE, MAPS)
         private val NOMES = mapOf(UBER to "Uber", "com.app99.driver" to "99", WAZE to "Waze", MAPS to "Maps")
         private val PALAVRAS_DE_RADAR = listOf("radar", "câmera", "camera", "fiscaliza", "limite", "velocidade")
-        private val TELA_RESUMO = listOf("Resumo da sessão", "Viagens concluídas", "Viagens oferecidas", "Histórico de ganhos")
         const val NOVENTA_E_NOVE = "com.app99.driver"
         const val ARQUIVO_DIAGNOSTICO = "diagnostico.txt"
         const val ARQUIVO_STATUS = "status.txt"

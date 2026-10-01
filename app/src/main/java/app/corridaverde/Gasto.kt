@@ -58,7 +58,7 @@ object LeitorGasto {
     private val ANTES_VALOR = Regex("""r\$\s*$""")
     private val CHEIO = Regex("""tanque cheio|enchi|completei|complet(o|ar)|cheio""")
 
-    private val TIPOS = listOf(
+    val TIPOS = listOf(
         Tipo.GASOLINA to Regex("""gasolina"""),
         Tipo.ETANOL to Regex("""etanol|alcool"""),
         Tipo.DIESEL to Regex("""diesel"""),
@@ -100,11 +100,11 @@ object LeitorGasto {
     }
 
     /** "45.320" é milhar; "120,50" e "5.89" são decimais. */
-    private fun numero(s: String): Double? =
+    fun numero(s: String): Double? =
         if (Regex("""\d{1,3}(\.\d{3})+(,\d+)?""").matches(s)) s.replace(".", "").replace(',', '.').toDoubleOrNull()
         else s.replace(',', '.').toDoubleOrNull()
 
-    private fun semAcento(s: String) =
+    fun semAcento(s: String) =
         Normalizer.normalize(s, Normalizer.Form.NFD).replace(Regex("""\p{Mn}"""), "")
 }
 
@@ -117,6 +117,14 @@ object Gastos {
     }
 
     fun adicionar(ctx: Context, g: Gasto) = File(ctx.filesDir, ARQUIVO).appendText(paraLinha(g) + "\n")
+
+    /** Apaga um gasto (o primeiro igual, se houver dois iguais). */
+    fun apagar(ctx: Context, g: Gasto) {
+        val linhas = File(ctx.filesDir, ARQUIVO).takeIf { it.exists() }?.readLines() ?: return
+        val i = linhas.indexOfFirst { deLinha(it) == g }
+        if (i < 0) return
+        File(ctx.filesDir, ARQUIVO).writeText(linhas.filterIndexed { j, _ -> j != i }.joinToString("") { it + "\n" })
+    }
 
     fun paraLinha(g: Gasto) =
         listOf(g.quando, g.tipo.name, g.valor, g.litros ?: "", g.km ?: "", if (g.tanqueCheio) 1 else 0).joinToString("\t")

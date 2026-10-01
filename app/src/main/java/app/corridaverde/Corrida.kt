@@ -5,56 +5,8 @@ import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-/** Uma corrida feita, com o valor da oferta aceita (a tela do fim da corrida não mostra o valor). */
+/** Um ganho lançado por voz: uma corrida, ou o valor que o motorista quis somar. */
 data class Corrida(val hora: LocalDateTime, val app: String, val valor: Double)
-
-/**
- * Acompanha as telas de um app para saber qual oferta virou corrida.
- *
- * Uber: a oferta vira a corrida da vez quando aparece "Iniciar <categoria>" (chegou no
- * passageiro) e conta quando aparece "Encerrar <categoria>" (passageiro a bordo). Uma
- * oferta que chega no meio da corrida não troca a da vez, porque ela já foi presa no "Iniciar".
- * 99: conta a última oferta quando aparece "Finalizar corrida".
- */
-class AcompanhaCorrida(private val app: String) {
-    private var ultimaOferta: Oferta? = null
-    private var horaOferta: LocalDateTime? = null
-    private var daVez: Oferta? = null
-
-    fun oferta(o: Oferta, agora: LocalDateTime) {
-        ultimaOferta = o
-        horaOferta = agora
-    }
-
-    /** Devolve a corrida quando ela deve entrar na soma, uma vez só. */
-    fun tela(textos: List<String>, agora: LocalDateTime): Corrida? {
-        val linhas = textos.flatMap { it.lines() }.map { it.trim() }
-        if (app == "99") {
-            if (linhas.none { it.equals("Finalizar corrida", ignoreCase = true) }) return null
-            return pegarUltima(agora)?.let { Corrida(agora, app, it.valor) }
-        }
-        if (linhas.any { INICIAR.matches(it) } && daVez == null) daVez = pegarUltima(agora)
-        if (linhas.any { ENCERRAR.matches(it) }) {
-            val o = daVez ?: pegarUltima(agora) ?: return null
-            daVez = null
-            return Corrida(agora, app, o.valor)
-        }
-        return null
-    }
-
-    /** A última oferta, se for recente; ela sai daqui para não ser contada duas vezes. */
-    private fun pegarUltima(agora: LocalDateTime): Oferta? {
-        val o = ultimaOferta ?: return null
-        val h = horaOferta ?: return null
-        ultimaOferta = null
-        return if (h.plusHours(2).isAfter(agora)) o else null
-    }
-
-    companion object {
-        private val INICIAR = Regex("""Iniciar (?!sessão|navega).{2,30}""", RegexOption.IGNORE_CASE)
-        private val ENCERRAR = Regex("""Encerrar (?!sessão|o modo|modo)[^?]{2,30}""", RegexOption.IGNORE_CASE)
-    }
-}
 
 object Corridas {
     private const val ARQUIVO = "corridas.tsv"
@@ -66,6 +18,14 @@ object Corridas {
 
     fun guardar(ctx: Context, c: Corrida) = File(ctx.filesDir, ARQUIVO).appendText(paraLinha(c) + "\n")
 
+    /** Apaga uma corrida (a primeira igual, se houver duas iguais). */
+    fun apagar(ctx: Context, c: Corrida) {
+        val linhas = File(ctx.filesDir, ARQUIVO).takeIf { it.exists() }?.readLines() ?: return
+        val i = linhas.indexOfFirst { deLinha(it) == c }
+        if (i < 0) return
+        File(ctx.filesDir, ARQUIVO).writeText(linhas.filterIndexed { j, _ -> j != i }.joinToString("") { it + "\n" })
+    }
+
     fun paraLinha(c: Corrida) = listOf(c.hora, c.app, c.valor).joinToString("\t")
 
     fun deLinha(l: String): Corrida? = runCatching {
@@ -74,69 +34,44 @@ object Corridas {
     }.getOrNull()
 }
 
-/** O ganho do dia que a Uber mostra no topo da tela inicial ("Página inicial", "R$ 214,45"). */
-data class TotalUber(val hora: LocalDateTime, val valor: Double)
+/** O total de um app no dia, dito por voz ("faturei 240 na Uber", "fiz 200 na 99"). */
+data class TotalDoDia(val hora: LocalDateTime, val valor: Double, val app: String)
 
-object TotaisUber {
-    private const val ARQUIVO = "uber_hoje.tsv"
-    private val VALOR = Regex("""^R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})$""")
+object Totais {
+    private const val ARQUIVO = "totais.tsv"
 
-    /**
-     * O valor vem logo depois de "Página inicial". No Modo de privacidade esse fica escondido,
-     * mas o cartão "HOJE | 8 viagens concluídas | … | VER PROGRESSO | R$ 267,07" ainda mostra.
-     */
-    fun ler(textos: List<String>, agora: LocalDateTime = LocalDateTime.now()): TotalUber? {
-        val linhas = textos.map { it.replace('\u00a0', ' ').trim() }
-        val topo = linhas.indexOfFirst { it.equals("Página inicial", ignoreCase = true) }
-        val hoje = linhas.indexOfFirst { it.equals("HOJE", ignoreCase = true) }
-        val cartao = if (hoje >= 0) linhas.withIndex().indexOfFirst { (i, t) -> i > hoje && t.equals("VER PROGRESSO", ignoreCase = true) } else -1
-        val m = listOf(topo, cartao).filter { it >= 0 }
-            .firstNotNullOfOrNull { i -> linhas.getOrNull(i + 1)?.let { VALOR.find(it) } } ?: return null
-        val valor = m.groupValues[1].replace(".", "").replace(',', '.').toDoubleOrNull() ?: return null
-        return TotalUber(agora, valor)
-    }
-
-    /** Guarda a última leitura de cada dia. Devolve true se o valor do dia mudou. */
-    fun guardar(ctx: Context, t: TotalUber): Boolean {
-        val antes = todos(ctx)
+    /** Guarda o último total de cada app em cada dia. */
+    fun guardar(ctx: Context, t: TotalDoDia) {
         val dia = t.hora.toLocalDate()
-        if (antes.any { it.hora.toLocalDate() == dia && it.valor == t.valor }) return false
-        val lista = antes.filter { it.hora.toLocalDate() != dia && it.hora.toLocalDate().isAfter(dia.minusDays(60)) } + t
-        File(ctx.filesDir, ARQUIVO).writeText(lista.sortedBy { it.hora }.joinToString("") { "${it.hora}\t${it.valor}\n" })
-        return true
+        gravar(ctx, todos(ctx).filter { !(it.app == t.app && it.hora.toLocalDate() == dia) && it.hora.toLocalDate().isAfter(dia.minusDays(60)) } + t)
     }
 
-    fun todos(ctx: Context): List<TotalUber> {
+    fun apagar(ctx: Context, t: TotalDoDia) = gravar(ctx, todos(ctx).filter { it != t })
+
+    private fun gravar(ctx: Context, lista: List<TotalDoDia>) =
+        File(ctx.filesDir, ARQUIVO).writeText(lista.sortedBy { it.hora }.joinToString("") { "${it.hora}\t${it.valor}\t${it.app}\n" })
+
+    fun todos(ctx: Context): List<TotalDoDia> {
         val f = File(ctx.filesDir, ARQUIVO)
         if (!f.exists()) return emptyList()
         return f.readLines().mapNotNull { l ->
-            runCatching { l.split('\t').let { TotalUber(LocalDateTime.parse(it[0]), it[1].toDouble()) } }.getOrNull()
+            runCatching { l.split('\t').let { TotalDoDia(LocalDateTime.parse(it[0]), it[1].toDouble(), it[2]) } }.getOrNull()
         }
     }
-
-    fun doDia(ctx: Context, dia: LocalDate) = todos(ctx).lastOrNull { it.hora.toLocalDate() == dia }
 }
 
 object Ganhos {
-    /**
-     * Ganhos do dia. Uber: o total que ela mostra na tela inicial, mais as corridas encerradas
-     * depois dessa leitura; sem essa leitura, as sessões (valor oficial, com gorjeta e ajuste)
-     * mais as corridas fora de uma sessão fechada. 99: todas as corridas.
-     */
-    fun doDia(sessoes: List<Sessao>, corridas: List<Corrida>, dia: LocalDate, totalUber: TotalUber? = null): Double {
+    /** Ganhos do dia por app: o último total dito por voz mais as corridas lançadas depois dele. */
+    fun porApp(corridas: List<Corrida>, dia: LocalDate, totais: List<TotalDoDia> = emptyList()): Map<String, Double> {
         val doDia = corridas.filter { it.hora.toLocalDate() == dia }
-        val noventaENove = doDia.filter { it.app != "Uber" }.sumOf { it.valor }
-        if (totalUber != null) {
-            return totalUber.valor + noventaENove + doDia.filter { it.app == "Uber" && it.hora.isAfter(totalUber.hora) }.sumOf { it.valor }
+        val totaisDoDia = totais.filter { it.hora.toLocalDate() == dia }
+        return (totaisDoDia.map { it.app } + doDia.map { it.app }).distinct().associateWith { app ->
+            val total = totaisDoDia.lastOrNull { it.app == app }
+            (total?.valor ?: 0.0) + doDia.filter { it.app == app && (total == null || it.hora.isAfter(total.hora)) }.sumOf { it.valor }
         }
-        val soltas = doDia.filter { c ->
-            c.app == "Uber" && sessoes.none { s -> !c.hora.isBefore(s.inicio) && !c.hora.isAfter(s.fim.plusMinutes(1)) }
-        }
-        return Sessoes.totalDoDia(sessoes, dia) + noventaENove + soltas.sumOf { it.valor }
     }
 
-    fun doDia(ctx: Context, dia: LocalDate = LocalDate.now()) =
-        doDia(Sessoes.todas(ctx), Corridas.todas(ctx), dia, TotaisUber.doDia(ctx, dia))
+    fun porApp(ctx: Context, dia: LocalDate = LocalDate.now()) = porApp(Corridas.todas(ctx), dia, Totais.todos(ctx))
 
-    fun corridasDoDia(ctx: Context, dia: LocalDate = LocalDate.now()) = Corridas.todas(ctx).count { it.hora.toLocalDate() == dia }
+    fun doDia(ctx: Context, dia: LocalDate = LocalDate.now()) = porApp(ctx, dia).values.sum()
 }

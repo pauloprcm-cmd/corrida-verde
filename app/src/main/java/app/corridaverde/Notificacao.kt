@@ -9,7 +9,7 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import java.time.LocalDate
 
-/** Notificação fixa enquanto a leitura está ligada, com o saldo do dia e os botões "Registrar gasto" e "Gravar corrida". */
+/** Notificação fixa enquanto a leitura está ligada, com o saldo do dia e os botões "Registrar por voz" e "Gravar corrida". */
 object Notificacao {
     private const val CANAL = "gastos"
     private const val ID = 1
@@ -34,7 +34,7 @@ object Notificacao {
             .setOngoing(true)
             .setShowWhen(false)
             .setContentIntent(abrirApp)
-            .addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_microfone), "Registrar gasto", registrar).build())
+            .addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_microfone), "Registrar por voz", registrar).build())
         if (Config.carregar(ctx).gravar && !GravacaoService.gravando) {
             val gravar = PendingIntent.getActivity(
                 ctx, 2, Intent(ctx, GravarActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), flags,
