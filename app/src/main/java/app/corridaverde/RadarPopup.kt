@@ -115,12 +115,12 @@ class RadarPopup(private val ctx: Context) {
     companion object {
         private const val TAXA = 22050
 
-        /** Som "Madeira": três batidinhas graves, curtas e baixas. Sai junto com a voz do navegador. */
+        /** Som "Madeira": três batidinhas graves e curtas. Sai junto com a voz do navegador. */
         val madeira: ShortArray by lazy {
             val total = (TAXA * 0.7).toInt()
             val s = DoubleArray(total)
             for ((i, inicio) in listOf(0.0, 0.16, 0.32).withIndex()) {
-                val vol = if (i == 2) 0.30 else 0.22
+                val vol = if (i == 2) 0.42 else 0.31
                 val ini = (inicio * TAXA).toInt()
                 for (k in 0 until (0.30 * TAXA).toInt()) {
                     val t = k.toDouble() / TAXA

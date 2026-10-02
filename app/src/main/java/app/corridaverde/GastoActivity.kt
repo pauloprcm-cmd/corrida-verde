@@ -25,11 +25,16 @@ import java.util.Locale
 /**
  * Aberta pelo botão "Registrar por voz" da notificação: ouve a fala, decide se é gasto ou ganho,
  * mostra o que entendeu para o motorista conferir e salva. Depois de um tanque cheio, mostra o consumo.
+ * Aberta por [editar], mostra um lançamento já salvo para corrigir ou apagar.
  */
 class GastoActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) ouvir()
+        if (savedInstanceState != null) return
+        val editando = intent.getStringExtra(EXTRA_GASTO)?.let { Gastos.deLinha(it) }
+            ?: intent.getStringExtra(EXTRA_CORRIDA)?.let { Corridas.deLinha(it) }
+            ?: intent.getStringExtra(EXTRA_TOTAL)?.let { Totais.deLinha(it) }
+        if (editando != null) formulario(null, editando) else ouvir()
     }
 
     private fun ouvir() {
@@ -56,9 +61,21 @@ class GastoActivity : Activity() {
         formulario(fala)
     }
 
-    private fun formulario(fala: String?) {
-        val l = fala?.let { LeitorGasto.ler(it) } ?: Leitura()
-        val g = fala?.let { LeitorFala.lerGanho(it) } ?: Ganho(null, null, false)
+    /** [editando] é o lançamento a corrigir (Gasto, Corrida ou TotalDoDia), ou null num lançamento novo. */
+    private fun formulario(fala: String?, editando: Any? = null) {
+        val l = (editando as? Gasto)?.let { Leitura(it.tipo, it.valor, it.litros, it.km, it.tanqueCheio) }
+            ?: fala?.let { LeitorGasto.ler(it) } ?: Leitura()
+        val g = when (editando) {
+            is Corrida -> Ganho(editando.app, editando.valor, false)
+            is TotalDoDia -> Ganho(editando.app, editando.valor, true)
+            else -> fala?.let { LeitorFala.lerGanho(it) } ?: Ganho(null, null, false)
+        }
+        val hora = when (editando) {
+            is Gasto -> editando.quando
+            is Corrida -> editando.hora
+            is TotalDoDia -> editando.hora
+            else -> null
+        }
         val tipos = Tipo.entries
         val caixa = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -75,7 +92,13 @@ class GastoActivity : Activity() {
             orientation = RadioGroup.HORIZONTAL
             addView(ehGasto)
             addView(ehGanho)
+            // Na correção o gasto continua gasto e o ganho continua ganho.
+            if (editando != null) visibility = View.GONE
         })
+        if (hora != null) {
+            val quando = "${String.format(PT, "%02d/%02d", hora.dayOfMonth, hora.monthValue)} às ${hora.toLocalTime().toString().take(5)}"
+            caixa.addView(TextView(this).apply { text = (if (editando is Gasto) "Gasto" else "Ganho") + " de $quando"; textSize = 16f })
+        }
 
         // Ganho: app, valor e se é o total do dia.
         val apps = (LeitorFala.APPS + listOfNotNull(g.app)).distinct()
@@ -125,15 +148,19 @@ class GastoActivity : Activity() {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) = mostrar()
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
-        if (fala != null && LeitorFala.ehGanho(fala)) ehGanho.isChecked = true else ehGasto.isChecked = true
+        val ehGanhoAgora = if (editando != null) editando !is Gasto else fala != null && LeitorFala.ehGanho(fala)
+        if (ehGanhoAgora) ehGanho.isChecked = true else ehGasto.isChecked = true
         ehGasto.setOnCheckedChangeListener { _, _ -> mostrar() }
         mostrar()
 
         val dialogo = AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
-            .setTitle("Confere?")
+            .setTitle(if (editando != null) "Corrigir lançamento" else "Confere?")
             .setView(ScrollView(this).apply { addView(caixa) })
             .setPositiveButton("Salvar", null)
-            .setNeutralButton("Falar de novo") { _, _ -> ouvir() }
+            .apply {
+                if (editando != null) setNeutralButton("Apagar") { _, _ -> apagar(editando) }
+                else setNeutralButton("Falar de novo") { _, _ -> ouvir() }
+            }
             .setNegativeButton("Cancelar") { _, _ -> finish() }
             .setOnCancelListener { finish() }
             .show()
@@ -150,7 +177,7 @@ class GastoActivity : Activity() {
                 }
                 dialogo.setOnCancelListener(null)
                 dialogo.dismiss()
-                salvarGanho(apps[app.selectedItemPosition], v, total.isChecked)
+                salvarGanho(apps[app.selectedItemPosition], v, total.isChecked, hora, editando)
                 return@setOnClickListener
             }
             val t = tipos[tipo.selectedItemPosition]
@@ -160,7 +187,7 @@ class GastoActivity : Activity() {
                 return@setOnClickListener
             }
             val gasto = Gasto(
-                quando = LocalDateTime.now().withNano(0),
+                quando = hora ?: LocalDateTime.now().withNano(0),
                 tipo = t,
                 valor = v,
                 litros = if (t.combustivel) num(litros)?.takeIf { it > 0 } else null,
@@ -169,12 +196,42 @@ class GastoActivity : Activity() {
             )
             dialogo.setOnCancelListener(null)
             dialogo.dismiss()
-            salvar(gasto)
+            salvar(gasto, editando as? Gasto)
         }
     }
 
-    private fun salvarGanho(app: String, valor: Double, total: Boolean) {
-        val agora = LocalDateTime.now().withNano(0)
+    private fun apagar(item: Any) {
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
+            .setMessage("Apagar este lançamento?")
+            .setPositiveButton("Apagar") { _, _ ->
+                when (item) {
+                    is Gasto -> Gastos.apagar(this, item)
+                    is Corrida -> Corridas.apagar(this, item)
+                    is TotalDoDia -> Totais.apagar(this, item)
+                }
+                Notificacao.atualizar(this)
+                Toast.makeText(this, "Lançamento apagado.", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+            .setNegativeButton("Cancelar") { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
+    }
+
+    private fun salvarGanho(app: String, valor: Double, total: Boolean, hora: LocalDateTime?, antigo: Any?) {
+        val agora = hora ?: LocalDateTime.now().withNano(0)
+        // Corrigindo: tira o lançamento antigo (ele pode ter virado total do dia, ou o contrário).
+        when (antigo) {
+            is Corrida -> Corridas.apagar(this, antigo)
+            is TotalDoDia -> Totais.apagar(this, antigo)
+        }
+        if (antigo != null) {
+            if (total) Totais.guardar(this, TotalDoDia(agora, valor, app)) else Corridas.guardar(this, Corrida(agora, app, valor))
+            Notificacao.atualizar(this)
+            Toast.makeText(this, "Lançamento corrigido.", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
         if (total) Totais.guardar(this, TotalDoDia(agora, valor, app)) else Corridas.guardar(this, Corrida(agora, app, valor))
         Notificacao.atualizar(this)
         val doApp = Ganhos.porApp(this)[app] ?: valor
@@ -182,7 +239,14 @@ class GastoActivity : Activity() {
         finish()
     }
 
-    private fun salvar(g: Gasto) {
+    private fun salvar(g: Gasto, antigo: Gasto?) {
+        if (antigo != null) {
+            Gastos.substituir(this, antigo, g)
+            Notificacao.atualizar(this)
+            Toast.makeText(this, "Lançamento corrigido.", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
         Gastos.adicionar(this, g)
         Notificacao.atualizar(this)
         val c = if (g.tipo.combustivel) Gastos.consumo(Gastos.todos(this)) else null
@@ -209,6 +273,20 @@ class GastoActivity : Activity() {
 
     companion object {
         private const val OUVIR = 1
+        private const val EXTRA_GASTO = "gasto"
+        private const val EXTRA_CORRIDA = "corrida"
+        private const val EXTRA_TOTAL = "total"
+
+        /** Abre o formulário com um lançamento já salvo (Gasto, Corrida ou TotalDoDia), para corrigir ou apagar. */
+        fun editar(ctx: android.content.Context, item: Any): Intent {
+            val i = Intent(ctx, GastoActivity::class.java)
+            return when (item) {
+                is Gasto -> i.putExtra(EXTRA_GASTO, Gastos.paraLinha(item))
+                is Corrida -> i.putExtra(EXTRA_CORRIDA, Corridas.paraLinha(item))
+                is TotalDoDia -> i.putExtra(EXTRA_TOTAL, Totais.paraLinha(item))
+                else -> i
+            }
+        }
         private val PT = Locale("pt", "BR")
     }
 }

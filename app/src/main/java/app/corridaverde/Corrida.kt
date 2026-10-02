@@ -26,6 +26,14 @@ object Corridas {
         File(ctx.filesDir, ARQUIVO).writeText(linhas.filterIndexed { j, _ -> j != i }.joinToString("") { it + "\n" })
     }
 
+    /** Troca uma corrida por outra (a corrigida), no mesmo lugar do arquivo. */
+    fun substituir(ctx: Context, antiga: Corrida, nova: Corrida) {
+        val linhas = File(ctx.filesDir, ARQUIVO).takeIf { it.exists() }?.readLines() ?: return
+        val i = linhas.indexOfFirst { deLinha(it) == antiga }
+        if (i < 0) return
+        File(ctx.filesDir, ARQUIVO).writeText(linhas.mapIndexed { j, l -> if (j == i) paraLinha(nova) else l }.joinToString("") { it + "\n" })
+    }
+
     fun paraLinha(c: Corrida) = listOf(c.hora, c.app, c.valor).joinToString("\t")
 
     fun deLinha(l: String): Corrida? = runCatching {
@@ -40,24 +48,27 @@ data class TotalDoDia(val hora: LocalDateTime, val valor: Double, val app: Strin
 object Totais {
     private const val ARQUIVO = "totais.tsv"
 
-    /** Guarda o último total de cada app em cada dia. */
+    /** Guarda o último total de cada app em cada dia (dois anos, para os resumos do mês). */
     fun guardar(ctx: Context, t: TotalDoDia) {
         val dia = t.hora.toLocalDate()
-        gravar(ctx, todos(ctx).filter { !(it.app == t.app && it.hora.toLocalDate() == dia) && it.hora.toLocalDate().isAfter(dia.minusDays(60)) } + t)
+        gravar(ctx, todos(ctx).filter { !(it.app == t.app && it.hora.toLocalDate() == dia) && it.hora.toLocalDate().isAfter(dia.minusYears(2)) } + t)
     }
 
     fun apagar(ctx: Context, t: TotalDoDia) = gravar(ctx, todos(ctx).filter { it != t })
 
     private fun gravar(ctx: Context, lista: List<TotalDoDia>) =
-        File(ctx.filesDir, ARQUIVO).writeText(lista.sortedBy { it.hora }.joinToString("") { "${it.hora}\t${it.valor}\t${it.app}\n" })
+        File(ctx.filesDir, ARQUIVO).writeText(lista.sortedBy { it.hora }.joinToString("") { paraLinha(it) + "\n" })
 
     fun todos(ctx: Context): List<TotalDoDia> {
         val f = File(ctx.filesDir, ARQUIVO)
         if (!f.exists()) return emptyList()
-        return f.readLines().mapNotNull { l ->
-            runCatching { l.split('\t').let { TotalDoDia(LocalDateTime.parse(it[0]), it[1].toDouble(), it[2]) } }.getOrNull()
-        }
+        return f.readLines().mapNotNull { deLinha(it) }
     }
+
+    fun paraLinha(t: TotalDoDia) = "${t.hora}\t${t.valor}\t${t.app}"
+
+    fun deLinha(l: String): TotalDoDia? =
+        runCatching { l.split('\t').let { TotalDoDia(LocalDateTime.parse(it[0]), it[1].toDouble(), it[2]) } }.getOrNull()
 }
 
 object Ganhos {

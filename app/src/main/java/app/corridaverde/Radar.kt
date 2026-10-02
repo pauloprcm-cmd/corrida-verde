@@ -22,6 +22,9 @@ object LeitorRadar {
     }
 }
 
+/** O alerta só aparece com o radar a esta distância ou menos, mesmo que o navegador avise antes. */
+const val ALERTA_RADAR_METROS = 600
+
 /** Decide quando o radar é outro (toca o som de novo) e quando é o mesmo chegando mais perto. */
 class AcompanhaRadar {
     private var ultimo: Radar? = null

@@ -16,7 +16,6 @@ import android.widget.RadioButton
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
-import java.time.LocalDate
 import java.util.Locale
 
 class MainActivity : Activity() {
@@ -37,6 +36,14 @@ class MainActivity : Activity() {
         campo(R.id.gravar, CheckBox::class.java).isChecked = cfg.gravar
         campo(R.id.radar, CheckBox::class.java).isChecked = cfg.radar
         campo(R.id.radarSom, CheckBox::class.java).isChecked = cfg.radarSom
+        campo(R.id.casaEndereco, EditText::class.java).setText(cfg.casaEndereco)
+        campo(R.id.raioCasa, EditText::class.java).setText(cfg.raioCasaKm.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString().replace('.', ',') })
+        campo(R.id.salvarCasa, Button::class.java).setOnClickListener { salvarCasa() }
+        campo(R.id.indoPraCasa, Button::class.java).setOnClickListener {
+            CasaReceiver.alternar(this)
+            mostrarCasa()
+            Notificacao.atualizar(this)
+        }
 
         campo(R.id.ativar, Button::class.java).setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -72,7 +79,9 @@ class MainActivity : Activity() {
         campo(R.id.registrarGasto, Button::class.java).setOnClickListener {
             startActivity(Intent(this, GastoActivity::class.java))
         }
-        campo(R.id.lancamentos, Button::class.java).setOnClickListener { lancamentos() }
+        val abrirDinheiro = { _: android.view.View -> startActivity(Intent(this, DinheiroActivity::class.java)) }
+        campo(R.id.verDinheiro, Button::class.java).setOnClickListener(abrirDinheiro)
+        findViewById<android.view.View>(R.id.cartaoHoje).setOnClickListener(abrirDinheiro)
         // A notificação com o botão "Registrar por voz" precisa desta permissão no Android 13 ou mais novo.
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
@@ -122,7 +131,8 @@ class MainActivity : Activity() {
         campo(R.id.status, TextView::class.java).text =
             if (ativo) "✅ Leitura ativa" else "❌ Leitura desligada: toque em \"Ativar leitura\""
         campo(R.id.textoDiagnostico, TextView::class.java).text = diagnostico()
-        campo(R.id.gastosHoje, TextView::class.java).text = resumoGastos()
+        mostrarHoje()
+        mostrarCasa()
         Notificacao.atualizar(this)
 
         val versao = campo(R.id.versao, TextView::class.java)
@@ -135,49 +145,54 @@ class MainActivity : Activity() {
         Notificacao.atualizar(this)
     }
 
-    private fun resumoGastos(): String {
-        val gastos = Gastos.todos(this)
-        val porApp = Ganhos.porApp(this)
-        val ganhos = porApp.values.sum()
-        val gasto = Gastos.totalDoDia(gastos, LocalDate.now())
-        var hoje = "Hoje: ganhos R$ ${Popup.br(ganhos)} − gastos R$ ${Popup.br(gasto)} = R$ ${Popup.br(ganhos - gasto)}"
-        if (porApp.isNotEmpty()) hoje += "\n" + porApp.entries.joinToString(" · ") { "${it.key} R$ ${Popup.br(it.value)}" }
-        val c = Gastos.consumo(gastos) ?: return hoje
-        return hoje + "\nÚltimo consumo: ${String.format(Locale("pt", "BR"), "%.1f", c.kmPorLitro)} km/${c.unidade.lowercase()} · R$ ${Popup.br(c.custoKm)}/km"
+    private fun mostrarCasa() {
+        val cfg = Config.carregar(this)
+        campo(R.id.casaStatus, TextView::class.java).text =
+            if (cfg.casa == null) "Casa ainda não cadastrada." else "✅ Casa cadastrada"
+        campo(R.id.indoPraCasa, Button::class.java).apply {
+            isEnabled = cfg.casa != null
+            text = if (cfg.indoPraCasa) "🏠 Indo pra casa: LIGADO (toque para desligar)" else "🏠 Ligar Indo pra casa"
+        }
     }
 
-    /** Os ganhos e gastos lançados hoje; tocar num deles pergunta se quer apagar. */
-    private fun lancamentos() {
-        val hoje = LocalDate.now()
-        fun hora(t: java.time.LocalDateTime) = t.toLocalTime().toString().take(5)
-        val itens = mutableListOf<Pair<String, () -> Unit>>()
-        Totais.todos(this).filter { it.hora.toLocalDate() == hoje }.forEach { t ->
-            itens += "${hora(t.hora)} ${t.app}: total do dia R$ ${Popup.br(t.valor)}" to { Totais.apagar(this, t) }
-        }
-        Corridas.todas(this).filter { it.hora.toLocalDate() == hoje }.forEach { c ->
-            itens += "${hora(c.hora)} ${c.app}: corrida R$ ${Popup.br(c.valor)}" to { Corridas.apagar(this, c) }
-        }
-        Gastos.todos(this).filter { it.quando.toLocalDate() == hoje }.forEach { g ->
-            itens += "${hora(g.quando)} Gasto ${g.tipo.nome}: R$ ${Popup.br(g.valor)}" to { Gastos.apagar(this, g) }
-        }
-        itens.sortBy { it.first }
-        val b = AlertDialog.Builder(this).setTitle("Lançamentos de hoje").setNegativeButton("Fechar", null)
-        if (itens.isEmpty()) {
-            b.setMessage("Nada lançado hoje.").show()
+    /** Procura o endereço no mapa (pela internet) e mostra o que achou, para o motorista conferir. */
+    private fun salvarCasa() {
+        val endereco = campo(R.id.casaEndereco, EditText::class.java).text.toString().trim()
+        val raio = campo(R.id.raioCasa, EditText::class.java).text.toString().trim().replace(',', '.').toDoubleOrNull()
+        if (endereco.length < 5 || raio == null || raio <= 0) {
+            Toast.makeText(this, "Escreva o endereço e quantos km conta como perto", Toast.LENGTH_LONG).show()
             return
         }
-        b.setItems(itens.map { it.first }.toTypedArray()) { _, i ->
-            AlertDialog.Builder(this)
-                .setMessage("Apagar \"${itens[i].first}\"?")
-                .setPositiveButton("Apagar") { _, _ ->
-                    itens[i].second()
-                    campo(R.id.gastosHoje, TextView::class.java).text = resumoGastos()
-                    Notificacao.atualizar(this)
-                    lancamentos()
+        val status = campo(R.id.casaStatus, TextView::class.java)
+        status.text = "Procurando o endereço…"
+        Thread {
+            val achado = runCatching { Enderecos.buscar(this, Casa.consulta(endereco)) }.getOrNull()
+            runOnUiThread {
+                if (achado == null) {
+                    status.text = "Não achei esse endereço. Confira a internet e escreva com bairro e cidade."
+                    return@runOnUiThread
                 }
-                .setNegativeButton("Cancelar") { _, _ -> lancamentos() }
-                .show()
-        }.show()
+                Config.carregar(this).copy(casaEndereco = endereco, casa = achado.first, raioCasaKm = raio).salvar(this)
+                mostrarCasa()
+                status.text = "✅ Casa: ${achado.second}\nSe não for a sua rua, corrija o endereço e salve de novo."
+                Notificacao.atualizar(this)
+            }
+        }.start()
+    }
+
+    /** O quadro "Sobrou hoje" no topo e, embaixo, ganhos por app e o último consumo. */
+    private fun mostrarHoje() {
+        val b = Dinheiro.hoje(this)
+        campo(R.id.sobrouHoje, TextView::class.java).apply {
+            text = Dinheiro.rs(b.sobrou)
+            setTextColor(if (b.sobrou < 0) COR_VERMELHO else COR_VERDE)
+        }
+        campo(R.id.detalheHoje, TextView::class.java).text = "Entrou ${Dinheiro.rs(b.entrou)} · Gastou ${Dinheiro.rs(b.gastou)}" +
+            if (b.porApp.isNotEmpty()) "\n" + b.porApp.entries.joinToString(" · ") { "${it.key} ${Dinheiro.rs(it.value)}" } else ""
+        val c = Gastos.consumo(Gastos.todos(this))
+        campo(R.id.gastosHoje, TextView::class.java).text = c?.let {
+            "Último consumo: ${String.format(Locale("pt", "BR"), "%.1f", it.kmPorLitro)} km/${it.unidade.lowercase()} · R$ ${Popup.br(it.custoKm)}/km"
+        } ?: ""
     }
 
     private fun diagnostico(): String {
@@ -199,7 +214,8 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Confira os números (o amarelo não pode passar do verde)", Toast.LENGTH_LONG).show()
             return null
         }
-        return Config(
+        // Parte com o que não está nestes campos (a casa e o modo Indo pra casa).
+        return Config.carregar(this).copy(
             luxo = campo(R.id.luxo, RadioButton::class.java).isChecked,
             limiteVerde = verde,
             limiteAmarelo = amarelo,
@@ -212,6 +228,11 @@ class MainActivity : Activity() {
             radar = campo(R.id.radar, CheckBox::class.java).isChecked,
             radarSom = campo(R.id.radarSom, CheckBox::class.java).isChecked,
         )
+    }
+
+    private companion object {
+        val COR_VERDE = android.graphics.Color.rgb(0x1B, 0x8A, 0x3C)
+        val COR_VERMELHO = android.graphics.Color.rgb(0xC6, 0x28, 0x28)
     }
 
     private fun <T : android.view.View> campo(id: Int, tipo: Class<T>): T = tipo.cast(findViewById(id))!!

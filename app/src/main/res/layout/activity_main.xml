@@ -37,6 +37,46 @@
             android:layout_height="wrap_content"
             android:textSize="13sp" />
 
+        <!-- Quanto sobrou hoje: toca para ver dia, semana e mês. -->
+        <LinearLayout
+            android:id="@+id/cartaoHoje"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="#F1F8F3"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SOBROU HOJE"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/sobrouHoje"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="36sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/detalheHoje"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/verDinheiro"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Ver dia, semana e mês ›" />
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -226,13 +266,68 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
+            android:text="Indo pra casa"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No fim do dia, ligue Indo pra casa (aqui ou na notificação). Quando a corrida da Uber termina perto da sua casa, o popup mostra 🏠 Perto de casa, em verde. Se termina longe, aparece só uma linha pequena, cinza, com a distância (em linha reta). Para calcular, o endereço do destino é consultado no serviço de mapas do Google pela internet. Desliga sozinho no dia seguinte."
+            android:textSize="13sp" />
+
+        <EditText
+            android:id="@+id/casaEndereco"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Endereço de casa (rua, número, bairro)"
+            android:inputType="textPostalAddress" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Perto de casa é até (km)" />
+
+            <EditText
+                android:id="@+id/raioCasa"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/salvarCasa"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Salvar casa" />
+
+        <TextView
+            android:id="@+id/casaStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/indoPraCasa"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
             android:text="Ganhos e gastos"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Ganhos e gastos entram por voz. Com a leitura ligada, desça a barra do topo e toque em Registrar por voz na notificação do Corrida Verde. Ganhos: fale o total que a tela do app mostra, como “ganhei 346 na 99” — ele substitui o que você já tinha falado da 99 hoje. Para somar uma corrida só, diga “corrida”: “corrida da Uber 23 e 50”. Sem dizer o app (passageiro de rua), soma: “ganhei 50”. Táxi e particular também somam. Gastos: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”. Errou? Apague em Lançamentos de hoje."
+            android:text="Ganhos e gastos entram por voz. Com a leitura ligada, desça a barra do topo e toque em Registrar por voz na notificação do Corrida Verde. Ganhos: fale o total que a tela do app mostra, como “ganhei 346 na 99” — ele substitui o que você já tinha falado da 99 hoje. Para somar uma corrida só, diga “corrida”: “corrida da Uber 23 e 50”. Sem dizer o app (passageiro de rua), soma: “ganhei 50”. Táxi e particular também somam. Gastos: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”. Errou? Toque no quadro Sobrou hoje, escolha o dia e toque no lançamento para corrigir ou apagar."
             android:textSize="13sp" />
 
         <TextView
@@ -248,11 +343,6 @@
             android:layout_height="wrap_content"
             android:text="Registrar ganho ou gasto por voz" />
 
-        <Button
-            android:id="@+id/lancamentos"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Lançamentos de hoje" />
 
         <TextView
             android:layout_width="wrap_content"

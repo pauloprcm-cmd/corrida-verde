@@ -24,6 +24,7 @@ class LeitorOfertaTest {
         assertEquals(4.9, o.viagemKm, 0.001)
         assertEquals(35, o.viagemMin)
         assertEquals(4.95, o.nota!!, 0.001)
+        assertEquals("Rua B, 308, Itaim Bibi, São Paulo", o.destino)
     }
 
     @Test
@@ -52,6 +53,22 @@ class LeitorOfertaTest {
         assertEquals(3.0, o.buscaKm, 0.001)
         assertEquals(4.1, o.viagemKm, 0.001)
         assertEquals(13, o.viagemMin)
+    }
+
+    @Test
+    fun leFaixaDaCategoriaTaxi() {
+        // Print de 01/10/2026, 17:28: o valor final fica entre o mínimo e o máximo.
+        val o = LeitorOferta.ler(listOf(
+            "Táxi", "R$ 31 - R$ 46", "4,97 (2106)", "Verificado",
+            "2 min (0.1 km)", "Rua A, Itaim Bibi, São Paulo", "30 minutos (6.1 km)", "Rua B, Vila Mariana, São Paulo", "Selecionar",
+        ))!!
+        assertEquals(31.0, o.valor, 0.001)
+        assertEquals(46.0, o.valorMax!!, 0.001)
+        assertEquals(6.1, o.viagemKm, 0.001)
+        assertEquals("Rua B, Vila Mariana, São Paulo", o.destino)
+        val r = Avaliador.avaliar(o, Config(), LocalDateTime.of(2026, 10, 1, 17, 28))
+        assertTrue(r.pctMax!! > r.pct)
+        assertEquals(Cor.VERMELHO, r.cor)
     }
 
     @Test

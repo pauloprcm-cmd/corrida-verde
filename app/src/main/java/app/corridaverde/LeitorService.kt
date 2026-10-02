@@ -10,6 +10,7 @@ import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.time.LocalDateTime
@@ -36,6 +37,11 @@ class LeitorService : AccessibilityService() {
 
     private lateinit var popup: Popup
     private lateinit var radarPopup: RadarPopup
+    /** Modo "Indo pra casa": o destino vira ponto no mapa pela internet, numa linha própria para não atrasar o popup. */
+    private val trabalhoCasa = HandlerThread("casa").apply { start() }
+    private val fundoCasa = Handler(trabalhoCasa.looper)
+    /** Cada destino consultado, a distância e quanto demorou, para o motorista conferir no diagnóstico. */
+    private val consultasCasa = ConcurrentLinkedDeque<String>()
     private var chaveAtual: String? = null
 
     // Só usados na linha de trabalho.
@@ -55,6 +61,8 @@ class LeitorService : AccessibilityService() {
     private val eventosDosNavegadores = ConcurrentHashMap<String, Int>()
     /** Textos que falam de radar ou limite, para descobrir o que cada navegador mostra. */
     private val textosDeRadar = ConcurrentLinkedDeque<String>()
+    /** Cada decisão do radar no Maps (aviso lido, velocidade, conta, se mostrou), para achar onde erra. */
+    private val contaRadarMaps = ConcurrentLinkedDeque<String>()
     /** Notificações da 99 e da Uber: a oferta da 99 pode vir por elas. */
     private val notificacoes = ArrayDeque<String>()
     /**
@@ -117,6 +125,8 @@ class LeitorService : AccessibilityService() {
         trabalho.quitSafely()
         fundoRadar.removeCallbacksAndMessages(null)
         trabalhoRadar.quitSafely()
+        fundoCasa.removeCallbacksAndMessages(null)
+        trabalhoCasa.quitSafely()
         if (::popup.isInitialized) popup.esconder()
         if (::radarPopup.isInitialized) radarPopup.esconder()
         super.onDestroy()
@@ -175,11 +185,13 @@ class LeitorService : AccessibilityService() {
         if (!cfg.radar) return
         val lido = LeitorRadar.ler(textos)
         val radar = if (app == MAPS) {
-            estimaRadarMaps.atualizar(lido, LeitorVelocidade.ler(textos), System.currentTimeMillis())
+            val velocidade = LeitorVelocidade.ler(textos)
+            estimaRadarMaps.atualizar(lido, velocidade, System.currentTimeMillis())
                 // O Maps só manda evento quando a tela muda: enquanto há radar, a conta anda sozinha.
-                ?.also { marcarLeituraDoRadar(app, 1_000) }
+                .also { if (it != null) marcarLeituraDoRadar(app, 1_000) }
+                .also { if (cfg.diagnostico) guardarContaDoMaps(tela, textos, lido, velocidade, it) }
         } else lido
-        if (radar == null) return
+        if (radar == null || radar.metros > ALERTA_RADAR_METROS) return
         val novo = acompanhaRadar.visto(radar, System.currentTimeMillis())
         handler.post {
             radarPopup.mostrar(radar, novo)
@@ -187,6 +199,29 @@ class LeitorService : AccessibilityService() {
             handler.removeCallbacks(esconderRadar)
             handler.postDelayed(esconderRadar, 4_000)
         }
+    }
+
+    private fun guardarContaDoMaps(tela: AccessibilityNodeInfo?, textos: List<String>, lido: Radar?, velocidade: Int?, mostrado: Radar?) {
+        // O Maps às vezes escreve só "Radar de velocidade", sem a distância: registra também.
+        val semDistancia = textos.firstOrNull { RADAR_SEM_DISTANCIA.containsMatchIn(it) && LeitorRadar.ler(listOf(it)) == null }
+        if (lido == null && semDistancia == null && mostrado == null && contaRadarMaps.peekLast()?.endsWith("nada") == true) return
+        val onde = if ((lido != null || semDistancia != null) && tela != null) acharRadar(tela)?.let { n ->
+            val r = Rect().also { n.getBoundsInScreen(it) }
+            " · nó ${n.className?.toString()?.substringAfterLast('.')} em ${r.centerX()},${r.centerY()} (${r.width()}x${r.height()})"
+        } ?: " · nó não achado" else ""
+        val linha = (if (tela == null) "sem janela do Maps" else "aviso ${lido?.metros?.let { "$it m" } ?: semDistancia?.let { "\"${it.take(40)}\" sem distância" } ?: "nenhum"}") +
+            " · vel ${velocidade ?: "?"} · ${textos.size} textos$onde → " + (mostrado?.let { "mostra ${it.metros} m" } ?: "nada")
+        contaRadarMaps.addLast("${LocalTime.now().withNano(0)} $linha")
+        while (contaRadarMaps.size > 150) contaRadarMaps.pollFirst()
+    }
+
+    /** O nó com o texto do aviso de radar, para ver se ele fica no desenho do mapa. */
+    private fun acharRadar(n: AccessibilityNodeInfo, visitados: IntArray = IntArray(1)): AccessibilityNodeInfo? {
+        if (!n.isVisibleToUser || ++visitados[0] > LIMITE_NOS_RADAR) return null
+        val t = listOfNotNull(n.text?.toString(), n.contentDescription?.toString())
+        if (t.any { RADAR_SEM_DISTANCIA.containsMatchIn(it) }) return n
+        for (i in 0 until n.childCount) n.getChild(i)?.let { c -> acharRadar(c, visitados)?.let { return it } }
+        return null
     }
 
     private fun guardarTextosDeRadar(app: String, textos: List<String>) {
@@ -302,6 +337,26 @@ class LeitorService : AccessibilityService() {
             if (oferta.chave != chaveAtual) {
                 chaveAtual = oferta.chave
                 popup.mostrar(Avaliador.avaliar(oferta, cfg), cfg)
+                if (cfg.indoPraCasa) calcularCasa(oferta, cfg)
+            }
+        }
+    }
+
+    /** Só na linha da tela. A conta corre em [fundoCasa]; a linha entra no popup se ele ainda for desta oferta. */
+    private fun calcularCasa(oferta: Oferta, cfg: Config) {
+        val casa = cfg.casa ?: return
+        val destino = oferta.destino ?: return popup.linhaCasa("distância de casa: destino não lido", false)
+        fundoCasa.post {
+            val inicio = System.currentTimeMillis()
+            val ponto = runCatching { Enderecos.destino(this, destino) }.getOrNull()
+            val km = ponto?.let { Casa.distanciaKm(it, casa) }
+            consultasCasa.addLast("${LocalTime.now().withNano(0)} ${destino.replace('\n', ' ').take(80)} → " +
+                (km?.let { String.format(Locale("pt", "BR"), "%.1f km", it) } ?: "não achou") + " em ${System.currentTimeMillis() - inicio} ms")
+            while (consultasCasa.size > 30) consultasCasa.pollFirst()
+            handler.post {
+                if (chaveAtual != oferta.chave) return@post
+                if (km == null) popup.linhaCasa("distância de casa: sem sinal", false)
+                else popup.linhaCasa(Casa.texto(km, cfg.raioCasaKm), Casa.perto(km, cfg.raioCasaKm))
             }
         }
     }
@@ -387,6 +442,10 @@ class LeitorService : AccessibilityService() {
             telas.values.forEach { appendLine(it) }
             appendLine("--- textos sobre radar e limite ---")
             textosDeRadar.forEach { appendLine(it) }
+            appendLine("--- radar no Maps, segundo a segundo (aviso lido → o que o app mostrou) ---")
+            contaRadarMaps.forEach { appendLine(it) }
+            appendLine("--- Indo pra casa (destino → distância até casa, tempo da consulta) ---")
+            consultasCasa.forEach { appendLine(it) }
             appendLine("--- textos com R$ (com o de antes e o de depois) ---")
             textosComValor.values.forEach { appendLine(it) }
             appendLine("--- notificações da Uber e da 99 ---")
@@ -400,6 +459,7 @@ class LeitorService : AccessibilityService() {
     /** Apaga o que o diagnóstico juntou até agora (os arquivos e as listas na memória). */
     fun limparDiagnostico() {
         textosDeRadar.clear()
+        contaRadarMaps.clear()
         eventosDosNavegadores.clear()
         fundo.post {
             eventosDaUber = 0
@@ -423,6 +483,7 @@ class LeitorService : AccessibilityService() {
         val exemplo = Oferta(valor = 62.10, buscaKm = 1.4, buscaMin = 8, viagemKm = 4.9, viagemMin = 35, nota = 4.95, paradas = 1)
         chaveAtual = "teste"
         popup.mostrar(Avaliador.avaliar(exemplo, cfg), cfg)
+        if (cfg.indoPraCasa) popup.linhaCasa(Casa.texto(1.8, cfg.raioCasaKm), true)
         handler.removeCallbacks(esconder)
         handler.postDelayed(esconder, 5_000)
     }
@@ -448,6 +509,7 @@ class LeitorService : AccessibilityService() {
         const val ARQUIVO_STATUS = "status.txt"
         private const val LIMITE_NOS = 400
         private const val LIMITE_NOS_RADAR = 1500
+        private val RADAR_SEM_DISTANCIA = Regex("""radar(?! de viagens)""", RegexOption.IGNORE_CASE)
         private const val LIMITE_NOS_ESTRUTURA = 120
         private val PARECE_OFERTA = Regex("""\d\s*(min|km|m\b)""")
         var instancia: LeitorService? = null

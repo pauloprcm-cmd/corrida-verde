@@ -11,7 +11,9 @@ data class Resultado(
     val oferta: Oferta,
     val taximetro: Double,
     val minParado: Int,
+    /** A cor e o número grande vêm do mínimo; na faixa do Táxi este é o % do máximo. */
     val pct: Int,
+    val pctMax: Int?,
     val cor: Cor,
     val rsKm: Double,
     val rsHora: Double?,
@@ -75,6 +77,7 @@ object Avaliador {
             taximetro = taximetro,
             minParado = Tarifa.minutosParado(o.viagemKm, o.viagemMin).roundToInt(),
             pct = pct,
+            pctMax = o.valorMax?.let { (it / taximetro * 100).roundToInt() },
             cor = cor,
             rsKm = if (kmTotal > 0) o.valor / kmTotal else 0.0,
             rsHora = if (minTotal > 0) o.valor / minTotal * 60 else null,

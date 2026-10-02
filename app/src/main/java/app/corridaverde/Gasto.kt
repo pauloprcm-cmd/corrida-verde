@@ -126,6 +126,14 @@ object Gastos {
         File(ctx.filesDir, ARQUIVO).writeText(linhas.filterIndexed { j, _ -> j != i }.joinToString("") { it + "\n" })
     }
 
+    /** Troca um gasto pelo corrigido, no mesmo lugar do arquivo. */
+    fun substituir(ctx: Context, antigo: Gasto, novo: Gasto) {
+        val linhas = File(ctx.filesDir, ARQUIVO).takeIf { it.exists() }?.readLines() ?: return
+        val i = linhas.indexOfFirst { deLinha(it) == antigo }
+        if (i < 0) return
+        File(ctx.filesDir, ARQUIVO).writeText(linhas.mapIndexed { j, l -> if (j == i) paraLinha(novo) else l }.joinToString("") { it + "\n" })
+    }
+
     fun paraLinha(g: Gasto) =
         listOf(g.quando, g.tipo.name, g.valor, g.litros ?: "", g.km ?: "", if (g.tanqueCheio) 1 else 0).joinToString("\t")
 

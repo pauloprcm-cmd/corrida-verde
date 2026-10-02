@@ -1,6 +1,7 @@
 package app.corridaverde
 
 import android.content.Context
+import java.time.LocalDate
 
 data class Config(
     val luxo: Boolean = false,
@@ -14,7 +15,15 @@ data class Config(
     val gravar: Boolean = false,
     val radar: Boolean = true,
     val radarSom: Boolean = true,
+    /** Casa do motorista, para o modo "Indo pra casa". */
+    val casaEndereco: String = "",
+    val casa: Ponto? = null,
+    val raioCasaKm: Double = 3.0,
+    /** Dia em que o modo "Indo pra casa" foi ligado: ele desliga sozinho no dia seguinte. */
+    val indoPraCasaDia: String = "",
 ) {
+    val indoPraCasa get() = casa != null && indoPraCasaDia == LocalDate.now().toString()
+
     fun salvar(ctx: Context) {
         ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE).edit()
             .putBoolean("luxo", luxo)
@@ -28,6 +37,10 @@ data class Config(
             .putBoolean("gravar", gravar)
             .putBoolean("radar", radar)
             .putBoolean("radarSom", radarSom)
+            .putString("casaEndereco", casaEndereco)
+            .putString("casa", casa?.let { "${it.lat};${it.lon}" } ?: "")
+            .putFloat("raioCasaKm", raioCasaKm.toFloat())
+            .putString("indoPraCasaDia", indoPraCasaDia)
             .apply()
     }
 
@@ -49,6 +62,14 @@ data class Config(
                 gravar = p.getBoolean("gravar", d.gravar),
                 radar = p.getBoolean("radar", d.radar),
                 radarSom = p.getBoolean("radarSom", d.radarSom),
+                casaEndereco = p.getString("casaEndereco", d.casaEndereco) ?: "",
+                casa = p.getString("casa", "")?.split(';')?.takeIf { it.size == 2 }?.let { (a, b) ->
+                    val lat = a.toDoubleOrNull()
+                    val lon = b.toDoubleOrNull()
+                    if (lat != null && lon != null) Ponto(lat, lon) else null
+                },
+                raioCasaKm = p.getFloat("raioCasaKm", d.raioCasaKm.toFloat()).toDouble(),
+                indoPraCasaDia = p.getString("indoPraCasaDia", "") ?: "",
             )
         }
     }

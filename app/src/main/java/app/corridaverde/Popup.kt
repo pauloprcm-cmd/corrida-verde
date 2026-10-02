@@ -5,6 +5,9 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.LinearLayout
@@ -24,14 +27,17 @@ class Popup(private val ctx: Context) {
         }
         val o = r.oferta
         val linhas = listOf(
-            "R$ ${br(o.valor)} · taxímetro R$ ${br(r.taximetro)}${if (r.bandeira2) " (B2)" else ""}",
+            (o.valorMax?.let { "R$ ${br(o.valor)} – R$ ${br(it)}" } ?: "R$ ${br(o.valor)}") + " · taxímetro R$ ${br(r.taximetro)}${if (r.bandeira2) " (B2)" else ""}",
             "R$ ${br(r.rsKm)}/km" + (r.rsHora?.let { " · R$ ${br(it)}/h" } ?: ""),
             "busca ${km(o.buscaKm)} · viagem ${km(o.viagemKm)} ${o.viagemMin} min",
         ) + (if (r.minParado > 0) listOf("trânsito: ~${r.minParado} min parado no taxímetro") else emptyList()) + (if (r.avisos.isNotEmpty()) listOf("⚠ " + r.avisos.joinToString(" · ")) else emptyList())
-        exibir(cfg, cor, "${r.pct}%", linhas)
+        // Faixa do Táxi: o mínimo grande (é ele que decide a cor) e até quanto pode chegar, menor.
+        val titulo = SpannableString("${r.pct}%" + (r.pctMax?.let { " → até $it%" } ?: ""))
+        titulo.setSpan(RelativeSizeSpan(0.5f), "${r.pct}%".length, titulo.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        exibir(cfg, cor, titulo, linhas)
     }
 
-    private fun exibir(cfg: Config, cor: Int, titulo: String, linhas: List<String>) {
+    private fun exibir(cfg: Config, cor: Int, titulo: CharSequence, linhas: List<String>) {
         esconder()
         val caixa = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
@@ -72,6 +78,19 @@ class Popup(private val ctx: Context) {
         view = caixa
     }
 
+    /**
+     * A linha da casa chega depois do resto: o destino vira ponto no mapa pela internet.
+     * Perto: verde e grande. Longe ou sem resposta: cinza e pequena, para não chamar o olho.
+     */
+    fun linhaCasa(texto: String, perto: Boolean) {
+        val caixa = view ?: return
+        val linha = caixa.findViewWithTag<TextView>(LINHA_CASA) ?: TextView(ctx).apply { tag = LINHA_CASA }.also { caixa.addView(it) }
+        linha.text = texto
+        linha.textSize = if (perto) 18f else 13f
+        linha.typeface = if (perto) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        linha.setTextColor(if (perto) Color.rgb(0x3B, 0xFF, 0x8B) else Color.rgb(0x9A, 0xA0, 0xA6))
+    }
+
     fun esconder() {
         view?.let { runCatching { wm.removeView(it) } }
         view = null
@@ -81,6 +100,7 @@ class Popup(private val ctx: Context) {
 
     companion object {
         private val PT = Locale("pt", "BR")
+        private const val LINHA_CASA = "casa"
         fun br(v: Double) = String.format(PT, "%.2f", v)
         fun km(v: Double) = String.format(PT, "%.1f km", v)
     }
