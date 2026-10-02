@@ -33,7 +33,8 @@ class Popup(private val ctx: Context) {
         ) + (if (r.minParado > 0) listOf("trânsito: ~${r.minParado} min parado no taxímetro") else emptyList()) + (if (r.avisos.isNotEmpty()) listOf("⚠ " + r.avisos.joinToString(" · ")) else emptyList())
         // Faixa do Táxi: o mínimo grande (é ele que decide a cor) e até quanto pode chegar, menor.
         val titulo = SpannableString("${r.pct}%" + (r.pctMax?.let { " → até $it%" } ?: ""))
-        titulo.setSpan(RelativeSizeSpan(0.5f), "${r.pct}%".length, titulo.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        // Sem faixa o trecho menor fica vazio, e o Android não aceita marcação de tamanho zero (o leitor caía).
+        if (r.pctMax != null) titulo.setSpan(RelativeSizeSpan(0.5f), "${r.pct}%".length, titulo.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         exibir(cfg, cor, titulo, linhas)
     }
 
