@@ -16,6 +16,8 @@ import java.io.File
 
 /** Os ajustes do aviso, do radar, da casa e da gravação, e o diagnóstico (em Avançado). */
 class AjustesActivity : Activity() {
+    private var restaurando = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_ajustes)
@@ -57,6 +59,16 @@ class AjustesActivity : Activity() {
             lerCampos()?.salvar(this) ?: return@setOnClickListener
             LeitorService.instancia?.testarRadar() ?: Toast.makeText(this, "Ligue a leitura primeiro (tela inicial)", Toast.LENGTH_LONG).show()
         }
+        campo(R.id.guardarCopia, Button::class.java).setOnClickListener {
+            val i = Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/zip").putExtra(Intent.EXTRA_TITLE, Copia.nomeDoArquivo())
+            runCatching { startActivityForResult(i, GUARDAR) }.onFailure { enviarCopia() }
+        }
+        campo(R.id.enviarCopia, Button::class.java).setOnClickListener { enviarCopia() }
+        campo(R.id.restaurarCopia, Button::class.java).setOnClickListener {
+            // "*/*": o WhatsApp e o Drive nem sempre dizem que o arquivo é um zip.
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"), RESTAURAR)
+        }
         campo(R.id.compartilhar, Button::class.java).setOnClickListener {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
@@ -84,12 +96,66 @@ class AjustesActivity : Activity() {
     /** Ao sair da tela, guarda o que foi mudado, para ninguém perder um ajuste por esquecer o Salvar. */
     override fun onPause() {
         super.onPause()
+        // Logo depois de restaurar, os campos ainda mostram os ajustes antigos: não podem sobrescrever a cópia.
+        if (restaurando) return
         lerCampos(avisar = false)?.let {
             if (it != Config.carregar(this)) {
                 it.salvar(this)
                 Notificacao.atualizar(this)
             }
         }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) return
+        when (requestCode) {
+            GUARDAR -> {
+                val ok = runCatching { contentResolver.openOutputStream(uri)!!.use { Copia.gerar(this, it) } }.isSuccess
+                Toast.makeText(this, if (ok) "Cópia guardada" else "Não deu para guardar a cópia aí. Tente Mandar a cópia.", Toast.LENGTH_LONG).show()
+            }
+            RESTAURAR -> {
+                val resumo = runCatching { contentResolver.openInputStream(uri)!!.use { Copia.conferir(it) } }.getOrNull()
+                if (resumo == null) {
+                    Toast.makeText(this, "Esse arquivo não é uma cópia do Corrida Verde", Toast.LENGTH_LONG).show()
+                    return
+                }
+                AlertDialog.Builder(this)
+                    .setTitle("Restaurar a cópia?")
+                    .setMessage(
+                        "Cópia feita em ${resumo.feitaEm}, com ${resumo.lancamentos} lançamentos de ganhos e gastos e ${resumo.recibos} recibos.\n\n" +
+                            "Os dados que estão neste celular agora serão trocados pelos da cópia.",
+                    )
+                    .setPositiveButton("Restaurar") { _, _ ->
+                        val ok = runCatching { contentResolver.openInputStream(uri)!!.use { Copia.restaurar(this, it) } }.getOrDefault(false)
+                        if (!ok) {
+                            Toast.makeText(this, "Não deu para ler a cópia", Toast.LENGTH_LONG).show()
+                            return@setPositiveButton
+                        }
+                        Notificacao.atualizar(this)
+                        Toast.makeText(this, "Pronto: dados restaurados", Toast.LENGTH_LONG).show()
+                        restaurando = true
+                        recreate()
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .show()
+            }
+        }
+    }
+
+    /** Gera a cópia na pasta de envio e abre a lista de apps (WhatsApp, Gmail, Drive…). */
+    private fun enviarCopia() {
+        val f = java.io.File(ArquivosProvider.pasta(this), Copia.nomeDoArquivo())
+        runCatching { f.outputStream().use { Copia.gerar(this, it) } }.onFailure {
+            Toast.makeText(this, "Não deu para gerar a cópia", Toast.LENGTH_LONG).show()
+            return
+        }
+        val i = Intent(Intent.ACTION_SEND).setType("application/zip")
+            .putExtra(Intent.EXTRA_STREAM, ArquivosProvider.uri(f))
+            .putExtra(Intent.EXTRA_SUBJECT, "Cópia dos dados do Corrida Verde")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivity(Intent.createChooser(i, "Mandar a cópia"))
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -166,4 +232,9 @@ class AjustesActivity : Activity() {
     }
 
     private fun <T : android.view.View> campo(id: Int, tipo: Class<T>): T = tipo.cast(findViewById(id))!!
+
+    private companion object {
+        const val GUARDAR = 10
+        const val RESTAURAR = 11
+    }
 }

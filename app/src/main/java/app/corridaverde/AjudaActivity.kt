@@ -53,6 +53,14 @@ class AjudaActivity : Activity() {
         pergunta(tela, "O que é o Indo pra casa?",
             "No fim do dia, ligue o Indo pra casa no Meu dia ou na notificação. Quando a corrida termina perto da sua casa, o aviso mostra 🏠 Perto de casa, em verde. " +
                 "Se termina longe, aparece só uma linha pequena com a distância. Cadastre a casa em Ajustes. Desliga sozinho no dia seguinte.")
+        pergunta(tela, "Troquei de celular. Meus dados voltam?",
+            "Se o backup do Google estiver ligado no celular, os ganhos, gastos, recibos e ajustes voltam sozinhos quando você " +
+                "configura o celular novo com a mesma conta Google e escolhe restaurar. Esse backup é feito uma vez por dia.\n\n" +
+                "Para garantir, guarde também a sua cópia: em Ajustes › Cópia dos seus dados, toque em Guardar uma cópia " +
+                "(no Google Drive) ou em Mandar a cópia (WhatsApp ou e-mail para você mesmo). No celular novo, toque em Restaurar " +
+                "de uma cópia e escolha o arquivo.") {
+            addView(v.botao("Abrir Ajustes") { startActivity(Intent(this@AjudaActivity, AjustesActivity::class.java)) }, cheio())
+        }
         pergunta(tela, "O app aceita ou recusa corrida sozinho?",
             "Não. O Corrida Verde só lê a tela e mostra o aviso. Quem aceita ou recusa é sempre você, no app da Uber.")
     }

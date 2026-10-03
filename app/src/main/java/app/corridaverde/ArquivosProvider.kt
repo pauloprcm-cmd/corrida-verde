@@ -12,7 +12,7 @@ import java.io.File
 import java.io.FileNotFoundException
 
 /**
- * Entrega os PDFs dos recibos ao Gmail, ao WhatsApp e a outros apps, só para leitura e só
+ * Entrega os PDFs dos recibos (e a cópia dos dados) ao Gmail, ao WhatsApp e a outros apps, só para leitura e só
  * com a permissão dada no envio. A única escrita aceita é a da câmera na foto da assinatura.
  * Faz o papel do FileProvider sem precisar do AndroidX.
  */
@@ -36,7 +36,11 @@ class ArquivosProvider : ContentProvider() {
         }
     }
 
-    override fun getType(uri: Uri) = if (uri.lastPathSegment == FOTO_ASSINATURA) "image/jpeg" else "application/pdf"
+    override fun getType(uri: Uri) = when (uri.lastPathSegment?.substringAfterLast('.')) {
+        "jpg" -> "image/jpeg"
+        "zip" -> "application/zip"
+        else -> "application/pdf"
+    }
     override fun insert(uri: Uri, values: ContentValues?): Uri? = null
     override fun delete(uri: Uri, selection: String?, args: Array<out String>?) = 0
     override fun update(uri: Uri, values: ContentValues?, selection: String?, args: Array<out String>?) = 0

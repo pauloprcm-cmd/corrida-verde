@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backup automático do Google (Android 11 ou mais antigo): ganhos, gastos, recibos e ajustes voltam
+     no celular novo. Fora: diagnóstico, vídeos da gravação (passariam dos 25 MB e o backup pararia)
+     e o "já ligou a leitura" da tela inicial, que é deste celular. -->
+<full-backup-content>
+    <exclude domain="file" path="diagnostico.txt" />
+    <exclude domain="file" path="status.txt" />
+    <exclude domain="external" path="." />
+    <exclude domain="sharedpref" path="inicio.xml" />
+</full-backup-content>

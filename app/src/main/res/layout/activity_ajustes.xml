@@ -100,6 +100,16 @@
 
         <Button android:id="@+id/salvar" style="@style/Botao.Principal" android:layout_width="match_parent" android:layout_height="68dp" android:layout_marginTop="28dp" android:text="Salvar ajustes" />
 
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="40dp" android:text="Cópia dos seus dados" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ganhos, gastos, recibos, assinatura e ajustes ficam só neste celular. O backup do Google guarda uma cópia sozinho uma vez por dia, mas vale guardar a sua também: no Google Drive, no WhatsApp ou no e-mail. No celular novo, toque em Restaurar e escolha o arquivo." />
+
+        <Button android:id="@+id/guardarCopia" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Guardar uma cópia (Drive ou celular)" />
+
+        <Button android:id="@+id/enviarCopia" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Mandar a cópia por WhatsApp ou e-mail" />
+
+        <Button android:id="@+id/restaurarCopia" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Restaurar de uma cópia" />
+
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="40dp" android:text="Avançado" />
 
         <Button android:id="@+id/ativar" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Abrir a tela de Acessibilidade" />
