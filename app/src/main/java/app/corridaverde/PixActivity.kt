@@ -157,6 +157,7 @@ class PixActivity : Activity() {
             setText(valor)
             textSize = 18f
             inputType = tipo
+            if ((tipo and InputType.TYPE_NUMBER_FLAG_DECIMAL) != 0) aceitarVirgula()
             setTextColor(PRETO)
         }.also { tela.addView(it) }
     }

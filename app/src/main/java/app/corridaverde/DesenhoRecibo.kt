@@ -154,6 +154,7 @@ object DesenhoRecibo {
         c.drawText("Página 1/1", w - m, ALTURA - 18f, pincel(8f, cor = CINZA).apply { textAlign = Paint.Align.RIGHT })
         val pe = rodapeLargo(c, f, ALTURA - 32f, m)
         val dados = listOfNotNull(
+            f.m.nome.takeIf { f.m.fantasia.isNotBlank() && it.isNotBlank() },
             f.m.documento.takeIf { it.isNotBlank() },
             f.m.placa.takeIf { it.isNotBlank() }?.let { "Placa $it" },
             f.m.cidade.takeIf { it.isNotBlank() },
@@ -415,9 +416,12 @@ object DesenhoRecibo {
         return y + l.height
     }
 
-    private fun pincel(tamanho: Float, negrito: Boolean = false, cor: Int = PRETO) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = tamanho
-        color = cor
-        typeface = if (negrito) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-    }
+    // SUBPIXEL e LINEAR: sem eles o Android arredonda a largura de cada letra no tamanho pequeno e, ao ampliar
+    // para a prévia, as palavras saem com espaços tortos ("Confirmamos o recebimento").
+    private fun pincel(tamanho: Float, negrito: Boolean = false, cor: Int = PRETO) =
+        TextPaint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG or Paint.LINEAR_TEXT_FLAG).apply {
+            textSize = tamanho
+            color = cor
+            typeface = if (negrito) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        }
 }

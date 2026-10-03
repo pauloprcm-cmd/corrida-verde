@@ -20,6 +20,7 @@ class AjustesActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_ajustes)
         findViewById<LinearLayout>(R.id.coluna).addView(Visual(this).topo("Ajustes"), 0)
+        listOf(R.id.buscaMax, R.id.notaMinima, R.id.viagemLonga, R.id.raioCasa).forEach { findViewById<EditText>(it).aceitarVirgula() }
 
         val cfg = Config.carregar(this)
         campo(R.id.luxo, RadioButton::class.java).isChecked = cfg.luxo

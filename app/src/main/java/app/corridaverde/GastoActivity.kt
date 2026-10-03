@@ -94,7 +94,11 @@ class GastoActivity : Activity() {
             setPadding(dp(20), dp(8), dp(20), 0)
         }
         fun rotulo(texto: String) = TextView(this).apply { text = texto; setPadding(0, dp(10), 0, 0) }.also { caixa.addView(it) }
-        fun campo(valor: String, tipoTeclado: Int) = EditText(this).apply { setText(valor); inputType = tipoTeclado }.also { caixa.addView(it) }
+        fun campo(valor: String, tipoTeclado: Int) = EditText(this).apply {
+            setText(valor)
+            inputType = tipoTeclado
+            if ((tipoTeclado and InputType.TYPE_NUMBER_FLAG_DECIMAL) != 0) aceitarVirgula()
+        }.also { caixa.addView(it) }
         val decimal = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
 
         if (fala != null) caixa.addView(TextView(this).apply { text = "Você disse: “$fala”"; setTypeface(typeface, android.graphics.Typeface.ITALIC) })

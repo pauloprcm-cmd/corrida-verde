@@ -47,6 +47,8 @@ class ReciboActivity : Activity() {
     /** Número do recibo que está sendo corrigido, se for correção. */
     private var substitui: Int? = null
     private var lancarGanho = false
+    /** O recibo que está na prévia, para redesenhar quando o motorista volta de gravar a assinatura. */
+    private var previa: Recibo? = null
     /** Campo que espera o endereço do "📍 Aqui" enquanto o Android pede a permissão de localização. */
     private var campoAqui: EditText? = null
 
@@ -82,8 +84,14 @@ class ReciboActivity : Activity() {
         }
     }
 
+    private fun assinar(foto: Boolean) {
+        startActivityForResult(Intent(this, AssinaturaActivity::class.java).putExtra(AssinaturaActivity.EXTRA_FOTO, foto), ASSINAR)
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        // Voltou da assinatura: mostra o mesmo recibo de novo, agora assinado.
+        if (requestCode == ASSINAR) { previa?.let { telaPrevia(it) }; return }
         if (requestCode != OUVIR) return
         val fala = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         if (resultCode != RESULT_OK || fala.isNullOrBlank()) {
@@ -186,12 +194,21 @@ class ReciboActivity : Activity() {
         }
         val nota = TextView(this).apply { textSize = 14f; setTextColor(CINZA) }
         fun desenhar() {
-            imagem.setImageBitmap(DesenhoRecibo.imagem(DesenhoRecibo.folha(this, r, motorista)))
-            nota.text = if (r.numero == 0) "O número (nº ${numero(Recibos.proximoNumero(this))}) é dado quando você envia." else "Recibo nº ${r.numeroTexto} emitido."
+            previa = r
+            // Antes de enviar, a prévia já mostra o número que o recibo vai ter; ele só fica guardado no envio,
+            // para não pular números quando o motorista desiste.
+            val mostrado = if (r.numero == 0) r.copy(numero = Recibos.proximoNumero(this)) else r
+            imagem.setImageBitmap(DesenhoRecibo.imagem(DesenhoRecibo.folha(this, mostrado, motorista)))
+            nota.text = if (r.numero == 0) "Este será o recibo nº ${mostrado.numeroTexto}." else "Recibo nº ${r.numeroTexto} enviado."
         }
         desenhar()
         tela.addView(imagem, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         tela.addView(nota)
+        if (!EstiloRecibo.arquivoAssinatura(this).exists()) {
+            aviso("Você ainda não gravou a sua assinatura. Grave uma vez e todo recibo já sai assinado.")
+            botao("✍️ Assinar com o dedo") { assinar(foto = false) }
+            botao("📷 Foto da assinatura no papel") { assinar(foto = true) }
+        }
 
         /** Na primeira vez que envia, o recibo ganha número, fica guardado e (se marcado) vira ganho. */
         fun emitido(): Recibo {
@@ -365,6 +382,7 @@ class ReciboActivity : Activity() {
             setText(valor)
             textSize = 18f
             inputType = if ((tipo and InputType.TYPE_MASK_CLASS) == 0) InputType.TYPE_CLASS_TEXT or tipo else tipo
+            if ((tipo and InputType.TYPE_NUMBER_FLAG_DECIMAL) != 0) aceitarVirgula()
         }.also { tela.addView(it) }
     }
 
@@ -388,6 +406,7 @@ class ReciboActivity : Activity() {
 
     companion object {
         private const val OUVIR = 1
+        private const val ASSINAR = 2
         private const val PEDIR_LOCAL = 2
         private const val EXTRA_FALA = "fala"
         private const val EXTRA_OUVIR = "ouvir"
