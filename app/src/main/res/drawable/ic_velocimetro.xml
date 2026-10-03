@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Velocímetro da marca: arco vermelho, amarelo e verde, ponteiro no verde. Gerado a partir do ícone aprovado. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:strokeColor="#FF5A4F" android:strokeWidth="2.40" android:pathData="M6.63,18.17 A7.60,7.60 0 0,1 4.77,10.45" />
+    <path android:strokeColor="#F5C21B" android:strokeWidth="2.40" android:pathData="M5.06,9.71 A7.60,7.60 0 0,1 9.40,5.66" />
+    <path android:strokeColor="#3BFF8B" android:strokeWidth="2.40" android:pathData="M10.16,5.43 A7.60,7.60 0 0,1 17.37,18.17" />
+    <path android:strokeColor="#EAF5EE" android:strokeWidth="1.32" android:strokeLineCap="round" android:pathData="M12.64,12.16 L15.12,9.68" />
+    <path android:strokeColor="#EAF5EE" android:strokeWidth="1.20" android:pathData="M11.01,12.80 a0.99,0.99 0 1,0 1.98,0 a0.99,0.99 0 1,0 -1.98,0" />
+</vector>

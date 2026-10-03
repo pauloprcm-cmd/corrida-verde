@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ajustes: o que antes ficava na tela inicial comprida. O topo (‹ Ajustes) entra pelo código. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/fundo"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:id="@+id/coluna"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="32dp">
+
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="0dp" android:text="Taxímetro" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="O aviso compara a oferta com a tabela do táxi de São Paulo." />
+
+        <RadioGroup
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton android:id="@+id/comum" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Comum" />
+
+            <RadioButton android:id="@+id/luxo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Luxo" />
+        </RadioGroup>
+
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Quando fica verde ou amarelo" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="O número grande do aviso é quanto a oferta paga perto do que o taxímetro daria. Abaixo do amarelo, fica vermelho." />
+
+        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Verde a partir de (% do taxímetro)" />
+
+        <EditText android:id="@+id/limiteVerde" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Amarelo a partir de (% do taxímetro)" />
+
+        <EditText android:id="@+id/limiteAmarelo" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Busca maior que (km) baixa uma cor" />
+
+        <EditText android:id="@+id/buscaMax" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Avisos na oferta" />
+
+        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Avisar nota do passageiro abaixo de" />
+
+        <EditText android:id="@+id/notaMinima" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+
+        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Avisar viagem longa acima de (km)" />
+
+        <EditText android:id="@+id/viagemLonga" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Onde o aviso aparece" />
+
+        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Distância do aviso até o topo da tela" />
+
+        <EditText android:id="@+id/posicaoY" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Número maior = aviso mais para baixo. Teste para ver se ficou em cima de alguma coisa." />
+
+        <Button android:id="@+id/testar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Testar o aviso" />
+
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Alerta de radar" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Quando o Waze, a 99 ou o Google Maps avisam de um radar, a tela ganha uma borda amarela e aparece a placa do limite com a distância. Na navegação da Uber o radar é só um desenho no mapa, e o app não consegue ler." />
+
+        <CheckBox android:id="@+id/radar" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mostrar alerta de radar" />
+
+        <CheckBox android:id="@+id/radarSom" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tocar som baixo (três batidinhas)" />
+
+        <Button android:id="@+id/testarRadar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Testar alerta de radar" />
+
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Indo pra casa" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No fim do dia, ligue o Indo pra casa no Meu dia ou na notificação. Quando a corrida termina perto da sua casa, o aviso mostra 🏠 Perto de casa, em verde. Para calcular, o endereço do destino é consultado no mapa do Google pela internet. Desliga sozinho no dia seguinte." />
+
+        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Endereço de casa" />
+
+        <EditText android:id="@+id/casaEndereco" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Rua, número e bairro" android:inputType="textPostalAddress" />
+
+        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Perto de casa é até (km)" />
+
+        <EditText android:id="@+id/raioCasa" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+
+        <Button android:id="@+id/salvarCasa" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="Salvar casa" />
+
+        <TextView android:id="@+id/casaStatus" style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" />
+
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gravação da corrida" />
+
+        <CheckBox android:id="@+id/gravar" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Botão Gravar corrida na notificação" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Use só no táxi de rua, de ponto ou em corrida particular. Em corrida da Uber ou da 99, não use: a câmera fica ocupada e a gravação do próprio app pode falhar, e é ela que defende você numa reclamação. Grava em 480p (uns 300 MB por hora) na pasta Movies/Corrida Verde; passando de 5 GB, apaga os vídeos mais antigos. Nunca começa sozinha." />
+
+        <Button android:id="@+id/salvar" style="@style/Botao.Principal" android:layout_width="match_parent" android:layout_height="68dp" android:layout_marginTop="28dp" android:text="Salvar ajustes" />
+
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="40dp" android:text="Avançado" />
+
+        <Button android:id="@+id/ativar" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Abrir a tela de Acessibilidade" />
+
+        <CheckBox android:id="@+id/diagnostico" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Modo diagnóstico (guarda os textos lidos)" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Só ligue quando o suporte pedir: ele junta o que o app leu da tela para achar um problema." />
+
+        <Button android:id="@+id/compartilhar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Enviar diagnóstico" />
+
+        <Button android:id="@+id/limparDiagnostico" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Limpar diagnóstico" />
+
+        <TextView
+            android:id="@+id/textoDiagnostico"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:fontFamily="monospace"
+            android:textColor="@color/texto2"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

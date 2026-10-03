@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cores do visual aprovado em 01/10/2026: fundo escuro, verde da marca; amarelo e vermelho só para avisos. -->
+<resources>
+    <color name="fundo">#08100C</color>
+    <color name="cartao">#111B16</color>
+    <color name="borda">#24332A</color>
+    <color name="verde">#3BFF8B</color>
+    <color name="amarelo">#F5C21B</color>
+    <color name="vermelho">#FF5A4F</color>
+    <color name="vermelho_fundo">#22100F</color>
+    <color name="vermelho_claro">#FF9A8F</color>
+    <color name="texto">#E9F2EC</color>
+    <color name="texto2">#93A39A</color>
+    <color name="toque">#223D2E</color>
+</resources>
