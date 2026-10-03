@@ -48,8 +48,9 @@ class AjudaActivity : Activity() {
                 "Você confere o recibo e manda pelo WhatsApp ou pelo e-mail. O valor entra sozinho como ganho de Táxi.\n\n" +
                 "Em Meu dia › Personalizar, escolha o modelo, a cor, a logo e grave a sua assinatura.")
         pergunta(tela, "Como funciona o alerta de radar?",
-            "Quando o Waze, a 99 ou o Google Maps avisam de um radar, a tela ganha uma borda amarela e aparece a placa do limite com a distância. " +
-                "Na navegação da Uber o radar é só um desenho no mapa, sem texto, e o app não consegue ler.")
+            "Funciona só navegando pelo Waze ou pela 99. Quando eles avisam de um radar, a tela ganha uma borda amarela e aparece a placa do limite com a distância.\n\n" +
+                "No Google Maps e na navegação da Uber o alerta não funciona: eles só desenham o radar no mapa, sem dizer a que distância ele está. " +
+                "Se quiser o alerta, navegue pelo Waze ou pela 99.")
         pergunta(tela, "O que é o Indo pra casa?",
             "No fim do dia, ligue o Indo pra casa no Meu dia ou na notificação. Quando a corrida termina perto da sua casa, o aviso mostra 🏠 Perto de casa, em verde. " +
                 "Se termina longe, aparece só uma linha pequena com a distância. Cadastre a casa em Ajustes. Desliga sozinho no dia seguinte.")

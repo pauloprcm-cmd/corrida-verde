@@ -18,7 +18,8 @@ import java.time.LocalTime
 
 /**
  * Lê a oferta do app de motorista da Uber e mostra o popup. Também lê o aviso de
- * radar do Waze e da 99 e mostra o alerta de radar.
+ * radar do Waze e da 99 e mostra o alerta de radar (no Google Maps e na navegação da
+ * Uber o aviso não traz a distância, então lá não tem alerta).
  * Só lê: não toca na tela, não aceita nem recusa corridas.
  *
  * O cartão da oferta não aparece na árvore da janela da Uber: ele só chega pelos
@@ -55,7 +56,6 @@ class LeitorService : AccessibilityService() {
     /** Cada tela diferente e a hora em que apareceu pela primeira vez, para achar o início e o fim da corrida. */
     private val telas = LinkedHashMap<String, String>()
     private val acompanhaRadar = AcompanhaRadar()
-    private val estimaRadarMaps = EstimaRadar()
     /** Apps com leitura de radar já marcada: no máximo uma leitura da tela a cada meio segundo. */
     private val radarAgendado = mutableSetOf<String>()
     /** Só na linha do radar: última vez que pediu para salvar o diagnóstico. */
@@ -63,8 +63,6 @@ class LeitorService : AccessibilityService() {
     private val eventosDosNavegadores = ConcurrentHashMap<String, Int>()
     /** Textos que falam de radar ou limite, para descobrir o que cada navegador mostra. */
     private val textosDeRadar = ConcurrentLinkedDeque<String>()
-    /** Cada decisão do radar no Maps (aviso lido, velocidade, conta, se mostrou), para achar onde erra. */
-    private val contaRadarMaps = ConcurrentLinkedDeque<String>()
     /** Notificações da 99 e da Uber: a oferta da 99 pode vir por elas. */
     private val notificacoes = ArrayDeque<String>()
     /**
@@ -177,29 +175,19 @@ class LeitorService : AccessibilityService() {
 
     /**
      * Lê a tela inteira do navegador atrás do aviso de radar. Enquanto ele aparece, o alerta
-     * fica na tela; 4 s depois de sumir (radar passou), o alerta some também. No Maps o aviso
-     * some antes do radar: lá quem decide é a conta do [EstimaRadar].
+     * fica na tela; 4 s depois de sumir (radar passou), o alerta some também.
      */
     private fun lerRadar(app: String) {
         val cfg = Config.carregar(this)
         if (!cfg.radar && !cfg.diagnostico) return
-        // Na navegação da Uber o radar é só desenho no mapa: só lê para o diagnóstico.
-        if (app == UBER && !cfg.diagnostico) return
-        val tela = windows.firstNotNullOfOrNull { w -> w.root?.takeIf { it.packageName?.toString() == app } }
-        // No Maps o alerta segue pela conta mesmo sem a janela dele (outro app por cima).
-        if (tela == null && app != MAPS) return
-        val textos = tela?.let { textosDo(it, LIMITE_NOS_RADAR) } ?: emptyList()
+        // Na navegação da Uber e no Google Maps o aviso vem sem distância: só lê para o diagnóstico.
+        val semAlerta = app == UBER || app == MAPS
+        if (semAlerta && !cfg.diagnostico) return
+        val tela = windows.firstNotNullOfOrNull { w -> w.root?.takeIf { it.packageName?.toString() == app } } ?: return
+        val textos = textosDo(tela, LIMITE_NOS_RADAR)
         if (cfg.diagnostico) guardarTextosDeRadar(app, textos)
-        if (!cfg.radar) return
-        if (app == MAPS && !cfg.radarMaps) return
-        val lido = LeitorRadar.ler(textos)
-        val radar = if (app == MAPS) {
-            val velocidade = LeitorVelocidade.ler(textos)
-            estimaRadarMaps.atualizar(lido, velocidade, System.currentTimeMillis())
-                // O Maps só manda evento quando a tela muda: enquanto há radar, a conta anda sozinha.
-                .also { if (it != null) marcarLeituraDoRadar(app, 1_000) }
-                .also { if (cfg.diagnostico) guardarContaDoMaps(tela, textos, lido, velocidade, it) }
-        } else lido
+        if (!cfg.radar || semAlerta) return
+        val radar = LeitorRadar.ler(textos)
         if (radar == null || radar.metros > ALERTA_RADAR_METROS) return
         val novo = acompanhaRadar.visto(radar, System.currentTimeMillis())
         handler.post {
@@ -208,29 +196,6 @@ class LeitorService : AccessibilityService() {
             handler.removeCallbacks(esconderRadar)
             handler.postDelayed(esconderRadar, 4_000)
         }
-    }
-
-    private fun guardarContaDoMaps(tela: AccessibilityNodeInfo?, textos: List<String>, lido: Radar?, velocidade: Int?, mostrado: Radar?) {
-        // O Maps às vezes escreve só "Radar de velocidade", sem a distância: registra também.
-        val semDistancia = textos.firstOrNull { RADAR_SEM_DISTANCIA.containsMatchIn(it) && LeitorRadar.ler(listOf(it)) == null }
-        if (lido == null && semDistancia == null && mostrado == null && contaRadarMaps.peekLast()?.endsWith("nada") == true) return
-        val onde = if ((lido != null || semDistancia != null) && tela != null) acharRadar(tela)?.let { n ->
-            val r = Rect().also { n.getBoundsInScreen(it) }
-            " · nó ${n.className?.toString()?.substringAfterLast('.')} em ${r.centerX()},${r.centerY()} (${r.width()}x${r.height()})"
-        } ?: " · nó não achado" else ""
-        val linha = (if (tela == null) "sem janela do Maps" else "aviso ${lido?.metros?.let { "$it m" } ?: semDistancia?.let { "\"${it.take(40)}\" sem distância" } ?: "nenhum"}") +
-            " · vel ${velocidade ?: "?"} · ${textos.size} textos$onde → " + (mostrado?.let { "mostra ${it.metros} m" } ?: "nada")
-        contaRadarMaps.addLast("${LocalTime.now().withNano(0)} $linha")
-        while (contaRadarMaps.size > 150) contaRadarMaps.pollFirst()
-    }
-
-    /** O nó com o texto do aviso de radar, para ver se ele fica no desenho do mapa. */
-    private fun acharRadar(n: AccessibilityNodeInfo, visitados: IntArray = IntArray(1)): AccessibilityNodeInfo? {
-        if (!n.isVisibleToUser || ++visitados[0] > LIMITE_NOS_RADAR) return null
-        val t = listOfNotNull(n.text?.toString(), n.contentDescription?.toString())
-        if (t.any { RADAR_SEM_DISTANCIA.containsMatchIn(it) }) return n
-        for (i in 0 until n.childCount) n.getChild(i)?.let { c -> acharRadar(c, visitados)?.let { return it } }
-        return null
     }
 
     private fun guardarTextosDeRadar(app: String, textos: List<String>) {
@@ -451,8 +416,6 @@ class LeitorService : AccessibilityService() {
             telas.values.forEach { appendLine(it) }
             appendLine("--- textos sobre radar e limite ---")
             textosDeRadar.forEach { appendLine(it) }
-            appendLine("--- radar no Maps, segundo a segundo (aviso lido → o que o app mostrou) ---")
-            contaRadarMaps.forEach { appendLine(it) }
             appendLine("--- Indo pra casa (destino → distância até casa, tempo da consulta) ---")
             consultasCasa.forEach { appendLine(it) }
             appendLine("--- textos com R$ (com o de antes e o de depois) ---")
@@ -468,7 +431,6 @@ class LeitorService : AccessibilityService() {
     /** Apaga o que o diagnóstico juntou até agora (os arquivos e as listas na memória). */
     fun limparDiagnostico() {
         textosDeRadar.clear()
-        contaRadarMaps.clear()
         eventosDosNavegadores.clear()
         fundo.post {
             eventosDaUber = 0
@@ -518,7 +480,6 @@ class LeitorService : AccessibilityService() {
         const val ARQUIVO_STATUS = "status.txt"
         private const val LIMITE_NOS = 400
         private const val LIMITE_NOS_RADAR = 1500
-        private val RADAR_SEM_DISTANCIA = Regex("""radar(?! de viagens)""", RegexOption.IGNORE_CASE)
         private const val LIMITE_NOS_ESTRUTURA = 120
         private val PARECE_OFERTA = Regex("""\d\s*(min|km|m\b)""")
         var instancia: LeitorService? = null

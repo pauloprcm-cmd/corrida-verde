@@ -68,15 +68,11 @@
 
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Alerta de radar" />
 
-        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Quando o Waze, a 99 ou o Google Maps avisam de um radar, a tela ganha uma borda amarela e aparece a placa do limite com a distância. Na navegação da Uber o radar é só um desenho no mapa, e o app não consegue ler." />
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Funciona só navegando pelo Waze ou pela 99: quando eles avisam de um radar, a tela ganha uma borda amarela e aparece a placa do limite com a distância. No Google Maps e na navegação da Uber não funciona, porque eles não escrevem a distância até o radar." />
 
         <CheckBox android:id="@+id/radar" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mostrar alerta de radar" />
 
-        <CheckBox android:id="@+id/radarSom" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tocar som baixo (três batidinhas)" />
-
-        <CheckBox android:id="@+id/radarMaps" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Alerta também no Google Maps (em teste)" />
-
-        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Waze e na 99 o alerta é firme. O Google Maps só mostra a distância do primeiro radar do trajeto; nos outros não dá para avisar." />
+        <CheckBox android:id="@+id/radarSom" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tocar som (três batidinhas)" />
 
         <Button android:id="@+id/testarRadar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Testar alerta de radar" />
 

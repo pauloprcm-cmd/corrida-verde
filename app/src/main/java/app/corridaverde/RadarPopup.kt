@@ -120,7 +120,7 @@ class RadarPopup(private val ctx: Context) {
             val total = (TAXA * 0.7).toInt()
             val s = DoubleArray(total)
             for ((i, inicio) in listOf(0.0, 0.16, 0.32).withIndex()) {
-                val vol = if (i == 2) 0.42 else 0.31
+                val vol = if (i == 2) 0.67 else 0.50
                 val ini = (inicio * TAXA).toInt()
                 for (k in 0 until (0.30 * TAXA).toInt()) {
                     val t = k.toDouble() / TAXA
