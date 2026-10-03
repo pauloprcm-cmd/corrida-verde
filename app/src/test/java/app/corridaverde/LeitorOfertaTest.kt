@@ -67,8 +67,14 @@ class LeitorOfertaTest {
         assertEquals(6.1, o.viagemKm, 0.001)
         assertEquals("Rua B, Vila Mariana, São Paulo", o.destino)
         val r = Avaliador.avaliar(o, Config(), LocalDateTime.of(2026, 10, 1, 17, 28))
-        assertTrue(r.pctMax!! > r.pct)
-        assertEquals(Cor.VERMELHO, r.cor)
+        // uberTAXI paga o taxímetro (~R$ 50,04) até o máximo (R$ 46): recebe 92% dele.
+        assertEquals(92, r.pct)
+        assertEquals(Cor.AMARELO, r.cor)
+        assertEquals(46.0 / 6.2, r.rsKm, 0.01)
+        // Máximo acima do taxímetro: recebe o taxímetro inteiro, 100%.
+        val folgado = Avaliador.avaliar(o.copy(valorMax = 70.0), Config(), LocalDateTime.of(2026, 10, 1, 17, 28))
+        assertEquals(100, folgado.pct)
+        assertEquals(Cor.VERDE, folgado.cor)
     }
 
     @Test

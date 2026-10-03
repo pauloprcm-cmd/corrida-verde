@@ -5,9 +5,6 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.text.SpannableString
-import android.text.Spanned
-import android.text.style.RelativeSizeSpan
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.LinearLayout
@@ -27,15 +24,12 @@ class Popup(private val ctx: Context) {
         }
         val o = r.oferta
         val linhas = listOf(
-            (o.valorMax?.let { "R$ ${br(o.valor)} – R$ ${br(it)}" } ?: "R$ ${br(o.valor)}") + " · taxímetro R$ ${br(r.taximetro)}${if (r.bandeira2) " (B2)" else ""}",
+            (o.valorMax?.let { "pelo taxímetro, até R$ ${br(it)}" } ?: "R$ ${br(o.valor)}") +
+                " · taxímetro R$ ${br(r.taximetro)}${if (r.bandeira2) " (B2)" else ""}",
             "R$ ${br(r.rsKm)}/km" + (r.rsHora?.let { " · R$ ${br(it)}/h" } ?: ""),
             "busca ${km(o.buscaKm)} · viagem ${km(o.viagemKm)} ${o.viagemMin} min",
         ) + (if (r.minParado > 0) listOf("trânsito: ~${r.minParado} min parado no taxímetro") else emptyList()) + (if (r.avisos.isNotEmpty()) listOf("⚠ " + r.avisos.joinToString(" · ")) else emptyList())
-        // Faixa do Táxi: o mínimo grande (é ele que decide a cor) e até quanto pode chegar, menor.
-        val titulo = SpannableString("${r.pct}%" + (r.pctMax?.let { " → até $it%" } ?: ""))
-        // Sem faixa o trecho menor fica vazio, e o Android não aceita marcação de tamanho zero (o leitor caía).
-        if (r.pctMax != null) titulo.setSpan(RelativeSizeSpan(0.5f), "${r.pct}%".length, titulo.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        exibir(cfg, cor, titulo, linhas)
+        exibir(cfg, cor, "${r.pct}%", linhas)
     }
 
     private fun exibir(cfg: Config, cor: Int, titulo: CharSequence, linhas: List<String>) {

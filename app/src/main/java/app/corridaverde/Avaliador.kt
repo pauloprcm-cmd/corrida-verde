@@ -11,9 +11,8 @@ data class Resultado(
     val oferta: Oferta,
     val taximetro: Double,
     val minParado: Int,
-    /** A cor e o número grande vêm do mínimo; na faixa do Táxi este é o % do máximo. */
+    /** % do taxímetro que a oferta paga; no uberTAXI, o taxímetro limitado ao máximo da faixa. */
     val pct: Int,
-    val pctMax: Int?,
     val cor: Cor,
     val rsKm: Double,
     val rsHora: Double?,
@@ -62,7 +61,10 @@ object Avaliador {
     fun avaliar(o: Oferta, cfg: Config, agora: LocalDateTime = LocalDateTime.now()): Resultado {
         val b2 = Tarifa.bandeira2(agora)
         val taximetro = Tarifa.taximetro(o.viagemKm, o.viagemMin, cfg.luxo, b2)
-        val pct = (o.valor / taximetro * 100).roundToInt()
+        // uberTAXI (faixa "R$ 31 - R$ 46"): a Uber paga o taxímetro, mas nunca mais que o máximo.
+        // Se o taxímetro estimado passa do máximo, a diferença o motorista perde.
+        val recebe = o.valorMax?.let { minOf(it, taximetro) } ?: o.valor
+        val pct = (recebe / taximetro * 100).roundToInt()
         var cor = when {
             pct >= cfg.limiteVerde -> Cor.VERDE
             pct >= cfg.limiteAmarelo -> Cor.AMARELO
@@ -77,10 +79,9 @@ object Avaliador {
             taximetro = taximetro,
             minParado = Tarifa.minutosParado(o.viagemKm, o.viagemMin).roundToInt(),
             pct = pct,
-            pctMax = o.valorMax?.let { (it / taximetro * 100).roundToInt() },
             cor = cor,
-            rsKm = if (kmTotal > 0) o.valor / kmTotal else 0.0,
-            rsHora = if (minTotal > 0) o.valor / minTotal * 60 else null,
+            rsKm = if (kmTotal > 0) recebe / kmTotal else 0.0,
+            rsHora = if (minTotal > 0) recebe / minTotal * 60 else null,
             bandeira2 = b2,
             buscaLonga = buscaLonga,
             avisos = avisos(o, cfg, buscaLonga),
