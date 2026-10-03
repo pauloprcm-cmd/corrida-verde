@@ -79,6 +79,10 @@ class MainActivity : Activity() {
         campo(R.id.registrarGasto, Button::class.java).setOnClickListener {
             startActivity(Intent(this, GastoActivity::class.java))
         }
+        campo(R.id.cobrarPix, Button::class.java).setOnClickListener { startActivity(PixActivity.abrir(this)) }
+        campo(R.id.fazerRecibo, Button::class.java).setOnClickListener { startActivity(ReciboActivity.porVoz(this)) }
+        campo(R.id.recibosEnviados, Button::class.java).setOnClickListener { startActivity(ReciboActivity.lista(this)) }
+        campo(R.id.personalizarRecibo, Button::class.java).setOnClickListener { startActivity(Intent(this, PersonalizarReciboActivity::class.java)) }
         val abrirDinheiro = { _: android.view.View -> startActivity(Intent(this, DinheiroActivity::class.java)) }
         campo(R.id.verDinheiro, Button::class.java).setOnClickListener(abrirDinheiro)
         findViewById<android.view.View>(R.id.cartaoHoje).setOnClickListener(abrirDinheiro)

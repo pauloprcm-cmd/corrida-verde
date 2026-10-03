@@ -50,5 +50,7 @@ android {
 }
 
 dependencies {
+    // Desenha o QR Code do Pix (só a parte de gerar; Java puro, sem AndroidX).
+    implementation("com.google.zxing:core:3.5.3")
     testImplementation("junit:junit:4.13.2")
 }

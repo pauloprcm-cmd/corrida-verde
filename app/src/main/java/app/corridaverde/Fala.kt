@@ -55,6 +55,9 @@ object LeitorFala {
 
     private fun app(t: String) = NOMES.firstOrNull { it.second.containsMatchIn(t) }?.first
 
+    /** O valor de uma fala qualquer ("recibo de 23 e 50…"). */
+    fun valorDaFala(fala: String) = valor(normal(fala))
+
     private fun valor(t: String): Double? {
         REAIS_E_CENTAVOS.find(t)?.let { m -> return m.groupValues[1].toDouble() + m.groupValues[2].padEnd(2, '0').toDouble() / 100 }
         val numeros = NUMERO.findAll(t).filter { !DEPOIS_CONTAGEM.containsMatchIn(t.substring(it.range.last + 1)) }.toList()

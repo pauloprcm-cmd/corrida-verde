@@ -58,6 +58,18 @@ class GastoActivity : Activity() {
             finish()
             return
         }
+        // "Recibo de 50 reais, da Paulista até a Vila Mariana": vai para o recibo, que lança o ganho junto.
+        if (LeitorRecibo.ehRecibo(fala)) {
+            startActivity(ReciboActivity.daFala(this, fala))
+            finish()
+            return
+        }
+        // "Gera um Pix de 70 reais", "QR Code de 70": mostra o QR Code para o passageiro pagar.
+        if (LeitorPix.ehPix(fala)) {
+            startActivity(PixActivity.daFala(this, fala))
+            finish()
+            return
+        }
         formulario(fala)
     }
 

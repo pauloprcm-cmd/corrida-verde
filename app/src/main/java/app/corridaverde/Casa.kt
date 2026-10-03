@@ -89,6 +89,29 @@ object Enderecos {
         return Ponto(a.latitude, a.longitude) to (a.getAddressLine(0) ?: texto)
     }
 
+    /** Rua, número e bairro de um ponto (o "📍 Aqui" do recibo). */
+    fun endereco(ctx: Context, p: Ponto): String? {
+        if (!Geocoder.isPresent()) return null
+        val g = Geocoder(ctx, Locale("pt", "BR"))
+        val a: Address = runCatching {
+            if (Build.VERSION.SDK_INT >= 33) {
+                var r: Address? = null
+                val pronto = CountDownLatch(1)
+                g.getFromLocation(p.lat, p.lon, 1, object : Geocoder.GeocodeListener {
+                    override fun onGeocode(lista: MutableList<Address>) { r = lista.firstOrNull(); pronto.countDown() }
+                    override fun onError(erro: String?) { pronto.countDown() }
+                })
+                pronto.await(8, TimeUnit.SECONDS)
+                r
+            } else {
+                @Suppress("DEPRECATION")
+                g.getFromLocation(p.lat, p.lon, 1)?.firstOrNull()
+            }
+        }.getOrNull() ?: return null
+        val rua = listOfNotNull(a.thoroughfare, a.subThoroughfare).joinToString(", ").ifBlank { null }
+        return listOfNotNull(rua, a.subLocality).joinToString(" - ").ifBlank { a.getAddressLine(0) }
+    }
+
     private fun carregar(ctx: Context) {
         if (carregado) return
         carregado = true

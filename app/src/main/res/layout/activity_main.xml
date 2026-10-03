@@ -343,6 +343,56 @@
             android:layout_height="wrap_content"
             android:text="Registrar ganho ou gasto por voz" />
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Cobrar no Pix"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="O passageiro perguntou se aceita Pix? No Registrar por voz, fale: “gera um Pix de 70 reais”. O app mostra o QR Code com o valor para ele pagar pelo app do banco."
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/cobrarPix"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mostrar QR Code do Pix" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Recibo"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Para o passageiro de rua, de ponto ou particular. No Registrar por voz, fale: “recibo de 50 reais, da Avenida Paulista até a Vila Mariana, no Pix”. Você confere o recibo e manda pelo WhatsApp ou pelo e-mail. O valor entra sozinho como ganho de Táxi."
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/fazerRecibo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Fazer recibo por voz" />
+
+        <Button
+            android:id="@+id/recibosEnviados"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Recibos enviados" />
+
+        <Button
+            android:id="@+id/personalizarRecibo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Personalizar recibo" />
+
 
         <TextView
             android:layout_width="wrap_content"
