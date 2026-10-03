@@ -15,6 +15,19 @@ class RadarTest {
     }
 
     @Test
+    fun leRadarSemaforicoDoWaze() {
+        // Textos do diagnóstico de 03/10/2026: sem o "de" depois de "Radar".
+        val a = LeitorRadar.ler(listOf("Radar semafórico em 240 m"))!!
+        assertEquals(240, a.metros)
+        assertEquals("semafórico", a.tipo)
+        val b = LeitorRadar.ler(listOf("Av. Inajar de Souza", "Radar semafórico e velocidade em 20 m"))!!
+        assertEquals(20, b.metros)
+        assertEquals("semafórico e velocidade", b.tipo)
+        // Sem distância (o Waze também escreve assim) não dá para alertar.
+        assertNull(LeitorRadar.ler(listOf("Radar semafórico e velocidade")))
+    }
+
+    @Test
     fun leRadarDa99ComLimite() {
         val r = LeitorRadar.ler(listOf("2,9 km", "Av. Deputado Emílio Carlos", "50", "Limite", "9 min", "3,6 km", "Radar de semáforo e velocidade a 286 m"))!!
         assertEquals(286, r.metros)

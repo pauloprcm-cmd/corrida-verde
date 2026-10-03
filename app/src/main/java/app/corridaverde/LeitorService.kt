@@ -58,6 +58,8 @@ class LeitorService : AccessibilityService() {
     private val estimaRadarMaps = EstimaRadar()
     /** Apps com leitura de radar já marcada: no máximo uma leitura da tela a cada meio segundo. */
     private val radarAgendado = mutableSetOf<String>()
+    /** Só na linha do radar: última vez que pediu para salvar o diagnóstico. */
+    private var ultimoPedidoStatus = 0L
     private val eventosDosNavegadores = ConcurrentHashMap<String, Int>()
     /** Textos que falam de radar ou limite, para descobrir o que cada navegador mostra. */
     private val textosDeRadar = ConcurrentLinkedDeque<String>()
@@ -155,6 +157,12 @@ class LeitorService : AccessibilityService() {
         fundoRadar.post {
             eventosDosNavegadores.merge(app, 1) { a, b -> a + b }
             marcarLeituraDoRadar(app, 500)
+            // Só com o Waze ou o Maps aberto não chega evento da Uber nem da 99: o diagnóstico é salvo daqui.
+            val agora = System.currentTimeMillis()
+            if (app in NAVEGADORES && agora - ultimoPedidoStatus >= 5_000 && Config.carregar(this).diagnostico) {
+                ultimoPedidoStatus = agora
+                fundo.post { runCatching { salvarStatus() } }
+            }
         }
     }
 
@@ -183,6 +191,7 @@ class LeitorService : AccessibilityService() {
         val textos = tela?.let { textosDo(it, LIMITE_NOS_RADAR) } ?: emptyList()
         if (cfg.diagnostico) guardarTextosDeRadar(app, textos)
         if (!cfg.radar) return
+        if (app == MAPS && !cfg.radarMaps) return
         val lido = LeitorRadar.ler(textos)
         val radar = if (app == MAPS) {
             val velocidade = LeitorVelocidade.ler(textos)

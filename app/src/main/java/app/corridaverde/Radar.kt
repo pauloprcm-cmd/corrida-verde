@@ -4,8 +4,9 @@ package app.corridaverde
 data class Radar(val metros: Int, val limite: Int?, val tipo: String)
 
 object LeitorRadar {
-    // "Radar de velocidade em 210 m" (Waze), "Radar de semáforo e velocidade a 286 m" (99).
-    private val RADAR = Regex("""radar( de [\p{L} ]{3,40}?)?\s+(?:em|a|à)\s+(\d+(?:[.,]\d+)?)\s*(km|m)\b""", RegexOption.IGNORE_CASE)
+    // "Radar de velocidade em 210 m" e "Radar semafórico e velocidade em 240 m" (Waze),
+    // "Radar de semáforo e velocidade a 286 m" (99).
+    private val RADAR = Regex("""radar((?: de)? [\p{L} ]{3,40}?)?\s+(?:em|a|à)\s+(\d+(?:[.,]\d+)?)\s*(km|m)\b""", RegexOption.IGNORE_CASE)
     // "50 Limite" (99 e Uber) ou "Limite de velocidade 60".
     private val LIMITE = Regex("""\b(\d{2,3})\s*(?:km/h\s*)?limite\b|\blimite(?: de velocidade)?:?\s*(\d{2,3})\b""", RegexOption.IGNORE_CASE)
 

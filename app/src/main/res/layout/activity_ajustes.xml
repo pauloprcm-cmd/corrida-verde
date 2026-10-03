@@ -74,6 +74,10 @@
 
         <CheckBox android:id="@+id/radarSom" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tocar som baixo (três batidinhas)" />
 
+        <CheckBox android:id="@+id/radarMaps" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Alerta também no Google Maps (em teste)" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="No Waze e na 99 o alerta é firme. O Google Maps só mostra a distância do primeiro radar do trajeto; nos outros não dá para avisar." />
+
         <Button android:id="@+id/testarRadar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Testar alerta de radar" />
 
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Indo pra casa" />

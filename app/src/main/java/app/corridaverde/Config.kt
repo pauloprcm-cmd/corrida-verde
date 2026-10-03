@@ -15,6 +15,11 @@ data class Config(
     val gravar: Boolean = false,
     val radar: Boolean = true,
     val radarSom: Boolean = true,
+    /**
+     * O Google Maps só escreve a distância do primeiro radar da navegação; nos outros fica só o
+     * ícone no mapa. Por isso o alerta no Maps vem desligado.
+     */
+    val radarMaps: Boolean = false,
     /** Casa do motorista, para o modo "Indo pra casa". */
     val casaEndereco: String = "",
     val casa: Ponto? = null,
@@ -37,6 +42,7 @@ data class Config(
             .putBoolean("gravar", gravar)
             .putBoolean("radar", radar)
             .putBoolean("radarSom", radarSom)
+            .putBoolean("radarMaps", radarMaps)
             .putString("casaEndereco", casaEndereco)
             .putString("casa", casa?.let { "${it.lat};${it.lon}" } ?: "")
             .putFloat("raioCasaKm", raioCasaKm.toFloat())
@@ -62,6 +68,7 @@ data class Config(
                 gravar = p.getBoolean("gravar", d.gravar),
                 radar = p.getBoolean("radar", d.radar),
                 radarSom = p.getBoolean("radarSom", d.radarSom),
+                radarMaps = p.getBoolean("radarMaps", d.radarMaps),
                 casaEndereco = p.getString("casaEndereco", d.casaEndereco) ?: "",
                 casa = p.getString("casa", "")?.split(';')?.takeIf { it.size == 2 }?.let { (a, b) ->
                     val lat = a.toDoubleOrNull()
