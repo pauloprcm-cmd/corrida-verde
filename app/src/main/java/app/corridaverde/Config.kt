@@ -17,6 +17,8 @@ data class Config(
     val gravar: Boolean = false,
     val radar: Boolean = true,
     val radarSom: Boolean = true,
+    /** Aviso também nas ofertas da 99 (lidas por imagem). */
+    val aviso99: Boolean = true,
     /** Casa do motorista, para o modo "Indo pra casa". */
     val casaEndereco: String = "",
     val casa: Ponto? = null,
@@ -40,6 +42,7 @@ data class Config(
             .putBoolean("gravar", gravar)
             .putBoolean("radar", radar)
             .putBoolean("radarSom", radarSom)
+            .putBoolean("aviso99", aviso99)
             .putString("casaEndereco", casaEndereco)
             .putString("casa", casa?.let { "${it.lat};${it.lon}" } ?: "")
             .putFloat("raioCasaKm", raioCasaKm.toFloat())
@@ -67,6 +70,7 @@ data class Config(
                 gravar = p.getBoolean("gravar", d.gravar),
                 radar = p.getBoolean("radar", d.radar),
                 radarSom = p.getBoolean("radarSom", d.radarSom),
+                aviso99 = p.getBoolean("aviso99", d.aviso99),
                 casaEndereco = p.getString("casaEndereco", d.casaEndereco) ?: "",
                 casa = p.getString("casa", "")?.split(';')?.takeIf { it.size == 2 }?.let { (a, b) ->
                     val lat = a.toDoubleOrNull()

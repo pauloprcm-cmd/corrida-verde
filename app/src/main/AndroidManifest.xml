@@ -31,6 +31,11 @@
         android:label="Corrida Verde"
         android:theme="@android:style/Theme.Material.Light">
 
+        <!-- Leitor de texto (OCR) da oferta da 99: o Google Play baixa uma vez só, fora do APK. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
+
         <!-- Tela inicial: LIGADO/DESLIGADO, quanto sobrou hoje e os quatro botões. -->
         <activity
             android:name=".MainActivity"

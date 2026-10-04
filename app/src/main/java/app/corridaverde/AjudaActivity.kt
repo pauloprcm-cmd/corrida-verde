@@ -29,10 +29,12 @@ class AjudaActivity : Activity() {
             addView(v.botao("Liberar configuração restrita") { liberar(this@AjudaActivity) }, cheio())
         }
         pergunta(tela, "O que o aviso colorido quer dizer?",
-            "O número grande é quanto a oferta da Uber paga perto do que o taxímetro daria na mesma viagem.\n\n" +
+            "O número grande é quanto a oferta da Uber ou da 99 paga perto do que o taxímetro daria na mesma viagem.\n\n" +
                 "Verde: ${cfg.limiteVerde}% ou mais.\nAmarelo: de ${cfg.limiteAmarelo}% a ${cfg.limiteVerde - 1}%.\nVermelho: abaixo de ${cfg.limiteAmarelo}%.\n\n" +
                 "Se a busca até o passageiro passar de ${Popup.br(cfg.buscaMaxKm).removeSuffix(",00")} km, a cor cai um nível. " +
-                "Dá para mudar esses números em Ajustes.")
+                "Dá para mudar esses números em Ajustes.\n\n" +
+                "Na 99, o valor pode subir no fim da corrida (taxímetro, trânsito, pedágio): o aviso mostra o mínimo. " +
+                "Para não ver o aviso na 99, desmarque em Ajustes › Avisos na oferta.")
         pergunta(tela, "Como registro ganhos e gastos falando?",
             "Toque em Falar um ganho ou gasto (no Meu dia) ou em Registrar por voz, na notificação do Corrida Verde.\n\n" +
                 "Ganhos: fale o total que a tela do app mostra, como “ganhei 346 na 99”. Ele substitui o que você já tinha falado da 99 hoje. " +

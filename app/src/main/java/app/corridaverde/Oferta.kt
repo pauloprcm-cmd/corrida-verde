@@ -65,6 +65,31 @@ object LeitorOferta {
         )
     }
 
+    /**
+     * Cartão da oferta da 99, lido do print pelo OCR (linhas de cima para baixo). O valor grande é o primeiro
+     * R$: depois dele vêm o R$/km, o "R$ 4,02 a mais por corrida" e as contrapropostas do Negocia, que são maiores.
+     * A nota vem como "4,92 · 127 corridas".
+     */
+    fun ler99(linhas: List<String>): Oferta? {
+        // O OCR às vezes lê o "$" como S ou 5.
+        val tela = linhas.joinToString("\n").replace(REAL_DO_OCR, "R\$")
+        val base = ler(listOf(tela)) ?: return null
+        val valor = VALOR.findAll(tela).firstOrNull { !POR_UNIDADE.containsMatchIn(tela.substring(it.range.last + 1)) }
+            ?.let { dinheiro(it.groupValues[1]) } ?: return null
+        val nota = NOTA_99.find(tela)?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull()
+        // O destino ocupa até duas linhas depois da viagem e às vezes termina cortado ("Avenida Dep. Cantídio Samp...").
+        val ultimoTrecho = TRECHO.findAll(tela).last { it.groupValues[1].isNotBlank() }
+        val destino = tela.substring(ultimoTrecho.range.last + 1).lines().map { it.trim() }.filter { it.isNotEmpty() }
+            .takeWhile { it.any(Char::isLetter) && "R$" !in it && !NAO_ENDERECO.containsMatchIn(it) }.take(2)
+            .joinToString(" ").replace(CORTADO, "").trim().trimEnd(',').takeIf { it.length >= 5 }
+        return base.copy(valor = valor, valorMax = null, nota = nota ?: base.nota, destino = destino)
+    }
+
+    private val CORTADO = Regex("""\s*\S*(\.{3}|…)$""")
+
+    private val REAL_DO_OCR = Regex("""\bR\s?[S5]\s?(?=\d)""")
+    private val NOTA_99 = Regex("""\b([1-5][,.]\d{2})\D{0,4}\d+\s*corridas""", RegexOption.IGNORE_CASE)
+
     private fun dinheiro(s: String) = s.replace(".", "").replace(',', '.').toDouble()
 
     private fun km(m: MatchResult): Double {

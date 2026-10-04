@@ -38,6 +38,7 @@ class AjustesActivity : Activity() {
         campo(R.id.gravar, CheckBox::class.java).isChecked = cfg.gravar
         campo(R.id.radar, CheckBox::class.java).isChecked = cfg.radar
         campo(R.id.radarSom, CheckBox::class.java).isChecked = cfg.radarSom
+        campo(R.id.aviso99, CheckBox::class.java).isChecked = cfg.aviso99
         campo(R.id.casaEndereco, EditText::class.java).setText(cfg.casaEndereco)
         campo(R.id.raioCasa, EditText::class.java).setText(cfg.raioCasaKm.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString().replace('.', ',') })
         campo(R.id.salvarCasa, Button::class.java).setOnClickListener { salvarCasa() }
@@ -242,6 +243,7 @@ class AjustesActivity : Activity() {
             gravar = campo(R.id.gravar, CheckBox::class.java).isChecked,
             radar = campo(R.id.radar, CheckBox::class.java).isChecked,
             radarSom = campo(R.id.radarSom, CheckBox::class.java).isChecked,
+            aviso99 = campo(R.id.aviso99, CheckBox::class.java).isChecked,
         )
     }
 

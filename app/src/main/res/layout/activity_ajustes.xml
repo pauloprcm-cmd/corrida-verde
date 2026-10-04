@@ -56,6 +56,10 @@
 
         <EditText android:id="@+id/viagemLonga" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
 
+        <CheckBox android:id="@+id/aviso99" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Mostrar o aviso também nas ofertas da 99" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="A 99 não deixa ler o texto da oferta: o app tira uma foto da tela só quando ela chega, lê o valor e os km e apaga a foto na hora. Na 99 o valor pode subir no fim da corrida (taxímetro, trânsito, pedágio), então o aviso mostra o mínimo. Precisa do Android 11 ou mais novo." />
+
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Onde o aviso aparece" />
 
         <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Distância do aviso até o topo da tela" />

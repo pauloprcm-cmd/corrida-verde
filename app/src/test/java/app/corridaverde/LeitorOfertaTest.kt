@@ -180,4 +180,65 @@ class LeitorOfertaTest {
         assertEquals(0.705, o.buscaKm, 0.001)
         assertEquals(1.1, o.viagemKm, 0.001)
     }
+
+    @Test
+    fun leTaxiDa99PeloOcr() {
+        // Print da oferta da 99 de 04/10/2026, 11:57, como o OCR devolve (com sobras do mapa nas bordas).
+        val o = LeitorOferta.ler99(listOf(
+            "Táxi", "3", "NE", "R$14,05", "01,0x", "lo", "4,92 • 127 corridas •", "Perfil Premium",
+            "7 min (1,6 km)", "EMEF Osvaldo Quirino Simões, Rua", "Camilo Peçanha, 10 - 10",
+            "4 min (1,2 km)", "TriMais Supermercado - Peri, Avenida", "Peri Ronchetti, 870",
+        ))!!
+        assertEquals(14.05, o.valor, 0.001)
+        assertEquals(1.6, o.buscaKm, 0.001)
+        assertEquals(7, o.buscaMin)
+        assertEquals(1.2, o.viagemKm, 0.001)
+        assertEquals(4, o.viagemMin)
+        assertEquals(4.92, o.nota!!, 0.001)
+        assertEquals(0, o.paradas)
+        assertEquals("TriMais Supermercado - Peri, Avenida Peri Ronchetti, 870", o.destino)
+    }
+
+    @Test
+    fun le99PgtoNoAppSemPegarOAMaisPorCorrida() {
+        val o = LeitorOferta.ler99(listOf(
+            "Pgto. no app", "1", "R$14,70", "1,4x", "R$3,78/km", "R$4,02 a mais por corrida", "5,00 • 31 corridas • Cartão verif.",
+            "6 min (1,5 km)", "Rua A, 80", "6 min (2,3 km)", "Rua B, Avenida C",
+        ))!!
+        assertEquals(14.70, o.valor, 0.001)
+        assertEquals(5.0, o.nota!!, 0.001)
+        assertEquals(2.3, o.viagemKm, 0.001)
+    }
+
+    @Test
+    fun le99NegociaSemPegarAsContrapropostas() {
+        val o = LeitorOferta.ler99(listOf(
+            "Negocia • Dinheiro", "RS23,68", "R$2,08/km", "4,90 • 214 corridas • Perfil Premium",
+            "5 min (1 km)", "Rua A, 725", "31 min (10,4 km)", "Shopping D, Avenida Cruzeiro do Sul,", "1100 - Canindé",
+            "Aceitar por R$23,68", "R$24,86", "R$25,57", "R$26,05",
+        ))!!
+        assertEquals(23.68, o.valor, 0.001)
+        assertEquals(1.0, o.buscaKm, 0.001)
+        assertEquals(10.4, o.viagemKm, 0.001)
+        assertEquals(31, o.viagemMin)
+        // O "Aceitar por" não entra no endereço.
+        assertEquals("Shopping D, Avenida Cruzeiro do Sul, 1100 - Canindé", o.destino)
+    }
+
+    @Test
+    fun destinoCortadoDa99PerdeAPalavraPelaMetade() {
+        // Print de 04/10/2026, 11:13: o fim do endereço vem cortado com reticências.
+        val o = LeitorOferta.ler99(listOf(
+            "Táxi", "R$11,96", "1,0x", "4,89 • 225 corridas • Cartão verif.",
+            "7 min (1,1 km)", "Rua São Gonçalo do Abaeté, 236,", "Parque Tiete",
+            "3 min (890 m)", "EE Profª Luiza Salette Junca de", "Almeida, Avenida Dep. Cantídio Samp...",
+        ))!!
+        assertEquals(0.89, o.viagemKm, 0.001)
+        assertEquals("EE Profª Luiza Salette Junca de Almeida, Avenida Dep. Cantídio", o.destino)
+    }
+
+    @Test
+    fun telaDa99SemOfertaNaoViraOferta() {
+        assertNull(LeitorOferta.ler99(listOf("Atualização nas configurações", "Para ajudar você a conseguir mais corridas")))
+    }
 }

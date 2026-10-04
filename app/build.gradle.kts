@@ -52,5 +52,8 @@ android {
 dependencies {
     // Desenha o QR Code do Pix (só a parte de gerar; Java puro, sem AndroidX).
     implementation("com.google.zxing:core:3.5.3")
+    // Lê o cartão da oferta da 99 no print (OCR). Versão dos serviços do Google: o leitor é baixado uma vez,
+    // fora do APK, que continua pequeno para o atualizador.
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
     testImplementation("junit:junit:4.13.2")
 }
