@@ -382,7 +382,7 @@ class ReciboActivity : Activity() {
             setText(valor)
             textSize = 18f
             inputType = if ((tipo and InputType.TYPE_MASK_CLASS) == 0) InputType.TYPE_CLASS_TEXT or tipo else tipo
-            if ((tipo and InputType.TYPE_NUMBER_FLAG_DECIMAL) != 0) aceitarVirgula()
+            if (ehDecimal(tipo)) aceitarVirgula()
         }.also { tela.addView(it) }
     }
 

@@ -1,18 +1,25 @@
 package app.corridaverde
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityService.ScreenshotResult
+import android.accessibilityservice.AccessibilityService.TakeScreenshotCallback
+import android.annotation.TargetApi
 import android.app.Notification
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
+import java.util.concurrent.Executor
 import java.time.LocalDateTime
 import java.time.LocalTime
 
@@ -71,6 +78,10 @@ class LeitorService : AccessibilityService() {
      */
     private val estruturas99 = LinkedHashMap<String, String>()
     private var ultimaEstrutura99 = 0L
+    /** Teste do print da oferta da 99: se o cartão está na tela, quando foi o último print e o resultado de cada um. */
+    private var ofertaNa99 = false
+    private var ultimoPrint99 = 0L
+    private val prints99 = ArrayDeque<String>()
     /** Cada texto com R$ que a Uber e a 99 mostram, com o texto de antes e o de depois. */
     private val textosComValor = LinkedHashMap<String, String>()
 
@@ -225,10 +236,74 @@ class LeitorService : AccessibilityService() {
                 val cfg = Config.carregar(this)
                 if (cfg.diagnostico) {
                     guardarEstrutura99()
+                    conferirOferta99()
                     salvarDiagnostico("99", todos, oferta, tipo, classe)
                 }
             }
         }
+    }
+
+    /**
+     * Teste da leitura da 99 por imagem: o cartão da oferta é desenhado em Flutter e chega sem texto.
+     * Quando ele aparece (a janela ganha o [ID_OFERTA_99]), tira um print da tela e guarda para o diagnóstico.
+     */
+    private fun conferirOferta99() {
+        if (Build.VERSION.SDK_INT < 30) return
+        val aberta = windows.any { w ->
+            val raiz = w.root?.takeIf { it.packageName?.toString() == NOVENTA_E_NOVE } ?: return@any false
+            raiz.findAccessibilityNodeInfosByViewId(ID_OFERTA_99).any { it.isVisibleToUser }
+        }
+        val agora = System.currentTimeMillis()
+        if (aberta && !ofertaNa99 && agora - ultimoPrint99 > 5_000) {
+            ultimoPrint99 = agora
+            // Espera o cartão terminar de subir.
+            fundo.postDelayed({ runCatching { tirarPrint99() } }, 300)
+        }
+        ofertaNa99 = aberta
+    }
+
+    @TargetApi(30)
+    private fun tirarPrint99() {
+        takeScreenshot(Display.DEFAULT_DISPLAY, Executor { fundo.post(it) }, object : TakeScreenshotCallback {
+            override fun onSuccess(r: ScreenshotResult) {
+                val hora = LocalTime.now().withNano(0)
+                runCatching {
+                    val hw = Bitmap.wrapHardwareBuffer(r.hardwareBuffer, r.colorSpace) ?: error("sem imagem")
+                    val bmp = hw.copy(Bitmap.Config.ARGB_8888, false)
+                    hw.recycle()
+                    val preto = quasePreto(bmp)
+                    File(ArquivosProvider.pasta(this@LeitorService), PRINT_99).outputStream().use {
+                        bmp.compress(Bitmap.CompressFormat.JPEG, 85, it)
+                    }
+                    anotarPrint99("$hora print ${bmp.width}x${bmp.height}${if (preto) " · SAIU PRETO" else ""}")
+                    bmp.recycle()
+                }.onFailure { anotarPrint99("$hora print falhou: ${it.message}") }
+                r.hardwareBuffer.close()
+            }
+
+            override fun onFailure(codigo: Int) {
+                anotarPrint99("${LocalTime.now().withNano(0)} o Android recusou o print (código $codigo)")
+            }
+        })
+    }
+
+    /** A metade de baixo (onde fica o cartão) quase toda preta: a 99 bloqueia print. */
+    private fun quasePreto(b: Bitmap): Boolean {
+        var soma = 0L
+        var n = 0
+        for (y in b.height / 2 until b.height step 40) for (x in 0 until b.width step 40) {
+            val p = b.getPixel(x, y)
+            soma += Color.red(p) + Color.green(p) + Color.blue(p)
+            n++
+        }
+        return n > 0 && soma / (3 * n) < 12
+    }
+
+    private fun anotarPrint99(linha: String) {
+        prints99.addLast(linha)
+        while (prints99.size > 10) prints99.removeFirst()
+        ultimoStatus = 0
+        salvarStatus()
     }
 
     /** Guarda o título e o texto da notificação da Uber e da 99, para o diagnóstico. */
@@ -424,6 +499,9 @@ class LeitorService : AccessibilityService() {
             notificacoes.forEach { appendLine(it) }
             appendLine("--- estrutura das janelas da 99 (cada formato novo) ---")
             estruturas99.values.forEach { appendLine(it) }
+            appendLine("--- prints da oferta da 99 (códigos: 1 desligue e ligue a leitura, 2 cedo demais, 5 tela protegida) ---")
+            if (Build.VERSION.SDK_INT < 30) appendLine("Este Android não deixa tirar print (precisa do Android 11)")
+            prints99.forEach { appendLine(it) }
         }
         File(filesDir, ARQUIVO_STATUS).writeText(texto)
     }
@@ -444,6 +522,9 @@ class LeitorService : AccessibilityService() {
             ultimoDiagnostico = ""
             ultimoStatus = 0
             ultimaEstrutura99 = 0
+            prints99.clear()
+            ofertaNa99 = false
+            ultimoPrint99 = 0
             apagarArquivosDoDiagnostico(this)
         }
     }
@@ -478,6 +559,9 @@ class LeitorService : AccessibilityService() {
         const val NOVENTA_E_NOVE = "com.app99.driver"
         const val ARQUIVO_DIAGNOSTICO = "diagnostico.txt"
         const val ARQUIVO_STATUS = "status.txt"
+        /** Fica na pasta do [ArquivosProvider] para ir junto com o diagnóstico; o cache não entra no backup. */
+        const val PRINT_99 = "oferta-99.jpg"
+        private const val ID_OFERTA_99 = "$NOVENTA_E_NOVE:id/broad_order_container"
         private const val LIMITE_NOS = 400
         private const val LIMITE_NOS_RADAR = 1500
         private const val LIMITE_NOS_ESTRUTURA = 120
@@ -488,6 +572,7 @@ class LeitorService : AccessibilityService() {
         fun apagarArquivosDoDiagnostico(ctx: android.content.Context) {
             File(ctx.filesDir, ARQUIVO_STATUS).delete()
             File(ctx.filesDir, ARQUIVO_DIAGNOSTICO).delete()
+            File(ArquivosProvider.pasta(ctx), PRINT_99).delete()
         }
     }
 }

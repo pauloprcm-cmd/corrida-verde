@@ -12,6 +12,8 @@ data class Config(
     val viagemLongaKm: Double = 25.0,
     val posicaoY: Int = 60,
     val diagnostico: Boolean = false,
+    /** Até quando o modo diagnóstico fica ligado (24 h depois de ligar), para ninguém esquecer ele lendo a tela. */
+    val diagnosticoAte: Long = 0,
     val gravar: Boolean = false,
     val radar: Boolean = true,
     val radarSom: Boolean = true,
@@ -34,6 +36,7 @@ data class Config(
             .putFloat("viagemLongaKm", viagemLongaKm.toFloat())
             .putInt("posicaoY", posicaoY)
             .putBoolean("diagnostico", diagnostico)
+            .putLong("diagnosticoAte", diagnosticoAte)
             .putBoolean("gravar", gravar)
             .putBoolean("radar", radar)
             .putBoolean("radarSom", radarSom)
@@ -46,6 +49,7 @@ data class Config(
 
     companion object {
         private const val ARQUIVO = "config"
+        const val DURACAO_DIAGNOSTICO = 24 * 60 * 60_000L
 
         fun carregar(ctx: Context): Config {
             val p = ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
@@ -58,7 +62,8 @@ data class Config(
                 notaMinima = p.getFloat("notaMinima", d.notaMinima.toFloat()).toDouble(),
                 viagemLongaKm = p.getFloat("viagemLongaKm", d.viagemLongaKm.toFloat()).toDouble(),
                 posicaoY = p.getInt("posicaoY", d.posicaoY),
-                diagnostico = p.getBoolean("diagnostico", d.diagnostico),
+                diagnostico = p.getBoolean("diagnostico", d.diagnostico) && System.currentTimeMillis() < p.getLong("diagnosticoAte", 0),
+                diagnosticoAte = p.getLong("diagnosticoAte", 0),
                 gravar = p.getBoolean("gravar", d.gravar),
                 radar = p.getBoolean("radar", d.radar),
                 radarSom = p.getBoolean("radarSom", d.radarSom),

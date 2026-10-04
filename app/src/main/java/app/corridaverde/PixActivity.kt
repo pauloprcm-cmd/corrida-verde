@@ -117,8 +117,8 @@ class PixActivity : Activity() {
         }
         tela.addView(tipo)
         val chave = campo("Chave", conta.chave, InputType.TYPE_CLASS_TEXT)
-        val nome = campo("Seu nome (como está no banco)", conta.nome.ifBlank { Motorista.carregar(this).nome }, InputType.TYPE_TEXT_FLAG_CAP_WORDS)
-        val cidade = campo("Cidade", conta.cidade, InputType.TYPE_TEXT_FLAG_CAP_WORDS)
+        val nome = campo("Seu nome (como está no banco)", conta.nome.ifBlank { Motorista.carregar(this).nome }, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS)
+        val cidade = campo("Cidade", conta.cidade, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS)
         botao("Salvar") {
             val nova = ContaPix(tipos[tipo.selectedItemPosition], chave.text.toString().trim(), nome.text.toString().trim(), cidade.text.toString().trim())
             when {
@@ -157,7 +157,7 @@ class PixActivity : Activity() {
             setText(valor)
             textSize = 18f
             inputType = tipo
-            if ((tipo and InputType.TYPE_NUMBER_FLAG_DECIMAL) != 0) aceitarVirgula()
+            if (ehDecimal(tipo)) aceitarVirgula()
             setTextColor(PRETO)
         }.also { tela.addView(it) }
     }

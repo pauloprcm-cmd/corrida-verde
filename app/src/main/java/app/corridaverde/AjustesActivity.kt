@@ -2,6 +2,7 @@ package app.corridaverde
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ClipData
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -70,9 +71,18 @@ class AjustesActivity : Activity() {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"), RESTAURAR)
         }
         campo(R.id.compartilhar, Button::class.java).setOnClickListener {
+            // Com o print da oferta da 99 (teste da leitura por imagem), a imagem vai junto com o texto.
+            val print = File(ArquivosProvider.pasta(this), LeitorService.PRINT_99).takeIf { it.isFile }
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, diagnostico())
+                print?.let {
+                    val uri = ArquivosProvider.uri(it)
+                    type = "image/jpeg"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri("", uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
             }, "Enviar diagnóstico"))
         }
         campo(R.id.limparDiagnostico, Button::class.java).setOnClickListener {
@@ -216,7 +226,9 @@ class AjustesActivity : Activity() {
             return null
         }
         // Parte com o que não está nestes campos (a casa e o modo Indo pra casa).
-        return Config.carregar(this).copy(
+        val atual = Config.carregar(this)
+        val diagnostico = campo(R.id.diagnostico, CheckBox::class.java).isChecked
+        return atual.copy(
             luxo = campo(R.id.luxo, RadioButton::class.java).isChecked,
             limiteVerde = verde,
             limiteAmarelo = amarelo,
@@ -224,7 +236,9 @@ class AjustesActivity : Activity() {
             notaMinima = nota,
             viagemLongaKm = viagem,
             posicaoY = y,
-            diagnostico = campo(R.id.diagnostico, CheckBox::class.java).isChecked,
+            diagnostico = diagnostico,
+            // Ligou agora: conta as 24 h a partir daqui.
+            diagnosticoAte = if (diagnostico && !atual.diagnostico) System.currentTimeMillis() + Config.DURACAO_DIAGNOSTICO else atual.diagnosticoAte,
             gravar = campo(R.id.gravar, CheckBox::class.java).isChecked,
             radar = campo(R.id.radar, CheckBox::class.java).isChecked,
             radarSom = campo(R.id.radarSom, CheckBox::class.java).isChecked,

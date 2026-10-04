@@ -97,7 +97,7 @@ class GastoActivity : Activity() {
         fun campo(valor: String, tipoTeclado: Int) = EditText(this).apply {
             setText(valor)
             inputType = tipoTeclado
-            if ((tipoTeclado and InputType.TYPE_NUMBER_FLAG_DECIMAL) != 0) aceitarVirgula()
+            if (ehDecimal(tipoTeclado)) aceitarVirgula()
         }.also { caixa.addView(it) }
         val decimal = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
 

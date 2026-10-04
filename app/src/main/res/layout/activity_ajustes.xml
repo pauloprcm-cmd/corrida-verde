@@ -116,7 +116,7 @@
 
         <CheckBox android:id="@+id/diagnostico" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Modo diagnóstico (guarda os textos lidos)" />
 
-        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Só ligue quando o suporte pedir: ele junta o que o app leu da tela para achar um problema." />
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Só ligue quando o suporte pedir: ele junta o que o app leu da tela para achar um problema. Desliga sozinho 24 horas depois de ligado." />
 
         <Button android:id="@+id/compartilhar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Enviar diagnóstico" />
 
