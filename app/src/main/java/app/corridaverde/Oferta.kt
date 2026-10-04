@@ -72,7 +72,7 @@ object LeitorOferta {
      */
     fun ler99(linhas: List<String>): Oferta? {
         // O OCR às vezes lê o "$" como S ou 5.
-        val tela = linhas.joinToString("\n").replace(REAL_DO_OCR, "R\$")
+        val tela = linhas.joinToString("\n").replace(REAL_DO_OCR) { "R\$" }
         val base = ler(listOf(tela)) ?: return null
         val valor = VALOR.findAll(tela).firstOrNull { !POR_UNIDADE.containsMatchIn(tela.substring(it.range.last + 1)) }
             ?.let { dinheiro(it.groupValues[1]) } ?: return null
