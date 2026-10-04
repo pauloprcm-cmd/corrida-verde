@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.Executor
 import java.time.LocalDateTime
 import java.time.LocalTime
+import kotlin.math.abs
 
 /**
  * Lê a oferta do app de motorista da Uber (e a da 99, por print e OCR) e mostra o popup. Também lê o aviso de
@@ -338,12 +339,17 @@ class LeitorService : AccessibilityService() {
         val inicio = System.currentTimeMillis()
         ocr.process(InputImage.fromBitmap(cartao, 0))
             .addOnSuccessListener(noFundo) { t ->
+                // De cima para baixo, como o motorista lê. Texto inclinado é nome de rua do mapa.
+                val todas = t.textBlocks.flatMap { it.lines }.filter { abs(it.angle) <= 15 }.sortedBy { it.boundingBox?.top ?: 0 }
+                // Só o que está escrito no cartão: pedaços do mapa em volta ("G", "jar") entravam no destino.
+                // Se o filtro tirar demais (mapa escuro à noite, cartão de outra cor), lê tudo.
+                val doCartao = todas.filter { l -> l.boundingBox?.let { noCartao(cartao, it) } ?: false }
                 cartao.recycle()
-                // De cima para baixo, como o motorista lê.
-                val linhas = t.textBlocks.flatMap { it.lines }.sortedBy { it.boundingBox?.top ?: 0 }.map { it.text }
+                val linhas = doCartao.map { it.text }.takeIf { LeitorOferta.ler99(it) != null } ?: todas.map { it.text }
                 val oferta = LeitorOferta.ler99(linhas)
+                val fora = todas.filter { it !in doCartao }.joinToString(" | ") { it.text }
                 anotar99("$hora leu em ${System.currentTimeMillis() - inicio} ms: ${oferta ?: "oferta NÃO reconhecida"} | " +
-                    linhas.joinToString(" | ").replace('\n', ' ').take(400))
+                    linhas.joinToString(" | ").replace('\n', ' ').take(400) + (if (fora.isNotEmpty()) " || fora do cartão: ${fora.take(120)}" else ""))
                 if (oferta == null) return@addOnSuccessListener tentarDeNovo99()
                 if (ofertaNa99 && avisar99) {
                     chave99 = oferta.chave
@@ -355,6 +361,15 @@ class LeitorService : AccessibilityService() {
                 // Logo depois de instalar, o Google Play ainda pode estar baixando o leitor de texto.
                 anotar99("$hora o leitor de texto falhou: ${erro.message}")
             }
+    }
+
+    /** O cartão da 99 é escuro e o mapa em volta é claro: confere o fundo logo fora das pontas do texto. */
+    private fun noCartao(b: Bitmap, r: Rect): Boolean {
+        val pontas = listOf(r.left - 6 to r.top - 6, r.right + 6 to r.top - 6, r.left - 6 to r.bottom + 6, r.right + 6 to r.bottom + 6)
+        return pontas.count { (x, y) ->
+            val p = b.getPixel(x.coerceIn(0, b.width - 1), y.coerceIn(0, b.height - 1))
+            (Color.red(p) + Color.green(p) + Color.blue(p)) / 3 < 100
+        } >= 3
     }
 
     /** Não leu: outro print, até 3 por oferta. O Android só deixa tirar um print por segundo. */

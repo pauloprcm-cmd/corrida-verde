@@ -241,4 +241,19 @@ class LeitorOfertaTest {
     fun telaDa99SemOfertaNaoViraOferta() {
         assertNull(LeitorOferta.ler99(listOf("Atualização nas configurações", "Para ajudar você a conseguir mais corridas")))
     }
+
+    @Test
+    fun leTaxiDa99EmMetrosComoOOcrDevolveu() {
+        // Leitura real do OCR de 04/10/2026, 12:41 (só as linhas do cartão; a nota vem com um "t" da estrela).
+        val o = LeitorOferta.ler99(listOf(
+            "Táxi", "3", "R$9,53 O1,0x", "t 4,98 270 corridas", "Perfil Premium",
+            "4 min (701 m)", "Rua José Maria Peixoto, 158, Jardim", "Peri",
+            "2 min (541 m)", "Rua Cariacica, 78, Jardim Santa Cruz",
+        ))!!
+        assertEquals(9.53, o.valor, 0.001)
+        assertEquals(0.701, o.buscaKm, 0.001)
+        assertEquals(0.541, o.viagemKm, 0.001)
+        assertEquals(4.98, o.nota!!, 0.001)
+        assertEquals("Rua Cariacica, 78, Jardim Santa Cruz", o.destino)
+    }
 }
