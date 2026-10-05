@@ -4,7 +4,9 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityService.ScreenshotResult
 import android.accessibilityservice.AccessibilityService.TakeScreenshotCallback
 import android.annotation.TargetApi
+import android.app.KeyguardManager
 import android.app.Notification
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
@@ -12,9 +14,13 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.PowerManager
+import android.os.SystemClock
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
+import android.widget.Toast
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
@@ -50,6 +56,21 @@ class LeitorService : AccessibilityService() {
 
     private lateinit var popup: Popup
     private lateinit var radarPopup: RadarPopup
+    private lateinit var bolinha: Bolinha
+    /** Saber qual app está na frente é uma consulta à tela: linha própria, para não atrasar a oferta. */
+    private val trabalhoBolinha = HandlerThread("bolinha").apply { start() }
+    private val fundoBolinha = Handler(trabalhoBolinha.looper)
+    @Volatile private var bolinhaNaTela = false
+    /** Só na tela (onde chegam os eventos). */
+    private var ultimaOlhadaBolinha = 0L
+    private val olharBolinha = Runnable { runCatching { atualizarBolinha() } }
+    /** Trocar da Uber para outro app não manda evento para cá: enquanto a bolinha está na tela, confere a cada segundo. */
+    private val vigiarBolinha = object : Runnable {
+        override fun run() {
+            runCatching { atualizarBolinha() }
+            if (bolinhaNaTela) fundoBolinha.postDelayed(this, 1_000)
+        }
+    }
     /** Modo "Indo pra casa": o destino vira ponto no mapa pela internet, numa linha própria para não atrasar o popup. */
     private val trabalhoCasa = HandlerThread("casa").apply { start() }
     private val fundoCasa = Handler(trabalhoCasa.looper)
@@ -147,6 +168,14 @@ class LeitorService : AccessibilityService() {
     override fun onServiceConnected() {
         popup = Popup(this)
         radarPopup = RadarPopup(this)
+        bolinha = Bolinha(this, aoTocar = {
+            esconderBolinha()
+            startActivity(Intent(this, GastoActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }, aoDescartar = {
+            bolinhaNaTela = false
+            Config.carregar(this).copy(bolinha = false).salvar(this)
+            Toast.makeText(this, "Bolinha Falar desligada. Para ligar de novo: Ajustes › Botão de falar.", Toast.LENGTH_LONG).show()
+        })
         instancia = this
         handler.postDelayed(buscarAtualizacao, 60_000)
         handler.post(notificar)
@@ -162,6 +191,10 @@ class LeitorService : AccessibilityService() {
         trabalhoRadar.quitSafely()
         fundoCasa.removeCallbacksAndMessages(null)
         trabalhoCasa.quitSafely()
+        bolinhaNaTela = false
+        fundoBolinha.removeCallbacksAndMessages(null)
+        trabalhoBolinha.quitSafely()
+        if (::bolinha.isInitialized) bolinha.esconder()
         if (::popup.isInitialized) popup.esconder()
         if (::radarPopup.isInitialized) radarPopup.esconder()
         reconhecedor?.close()
@@ -174,6 +207,7 @@ class LeitorService : AccessibilityService() {
         val app = e.packageName?.toString() ?: return
         if (e.eventType == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) return notificacao(app, e)
         agendarRadar(app)
+        if (app == UBER || app == NOVENTA_E_NOVE) conferirBolinha()
         if (app in NAVEGADORES) return
         if (app == NOVENTA_E_NOVE) return lerOferta99(e)
         if (app != UBER) return
@@ -186,6 +220,47 @@ class LeitorService : AccessibilityService() {
         val classe = e.className?.toString()
         fundo.post { runCatching { processar(textos, fonte, tipo, classe) } }
     }
+
+    /** Chega evento da Uber ou da 99: vê se é hora de mostrar a bolinha (no máximo a cada meio segundo). */
+    private fun conferirBolinha() {
+        if (bolinhaNaTela) return
+        val agora = SystemClock.uptimeMillis()
+        if (agora - ultimaOlhadaBolinha < 500) return
+        ultimaOlhadaBolinha = agora
+        fundoBolinha.post(olharBolinha)
+    }
+
+    /** Só na linha da bolinha. Ela fica na tela enquanto a Uber ou a 99 estão na frente (não no Waze: atrapalharia a navegação). */
+    private fun atualizarBolinha() {
+        val mostrar = if (!Config.carregar(this).bolinha || !telaLigada()) false
+        else (appNaFrente() ?: return) in APPS_DA_BOLINHA // Não deu para saber agora: deixa como está.
+        handler.post {
+            if (mostrar && !bolinha.visivel) {
+                bolinha.mostrar()
+                if (bolinha.visivel) {
+                    bolinhaNaTela = true
+                    fundoBolinha.removeCallbacks(vigiarBolinha)
+                    fundoBolinha.postDelayed(vigiarBolinha, 1_000)
+                }
+            } else if (!mostrar && bolinha.visivel) esconderBolinha()
+        }
+    }
+
+    private fun esconderBolinha() {
+        bolinhaNaTela = false
+        fundoBolinha.removeCallbacks(vigiarBolinha)
+        bolinha.esconder()
+    }
+
+    /** O app da janela em uso. A bolinha da 99 por cima de outro app não conta: ela não é janela de app. */
+    private fun appNaFrente(): String? {
+        val apps = windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val w = apps.firstOrNull { it.isActive } ?: apps.firstOrNull { it.isFocused } ?: apps.maxByOrNull { it.layer } ?: return null
+        return w.root?.packageName?.toString()
+    }
+
+    private fun telaLigada() = getSystemService(PowerManager::class.java).isInteractive &&
+        !getSystemService(KeyguardManager::class.java).isKeyguardLocked
 
     private fun agendarRadar(app: String) {
         fundoRadar.post {
@@ -649,6 +724,7 @@ class LeitorService : AccessibilityService() {
         private val NOMES = mapOf(UBER to "Uber", "com.app99.driver" to "99", WAZE to "Waze", MAPS to "Maps")
         private val PALAVRAS_DE_RADAR = listOf("radar", "câmera", "camera", "fiscaliza", "limite", "velocidade")
         const val NOVENTA_E_NOVE = "com.app99.driver"
+        private val APPS_DA_BOLINHA = setOf(UBER, NOVENTA_E_NOVE)
         const val ARQUIVO_DIAGNOSTICO = "diagnostico.txt"
         const val ARQUIVO_STATUS = "status.txt"
         /** Fica na pasta do [ArquivosProvider] para ir junto com o diagnóstico; o cache não entra no backup. */

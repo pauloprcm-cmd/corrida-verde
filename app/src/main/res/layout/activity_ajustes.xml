@@ -98,9 +98,9 @@
 
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Botão de falar" />
 
-        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Um ícone Falar na tela inicial do celular, perto da Uber e da 99: um toque e você fala um ganho ou gasto. Para tirar, segure o dedo nele e toque em Remover (o app continua instalado)." />
+        <CheckBox android:id="@+id/bolinha" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Bolinha Falar em cima da Uber e da 99" />
 
-        <Button android:id="@+id/colocarAtalho" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Colocar o botão Falar na tela inicial" />
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Uma bolinha verde com o microfone, como a da 99: um toque e você fala um ganho ou gasto sem sair da Uber ou da 99. Arraste para onde quiser; ela gruda na borda. Não aparece no Waze, para não atrapalhar a navegação. Para tirar, arraste até o X embaixo da tela ou desmarque aqui." />
 
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gravação da corrida" />
 

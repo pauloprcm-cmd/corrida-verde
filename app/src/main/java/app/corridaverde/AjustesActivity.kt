@@ -39,17 +39,12 @@ class AjustesActivity : Activity() {
         campo(R.id.radar, CheckBox::class.java).isChecked = cfg.radar
         campo(R.id.radarSom, CheckBox::class.java).isChecked = cfg.radarSom
         campo(R.id.aviso99, CheckBox::class.java).isChecked = cfg.aviso99
+        campo(R.id.bolinha, CheckBox::class.java).isChecked = cfg.bolinha
         campo(R.id.casaEndereco, EditText::class.java).setText(cfg.casaEndereco)
         campo(R.id.raioCasa, EditText::class.java).setText(cfg.raioCasaKm.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString().replace('.', ',') })
         campo(R.id.salvarCasa, Button::class.java).setOnClickListener { salvarCasa() }
 
         campo(R.id.ativar, Button::class.java).setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-        campo(R.id.colocarAtalho, Button::class.java).setOnClickListener {
-            when {
-                Atalho.naTelaInicial(this) -> Toast.makeText(this, "O botão Falar já está na tela inicial", Toast.LENGTH_LONG).show()
-                !Atalho.colocar(this) -> Toast.makeText(this, "Este celular não deixa o app colocar o ícone. Segure o dedo no ícone do Corrida Verde: a opção Falar aparece ali.", Toast.LENGTH_LONG).show()
-            }
-        }
         campo(R.id.salvar, Button::class.java).setOnClickListener {
             lerCampos()?.let {
                 it.salvar(this)
@@ -250,6 +245,7 @@ class AjustesActivity : Activity() {
             radar = campo(R.id.radar, CheckBox::class.java).isChecked,
             radarSom = campo(R.id.radarSom, CheckBox::class.java).isChecked,
             aviso99 = campo(R.id.aviso99, CheckBox::class.java).isChecked,
+            bolinha = campo(R.id.bolinha, CheckBox::class.java).isChecked,
         )
     }
 

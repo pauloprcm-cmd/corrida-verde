@@ -19,6 +19,8 @@ data class Config(
     val radarSom: Boolean = true,
     /** Aviso também nas ofertas da 99 (lidas por imagem). */
     val aviso99: Boolean = true,
+    /** Bolinha Falar por cima da Uber e da 99. */
+    val bolinha: Boolean = true,
     /** Casa do motorista, para o modo "Indo pra casa". */
     val casaEndereco: String = "",
     val casa: Ponto? = null,
@@ -43,6 +45,7 @@ data class Config(
             .putBoolean("radar", radar)
             .putBoolean("radarSom", radarSom)
             .putBoolean("aviso99", aviso99)
+            .putBoolean("bolinha", bolinha)
             .putString("casaEndereco", casaEndereco)
             .putString("casa", casa?.let { "${it.lat};${it.lon}" } ?: "")
             .putFloat("raioCasaKm", raioCasaKm.toFloat())
@@ -71,6 +74,7 @@ data class Config(
                 radar = p.getBoolean("radar", d.radar),
                 radarSom = p.getBoolean("radarSom", d.radarSom),
                 aviso99 = p.getBoolean("aviso99", d.aviso99),
+                bolinha = p.getBoolean("bolinha", d.bolinha),
                 casaEndereco = p.getString("casaEndereco", d.casaEndereco) ?: "",
                 casa = p.getString("casa", "")?.split(';')?.takeIf { it.size == 2 }?.let { (a, b) ->
                     val lat = a.toDoubleOrNull()

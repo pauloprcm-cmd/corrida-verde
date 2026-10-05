@@ -23,7 +23,7 @@ import java.time.LocalDateTime
 import java.util.Locale
 
 /**
- * Aberta pelo botão Falar (tela principal, Meu dia, ícone da tela inicial ou notificação): ouve a fala, decide se é gasto ou ganho,
+ * Aberta pelo botão Falar (tela principal, Meu dia, bolinha em cima da Uber e da 99 ou notificação): ouve a fala, decide se é gasto ou ganho,
  * mostra o que entendeu para o motorista conferir e salva. Depois de um tanque cheio, mostra o consumo.
  * Aberta por [editar], mostra um lançamento já salvo para corrigir ou apagar.
  */

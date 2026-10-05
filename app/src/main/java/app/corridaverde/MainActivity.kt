@@ -2,10 +2,10 @@ package app.corridaverde
 
 import android.Manifest
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ShortcutManager
 import android.graphics.Paint
 import android.os.Build
 import android.os.Bundle
@@ -38,8 +38,7 @@ class MainActivity : Activity() {
         super.onResume()
         montar()
         Notificacao.atualizar(this)
-        Atalho.publicar(this)
-        oferecerAtalho()
+        tirarIconeFalar()
         Atualizador.verificar(this, perguntar = true) { runOnUiThread { versao?.text = it } }
     }
 
@@ -139,27 +138,17 @@ class MainActivity : Activity() {
     private fun abrir(c: Class<*>) = startActivity(Intent(this, c))
 
     /**
-     * Uma vez só, depois que a leitura já está ligada (para não juntar com os pedidos do primeiro uso):
-     * oferece o ícone "Falar" na tela inicial. Quem disser não acha o botão em Ajustes.
+     * O ícone Falar da tela inicial (versão 1.35) virou a bolinha por cima da Uber e da 99:
+     * desliga o que tiver ficado no celular, com um aviso de onde a voz está agora.
      */
-    private fun oferecerAtalho() {
-        val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (prefs.getBoolean(OFERECEU_ATALHO, false) || LeitorService.instancia == null) return
-        if (!Atalho.podeColocar(this) || Atalho.naTelaInicial(this)) return
-        prefs.edit().putBoolean(OFERECEU_ATALHO, true).apply()
-        AlertDialog.Builder(this)
-            .setTitle("Botão de falar na tela inicial")
-            .setMessage("Quer um botão “Falar” na tela inicial do celular, perto da Uber e da 99? " +
-                "Com um toque você fala um ganho ou gasto, sem abrir o app.\n\n" +
-                "Se não quiser mais, é só segurar o dedo nele e tocar em Remover.")
-            .setPositiveButton("Colocar") { _, _ -> Atalho.colocar(this) }
-            .setNegativeButton("Agora não", null)
-            .show()
+    private fun tirarIconeFalar() = runCatching {
+        val sm = getSystemService(ShortcutManager::class.java) ?: return@runCatching
+        sm.removeAllDynamicShortcuts()
+        sm.disableShortcuts(listOf("falar"), "Agora o Falar é a bolinha verde em cima da Uber e da 99. Pode remover este ícone.")
     }
 
     private companion object {
         const val PREFS = "inicio"
         const val JA_LIGOU = "ja_ligou"
-        const val OFERECEU_ATALHO = "ofereceu_atalho"
     }
 }

@@ -78,7 +78,7 @@
             android:exported="false"
             android:label="Meu dinheiro" />
 
-        <!-- Aberta pelo botão Falar (tela principal, ícone da tela inicial, notificação), por cima do que estiver na tela. -->
+        <!-- Aberta pelo botão Falar (tela principal, bolinha em cima da Uber e da 99, notificação), por cima do que estiver na tela. -->
         <activity
             android:name=".GastoActivity"
             android:excludeFromRecents="true"
