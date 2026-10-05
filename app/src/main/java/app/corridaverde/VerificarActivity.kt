@@ -63,8 +63,10 @@ class VerificarActivity : Activity() {
                 }
             },
             Item("Fora da economia de bateria", (getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName),
-                "O celular pode desligar o app para poupar bateria. Na lista que abrir, procure Corrida Verde e escolha Não otimizar (ou Sem restrições).") {
-                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                "O celular pode desligar o app para poupar bateria. Na tela que abrir, toque em Bateria (ou Uso da bateria) e escolha Sem restrições.") {
+                // A página do próprio app: a lista geral de otimização vem filtrada em muitos celulares (Samsung) e o app some dela.
+                runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
+                    .onFailure { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
             },
             Item("App Uber Driver instalado", instalado(UBER), "Não achei o app de motorista da Uber neste celular.") {
                 abrirLoja(UBER)
