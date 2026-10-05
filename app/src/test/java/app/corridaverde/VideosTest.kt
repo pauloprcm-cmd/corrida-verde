@@ -18,6 +18,13 @@ class VideosTest {
     }
 
     @Test
+    fun videoGuardadoNuncaEApagadoNemEntraNaConta() {
+        val videos = listOf(v("c", 40, 3), v("a", 40, 1), v("b", 40, 2))
+        // Sem o "a" (guardado), b + c = 80 MB: só o "b" precisa sair para caber em 50 MB.
+        assertEquals(listOf("b"), Videos.quaisApagar(videos, limite = 50L * 1024 * 1024, guardados = setOf("a")).map { it.chave })
+    }
+
+    @Test
     fun escolhe480pOuOMenorAcimaDisso() {
         val tamanhos = listOf(1920 to 1080, 1280 to 720, 640 to 480, 320 to 240, 176 to 144)
         assertEquals(640 to 480, Videos.escolherTamanho(tamanhos))

@@ -554,6 +554,8 @@ class LeitorService : AccessibilityService() {
                 chaveAtual = oferta.chave
                 popup.mostrar(Avaliador.avaliar(oferta, cfg), cfg)
                 if (cfg.indoPraCasa) calcularCasa(oferta, cfg)
+                // Gravação ligada e chegou oferta: a corrida de rua já deve ter acabado.
+                GravacaoService.avisarSeGravando(this, "Chegou uma oferta de corrida")
             }
         }
     }

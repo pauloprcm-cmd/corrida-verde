@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter
 /**
  * Os vídeos das corridas ficam em Movies/Corrida Verde, onde a galeria os encontra.
  * Passando de [LIMITE_BYTES], os mais antigos são apagados, como numa câmera veicular.
+ * Os vídeos que o motorista guardou ficam fora da conta e nunca são apagados.
  */
 object Videos {
     const val PASTA = "Corrida Verde"
@@ -24,13 +25,16 @@ object Videos {
     data class Video(val chave: String, val bytes: Long, val criado: Long)
 
     /** Arquivo aberto para o gravador escrever. */
-    class Destino(val fd: ParcelFileDescriptor, val uri: Uri?, val arquivo: File?)
+    class Destino(val fd: ParcelFileDescriptor, val uri: Uri?, val arquivo: File?) {
+        val chave get() = uri?.toString() ?: arquivo!!.path
+    }
 
-    /** Os mais antigos saem primeiro, até o total caber no limite. */
-    fun quaisApagar(videos: List<Video>, limite: Long = LIMITE_BYTES): List<Video> {
-        var total = videos.sumOf { it.bytes }
+    /** Os mais antigos saem primeiro, até o total caber no limite. Os [guardados] não entram na conta. */
+    fun quaisApagar(videos: List<Video>, limite: Long = LIMITE_BYTES, guardados: Set<String> = emptySet()): List<Video> {
+        val livres = videos.filter { it.chave !in guardados }
+        var total = livres.sumOf { it.bytes }
         val apagar = mutableListOf<Video>()
-        for (v in videos.sortedBy { it.criado }) {
+        for (v in livres.sortedBy { it.criado }) {
             if (total <= limite) break
             apagar += v
             total -= v.bytes
@@ -72,10 +76,26 @@ object Videos {
     }
 
     fun limpar(ctx: Context) {
-        quaisApagar(todos(ctx)).forEach {
+        val todos = todos(ctx)
+        val guardados = guardados(ctx)
+        // O motorista apagou na galeria: esquece.
+        val existem = todos.map { it.chave }.toSet()
+        if (guardados.any { it !in existem }) salvarGuardados(ctx, guardados.filter { it in existem }.toSet())
+        quaisApagar(todos, guardados = guardados).forEach {
             if (it.chave.startsWith("content:")) ctx.contentResolver.delete(Uri.parse(it.chave), null, null) else File(it.chave).delete()
         }
     }
+
+    fun guardar(ctx: Context, chaves: Collection<String>) = salvarGuardados(ctx, guardados(ctx) + chaves)
+
+    private fun guardados(ctx: Context): Set<String> =
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(GUARDADOS, emptySet())!!.toSet()
+
+    private fun salvarGuardados(ctx: Context, chaves: Set<String>) =
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putStringSet(GUARDADOS, chaves).apply()
+
+    private const val PREFS = "videos"
+    private const val GUARDADOS = "guardados"
 
     private fun todos(ctx: Context): List<Video> {
         if (Build.VERSION.SDK_INT < 29) {

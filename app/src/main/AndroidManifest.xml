@@ -150,6 +150,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".GuardarVideoReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".ResultadoInstalacao"
             android:exported="false" />
     </application>

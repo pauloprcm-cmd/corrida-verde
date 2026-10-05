@@ -16,7 +16,11 @@ object Corridas {
         return if (f.exists()) f.readLines().mapNotNull { deLinha(it) } else emptyList()
     }
 
-    fun guardar(ctx: Context, c: Corrida) = File(ctx.filesDir, ARQUIVO).appendText(paraLinha(c) + "\n")
+    fun guardar(ctx: Context, c: Corrida) {
+        File(ctx.filesDir, ARQUIVO).appendText(paraLinha(c) + "\n")
+        // Falou o valor da corrida (ou fez Pix ou recibo) com a gravação ligada: provavelmente a corrida acabou.
+        GravacaoService.avisarSeGravando(ctx, "Você registrou o valor de uma corrida")
+    }
 
     /** Apaga uma corrida (a primeira igual, se houver duas iguais). */
     fun apagar(ctx: Context, c: Corrida) {

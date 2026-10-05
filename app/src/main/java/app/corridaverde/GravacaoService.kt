@@ -28,6 +28,10 @@ import java.time.LocalTime
  * Os vídeos são gravados em pedaços de uns 5 minutos: se o Android fechar o app no meio,
  * só o último pedaço se perde. Se outro app pedir a câmera (a selfie da Uber, por exemplo),
  * a gravação para e o que já foi gravado fica salvo.
+ *
+ * Para quem esquece gravando: avisa com som depois de 1 hora, quando chega oferta da Uber ou da 99
+ * e quando o motorista registra o valor de uma corrida. Nunca para sozinha: num assalto o motorista
+ * pode não conseguir responder, e é aí que a gravação mais importa.
  */
 class GravacaoService : Service() {
     private val linha = HandlerThread("gravacao").apply { start() }
@@ -40,12 +44,28 @@ class GravacaoService : Service() {
     private var atual: Videos.Destino? = null
     private var proximo: Videos.Destino? = null
     private var comecou = false
+    /** Pedaços desta gravação que deram certo, para o botão Guardar este vídeo. */
+    private val pedacos = mutableListOf<String>()
+
+    /** Só na tela. O lembrete de tempo: 1 hora depois de começar, e de novo a cada 30 min (15 se ninguém respondeu). */
+    private val lembrete = Runnable { avisar("Gravando há ${duracao()}. A corrida terminou?") }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == PARAR) {
             fundo.post { encerrar() }
+            return START_NOT_STICKY
+        }
+        if (intent?.action == CONTINUAR) {
+            getSystemService(NotificationManager::class.java).cancel(ID_LEMBRETE)
+            silencioAte = System.currentTimeMillis() + 30 * 60_000L
+            tela.removeCallbacks(lembrete)
+            tela.postDelayed(lembrete, 30 * 60_000L)
+            return START_NOT_STICKY
+        }
+        if (intent?.action == SUSPEITA) {
+            if (gravando) intent.getStringExtra(MOTIVO)?.let { avisar("$it e a gravação continua ligada (há ${duracao()}). A corrida terminou?") }
             return START_NOT_STICKY
         }
         if (gravando) return START_NOT_STICKY
@@ -62,6 +82,9 @@ class GravacaoService : Service() {
             return START_NOT_STICKY
         }
         gravando = true
+        desde = System.currentTimeMillis()
+        silencioAte = 0
+        tela.postDelayed(lembrete, 60 * 60_000L)
         situacao = "${agora()} abrindo a câmera"
         Notificacao.atualizar(this)
         fundo.post { runCatching { abrir() }.onFailure { falhou(it) } }
@@ -153,14 +176,14 @@ class GravacaoService : Service() {
                 }
             }
             MediaRecorder.MEDIA_RECORDER_INFO_NEXT_OUTPUT_FILE_STARTED -> {
-                atual?.let { Videos.concluir(this, it, ok = true) }
+                atual?.let { Videos.concluir(this, it, ok = true); pedacos += it.chave }
                 atual = proximo
                 proximo = null
                 runCatching { Videos.limpar(this) }
             }
             // Não conseguiu abrir o próximo pedaço: o gravador já parou e o arquivo está fechado.
             MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED -> {
-                atual?.let { Videos.concluir(this, it, ok = true) }
+                atual?.let { Videos.concluir(this, it, ok = true); pedacos += it.chave }
                 atual = null
                 encerrar()
             }
@@ -178,19 +201,75 @@ class GravacaoService : Service() {
         gravador = null
         runCatching { camera?.close() }
         camera = null
-        atual?.let { Videos.concluir(this, it, ok = comecou && parou) }
+        atual?.let {
+            val ok = comecou && parou
+            Videos.concluir(this, it, ok)
+            if (ok) pedacos += it.chave
+        }
         atual = null
         proximo?.let { Videos.concluir(this, it, ok = false) }
         proximo = null
         comecou = false
         runCatching { Videos.limpar(this) }
         if (situacao.endsWith("gravando")) situacao = "${agora()} gravação encerrada"
+        val gravados = pedacos.toList()
+        pedacos.clear()
         tela.post {
+            tela.removeCallbacks(lembrete)
+            getSystemService(NotificationManager::class.java).cancel(ID_LEMBRETE)
+            if (gravando && gravados.isNotEmpty()) oferecerGuardar(gravados)
             gravando = false
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             Notificacao.atualizar(this)
         }
+    }
+
+    /** Só na tela. Aviso com som e vibração, com Parar e Continuar. Sem resposta, o lembrete de tempo volta em 15 min. */
+    private fun avisar(texto: String) {
+        val agora = System.currentTimeMillis()
+        if (!gravando || agora < silencioAte) return
+        // Uma oferta atrás da outra não vira uma fila de avisos.
+        silencioAte = agora + 5 * 60_000L
+        tela.removeCallbacks(lembrete)
+        tela.postDelayed(lembrete, 15 * 60_000L)
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(NotificationChannel(CANAL_LEMBRETE, "Lembrete de gravação ligada", NotificationManager.IMPORTANCE_HIGH))
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        val parar = PendingIntent.getService(this, 0, Intent(this, GravacaoService::class.java).setAction(PARAR), flags)
+        val continuar = PendingIntent.getService(this, 1, Intent(this, GravacaoService::class.java).setAction(CONTINUAR), flags)
+        nm.notify(ID_LEMBRETE, Notification.Builder(this, CANAL_LEMBRETE)
+            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setContentTitle("A gravação continua ligada")
+            .setContentText(texto)
+            .setStyle(Notification.BigTextStyle().bigText(texto))
+            .setCategory(Notification.CATEGORY_REMINDER)
+            .addAction(Notification.Action.Builder(null, "Parar gravação", parar).build())
+            .addAction(Notification.Action.Builder(null, "Continuar gravando", continuar).build())
+            .build())
+    }
+
+    /** Acabou de parar: oferece guardar o vídeo, para ele nunca entrar na limpeza dos 5 GB. */
+    private fun oferecerGuardar(gravados: List<String>) {
+        val nm = getSystemService(NotificationManager::class.java)
+        val guardar = PendingIntent.getBroadcast(
+            this, 4, Intent(this, GuardarVideoReceiver::class.java).putExtra(GuardarVideoReceiver.PEDACOS, gravados.toTypedArray()),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        nm.notify(GuardarVideoReceiver.ID, Notification.Builder(this, CANAL)
+            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setContentTitle("Gravação salva (${duracao()})")
+            .setContentText("Aconteceu algo nesta corrida? Guarde o vídeo para ele nunca ser apagado.")
+            .setStyle(Notification.BigTextStyle().bigText(
+                "Aconteceu algo nesta corrida? Guarde o vídeo: os vídeos guardados nunca são apagados na limpeza dos 5 GB."))
+            .setAutoCancel(true)
+            .addAction(Notification.Action.Builder(null, "Guardar este vídeo", guardar).build())
+            .build())
+    }
+
+    private fun duracao(): String {
+        val min = ((System.currentTimeMillis() - desde) / 60_000).toInt()
+        return if (min < 60) "$min min" else "${min / 60} h" + (if (min % 60 > 0) " ${min % 60}" else "")
     }
 
     private fun notificacao(): Notification {
@@ -211,18 +290,35 @@ class GravacaoService : Service() {
 
     companion object {
         const val PARAR = "app.corridaverde.PARAR_GRAVACAO"
+        private const val CONTINUAR = "app.corridaverde.CONTINUAR_GRAVACAO"
+        private const val SUSPEITA = "app.corridaverde.SUSPEITA_GRAVACAO"
+        private const val MOTIVO = "motivo"
         private const val ID = 2
+        private const val ID_LEMBRETE = 5
         private const val CANAL = "gravacao"
+        private const val CANAL_LEMBRETE = "lembrete_gravacao"
         private const val TAMANHO_PEDACO = 25L * 1024 * 1024
 
         @Volatile var gravando = false
             private set
         @Volatile var situacao = "nenhuma gravação ainda"
             private set
+        @Volatile private var desde = 0L
+        /** Até quando não avisa de novo (depois de Continuar, ou logo depois de um aviso). */
+        @Volatile private var silencioAte = 0L
 
         /** Começa pela [GravarActivity]: câmera e microfone só podem ser ligados com uma tela do app aberta. */
         fun iniciar(ctx: Context) {
             ctx.startActivity(Intent(ctx, GravarActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+
+        /**
+         * Algo indica que a corrida de rua acabou ([motivo] completa a frase do aviso, ex.: "Chegou uma oferta da Uber").
+         * Sem gravação ligada, não faz nada.
+         */
+        fun avisarSeGravando(ctx: Context, motivo: String) {
+            if (!gravando || System.currentTimeMillis() < silencioAte) return
+            runCatching { ctx.startService(Intent(ctx, GravacaoService::class.java).setAction(SUSPEITA).putExtra(MOTIVO, motivo)) }
         }
 
         fun parar(ctx: Context) {
