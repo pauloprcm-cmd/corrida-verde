@@ -28,6 +28,16 @@ class AjudaActivity : Activity() {
             addView(v.botaoPrincipal("Ir para Acessibilidade") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }, cheio())
             addView(v.botao("Liberar configuração restrita") { liberar(this@AjudaActivity) }, cheio())
         }
+        pergunta(tela, "O aviso parou de aparecer no meio do dia. Por quê?",
+            "Quase sempre é a economia de bateria do celular: para poupar bateria, ele fecha o Corrida Verde sem avisar. " +
+                "Aí o aviso da Uber e da 99, o alerta de radar e o botão Falar da notificação param até você ligar a leitura de novo. " +
+                "Seus ganhos, gastos e recibos continuam guardados.\n\n" +
+                "Para não acontecer mais, deixe o app Sem restrições: segure o dedo no ícone do Corrida Verde, toque em Informações do app › Bateria " +
+                "(ou Uso da bateria) e escolha Sem restrições. A bateria quase não sente: o app só trabalha quando aparece uma oferta ou um radar.\n\n" +
+                "No Samsung, confira também se o Corrida Verde não está em Apps em suspensão profunda " +
+                "(Configurações › Bateria ou Cuidados com o aparelho › Limites de uso em segundo plano). Se estiver, tire de lá.") {
+            addView(v.botaoPrincipal("Verificar problemas") { startActivity(Intent(this@AjudaActivity, VerificarActivity::class.java)) }, cheio())
+        }
         pergunta(tela, "O que o aviso colorido quer dizer?",
             "O número grande é quanto a oferta da Uber ou da 99 paga perto do que o taxímetro daria na mesma viagem.\n\n" +
                 "Verde: ${cfg.limiteVerde}% ou mais.\nAmarelo: de ${cfg.limiteAmarelo}% a ${cfg.limiteVerde - 1}%.\nVermelho: abaixo de ${cfg.limiteAmarelo}%.\n\n" +
