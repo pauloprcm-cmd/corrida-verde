@@ -44,6 +44,12 @@ class AjustesActivity : Activity() {
         campo(R.id.salvarCasa, Button::class.java).setOnClickListener { salvarCasa() }
 
         campo(R.id.ativar, Button::class.java).setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        campo(R.id.colocarAtalho, Button::class.java).setOnClickListener {
+            when {
+                Atalho.naTelaInicial(this) -> Toast.makeText(this, "O botão Falar já está na tela inicial", Toast.LENGTH_LONG).show()
+                !Atalho.colocar(this) -> Toast.makeText(this, "Este celular não deixa o app colocar o ícone. Segure o dedo no ícone do Corrida Verde: a opção Falar aparece ali.", Toast.LENGTH_LONG).show()
+            }
+        }
         campo(R.id.salvar, Button::class.java).setOnClickListener {
             lerCampos()?.let {
                 it.salvar(this)

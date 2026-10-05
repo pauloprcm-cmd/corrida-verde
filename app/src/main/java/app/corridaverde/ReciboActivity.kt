@@ -239,7 +239,7 @@ class ReciboActivity : Activity() {
         titulo("Recibos enviados")
         val todos = Recibos.todos(this)
         val corrigidoPor = todos.filter { it.substitui != null }.associate { it.substitui!! to it.numero }
-        if (todos.isEmpty()) aviso("Nenhum recibo ainda. Para fazer um, fale “recibo de 50 reais…” no Registrar por voz.")
+        if (todos.isEmpty()) aviso("Nenhum recibo ainda. Para fazer um, toque em Falar e diga “recibo de 50 reais…”.")
         todos.sortedByDescending { it.numero }.forEach { r ->
             val linha = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL

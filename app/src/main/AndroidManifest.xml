@@ -78,7 +78,7 @@
             android:exported="false"
             android:label="Meu dinheiro" />
 
-        <!-- Aberta pelo botão "Registrar por voz" da notificação, por cima do que estiver na tela. -->
+        <!-- Aberta pelo botão Falar (tela principal, ícone da tela inicial, notificação), por cima do que estiver na tela. -->
         <activity
             android:name=".GastoActivity"
             android:excludeFromRecents="true"

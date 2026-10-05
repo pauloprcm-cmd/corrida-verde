@@ -36,7 +36,7 @@ class AjudaActivity : Activity() {
                 "Na 99, o valor pode subir no fim da corrida (taxímetro, trânsito, pedágio): o aviso mostra o mínimo. " +
                 "Para não ver o aviso na 99, desmarque em Ajustes › Avisos na oferta.")
         pergunta(tela, "Como registro ganhos e gastos falando?",
-            "Toque em Falar um ganho ou gasto (no Meu dia) ou em Registrar por voz, na notificação do Corrida Verde.\n\n" +
+            "Toque em Falar ganho ou gasto, na tela principal ou no Meu dia. Também dá pelo ícone Falar na tela inicial do celular (Ajustes › Botão de falar) ou pelo 🎤 Falar da notificação do Corrida Verde.\n\n" +
                 "Ganhos: fale o total que a tela do app mostra, como “ganhei 346 na 99”. Ele substitui o que você já tinha falado da 99 hoje. " +
                 "Para somar uma corrida só, diga “corrida”: “corrida da Uber 23 e 50”. Sem dizer o app (passageiro de rua), soma: “ganhei 50”.\n\n" +
                 "Gastos: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”.\n\n" +

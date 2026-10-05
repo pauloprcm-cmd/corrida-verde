@@ -55,7 +55,7 @@ class VerificarActivity : Activity() {
             Item("Leitura ligada", LeitorService.instancia != null, "A leitura está desligada. Sem ela, o aviso não aparece na Uber.") {
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             },
-            Item("Notificações permitidas", notificacoes(), "Sem notificação, o botão Registrar por voz não aparece na barra do topo.") {
+            Item("Notificações permitidas", notificacoes(), "Sem notificação, o botão Falar não aparece na barra do topo (o da tela principal continua funcionando).") {
                 if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                     requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
                 } else {

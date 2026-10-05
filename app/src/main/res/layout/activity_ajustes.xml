@@ -96,6 +96,12 @@
 
         <TextView android:id="@+id/casaStatus" style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" />
 
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Botão de falar" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Um ícone Falar na tela inicial do celular, perto da Uber e da 99: um toque e você fala um ganho ou gasto. Para tirar, segure o dedo nele e toque em Remover (o app continua instalado)." />
+
+        <Button android:id="@+id/colocarAtalho" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Colocar o botão Falar na tela inicial" />
+
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gravação da corrida" />
 
         <CheckBox android:id="@+id/gravar" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Botão Gravar corrida na notificação" />

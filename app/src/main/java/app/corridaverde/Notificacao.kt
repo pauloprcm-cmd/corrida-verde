@@ -8,7 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Icon
 
-/** Notificação fixa enquanto a leitura está ligada, com o que sobrou hoje e os botões "Registrar por voz" e "Gravar corrida". */
+/** Notificação fixa enquanto a leitura está ligada, com o que sobrou hoje e os botões "🎤 Falar" e "Gravar corrida". */
 object Notificacao {
     private const val CANAL = "gastos"
     private const val ID = 1
@@ -34,7 +34,7 @@ object Notificacao {
             .setOngoing(true)
             .setShowWhen(false)
             .setContentIntent(abrirApp)
-            .addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_microfone), "Registrar por voz", registrar).build())
+            .addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_microfone), "🎤 Falar", registrar).build())
         if (cfg.casa != null) {
             val casa = PendingIntent.getBroadcast(ctx, 3, Intent(ctx, CasaReceiver::class.java), flags)
             b.addAction(Notification.Action.Builder(null, if (cfg.indoPraCasa) "Desligar casa" else "Indo pra casa", casa).build())

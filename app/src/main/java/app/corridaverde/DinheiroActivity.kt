@@ -113,7 +113,7 @@ class DinheiroActivity : Activity() {
 
         if (visao == Visao.DIA) lancamentos() else barrasPorDia(b, hoje)
         if (b.entrou == 0.0 && b.gastou == 0.0) {
-            conteudo.addView(texto("Nada lançado neste período. Ganhos e gastos entram pelo Registrar por voz.", 15f, cor = CINZA).apply {
+            conteudo.addView(texto("Nada lançado neste período. Ganhos e gastos entram pelo botão Falar ganho ou gasto.", 15f, cor = CINZA).apply {
                 setPadding(0, dp(16), 0, 0)
             })
         }
