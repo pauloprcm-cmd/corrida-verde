@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+: a tela de abertura do sistema só com o fundo escuro, sem o ícone (a animação do app vem logo depois). -->
+    <style name="Tema.Inicio" parent="Tema.Escuro">
+        <item name="android:windowSplashScreenBackground">@color/fundo</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/vazio</item>
+    </style>
+</resources>

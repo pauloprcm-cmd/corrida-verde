@@ -24,6 +24,9 @@
         <item name="android:alertDialogTheme">@style/Dialogo</item>
     </style>
 
+    <!-- Tela inicial; no Android 12+ (values-v31) também ajusta a tela de abertura do sistema. -->
+    <style name="Tema.Inicio" parent="Tema.Escuro" />
+
     <style name="Texto" parent="android:Widget.Material.TextView">
         <item name="android:fontFamily">@font/atkinson</item>
         <item name="android:textColor">@color/texto</item>

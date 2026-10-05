@@ -28,6 +28,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         v = Visual(this)
+        Abertura.talvezMostrar(this, savedInstanceState)
         // A notificação com o botão "🎤 Falar" precisa desta permissão no Android 13 ou mais novo.
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
