@@ -13,8 +13,27 @@ data class Oferta(
     val valorMax: Double? = null,
     /** Endereço do destino final, como a Uber escreve ("Ambience Vila Mariana, Vila Mariana, São Paulo"). */
     val destino: String? = null,
+    /** Grupo da categoria escrita no cartão (UberX, Comfort, Black, 99Pop...), para o perfil de motorista de app. */
+    val grupo: Grupo = Grupo.ECONOMICO,
 ) {
     val chave get() = "$valor|$valorMax|$buscaKm|$viagemKm"
+}
+
+/** As categorias da Uber e da 99 em três grupos, cada um com o seu mínimo de R$/km no perfil de motorista de app. */
+enum class Grupo(val nome: String) {
+    ECONOMICO("Econômico"), CONFORTO("Conforto"), PREMIUM("Premium");
+
+    companion object {
+        private val PREMIUM_NA_TELA = Regex("""\bblack\b|electric[- ]?pro""", RegexOption.IGNORE_CASE)
+        private val CONFORTO_NA_TELA = Regex("""\bcomfort\b|\b99\s?plus\b""", RegexOption.IGNORE_CASE)
+
+        /** Sem nome conhecido no cartão (UberX, 99Pop e o que não deu para ler), fica no econômico. */
+        fun da(tela: String) = when {
+            PREMIUM_NA_TELA.containsMatchIn(tela) -> PREMIUM
+            CONFORTO_NA_TELA.containsMatchIn(tela) -> CONFORTO
+            else -> ECONOMICO
+        }
+    }
 }
 
 object LeitorOferta {
@@ -62,6 +81,8 @@ object LeitorOferta {
             // O endereço vem logo depois do último trecho ("30 minutos (6.1 km)").
             destino = tela.substring(viagem.last().range.last + 1).lines().map { it.trim() }
                 .firstOrNull { it.length >= 5 && it.any(Char::isLetter) && !NAO_ENDERECO.containsMatchIn(it) },
+            // A categoria vem antes da busca; o endereço do destino pode ter "Black" ou "Comfort" no nome.
+            grupo = Grupo.da(tela.substring(0, busca.range.first)),
         )
     }
 

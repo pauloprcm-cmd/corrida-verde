@@ -2,7 +2,9 @@ name: APK
 
 on:
   push:
-    branches: [main]
+    # main: versão oficial (link "latest", chega pelo atualizador).
+    # beta: versão de teste, sempre no mesmo link (release "teste"), fora do atualizador.
+    branches: [main, beta]
   workflow_dispatch:
 
 permissions:
@@ -42,6 +44,7 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk corrida-verde.apk
 
       - name: Release
+        if: github.ref_name == 'main'
         env:
           GH_TOKEN: ${{ github.token }}
           NOTAS: ${{ github.event.head_commit.message || 'Build manual' }}
@@ -49,3 +52,16 @@ jobs:
           gh release create "v1.${{ github.run_number }}" corrida-verde.apk \
             --title "Corrida Verde 1.${{ github.run_number }}" \
             --notes "$NOTAS"
+
+      - name: Versão de teste
+        if: github.ref_name == 'beta'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTAS: ${{ github.event.head_commit.message || 'Build manual' }}
+        run: |
+          # A tag "teste" acompanha o último commit do beta; o APK é trocado no mesmo endereço.
+          git tag -f teste
+          git push -f origin teste
+          gh release view teste >/dev/null 2>&1 || gh release create teste --prerelease --title "Versão de teste" --notes "Versão de teste"
+          gh release upload teste corrida-verde.apk --clobber
+          gh release edit teste --prerelease --title "Corrida Verde 1.${{ github.run_number }} (teste)" --notes "$NOTAS"

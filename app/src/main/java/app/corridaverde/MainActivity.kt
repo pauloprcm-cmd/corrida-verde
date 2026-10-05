@@ -2,6 +2,7 @@ package app.corridaverde
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -22,6 +23,7 @@ import android.widget.TextView
  * resto ficam nas telas Meu dia, Ajustes, Ajuda e Verificar problemas.
  */
 class MainActivity : Activity() {
+    private var perguntandoPerfil = false
     private lateinit var v: Visual
     private var versao: TextView? = null
 
@@ -39,6 +41,7 @@ class MainActivity : Activity() {
         montar()
         Notificacao.atualizar(this)
         tirarIconeFalar()
+        escolherPerfil()
         Atualizador.verificar(this, perguntar = true) { runOnUiThread { versao?.text = it } }
     }
 
@@ -80,7 +83,10 @@ class MainActivity : Activity() {
         c.addView(titulo(R.drawable.ic_ok, "LIGADO", v.verde))
         val cfg = Config.carregar(this)
         c.addView(v.texto(if (cfg.aviso99) "Lendo as ofertas da Uber e da 99." else "Lendo as ofertas da Uber.", 19f).apply { setPadding(0, v.dp(8), 0, 0) })
-        val linha = listOfNotNull("Taxímetro: ${if (cfg.luxo) "Luxo" else "Comum"}", "Indo pra casa".takeIf { cfg.indoPraCasa })
+        val linha = listOfNotNull(
+            if (cfg.motoristaDeApp) "Motorista de app" else "Taxímetro: ${if (cfg.luxo) "Luxo" else "Comum"}",
+            "Indo pra casa".takeIf { cfg.indoPraCasa },
+        )
         c.addView(v.texto(linha.joinToString(" · "), 16f, cor = v.texto2).apply { setPadding(0, v.dp(6), 0, 0) })
         return c
     }
@@ -136,6 +142,35 @@ class MainActivity : Activity() {
     }
 
     private fun abrir(c: Class<*>) = startActivity(Intent(this, c))
+
+    /**
+     * Na primeira abertura pergunta como a pessoa trabalha. Quem já usava o app antes dos perfis
+     * (leitura já ligada ou ajustes salvos) continua taxista, sem pergunta.
+     */
+    private fun escolherPerfil() {
+        val cfg = Config.carregar(this)
+        if (cfg.perfil.isNotEmpty() || perguntandoPerfil) return
+        val jaUsava = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(JA_LIGOU, false) ||
+            getSharedPreferences("config", Context.MODE_PRIVATE).all.isNotEmpty()
+        if (jaUsava) {
+            cfg.copy(perfil = Config.TAXI).salvar(this)
+            return
+        }
+        perguntandoPerfil = true
+        val escolher = { perfil: String ->
+            perguntandoPerfil = false
+            Config.carregar(this).copy(perfil = perfil).salvar(this)
+            montar()
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Como você trabalha?")
+            .setItems(arrayOf(
+                "Sou taxista\nCompara a corrida com o taxímetro",
+                "Sou motorista de aplicativo\nUberX, Comfort, Black, 99Pop…",
+            )) { _, qual -> escolher(if (qual == 0) Config.TAXI else Config.APP) }
+            .setCancelable(false)
+            .show()
+    }
 
     /**
      * O ícone Falar da tela inicial (versão 1.35) virou a bolinha por cima da Uber e da 99:

@@ -52,13 +52,16 @@ class MeuDiaActivity : Activity() {
         v.por(tela, v.item(R.drawable.ic_qr, "Cobrar no Pix", "QR Code com o valor, para o passageiro pagar") {
             startActivity(PixActivity.abrir(this))
         }, espaco = 18)
-        v.por(tela, v.item(R.drawable.ic_recibo, "Fazer recibo", "Fale o valor e o trajeto") { startActivity(ReciboActivity.porVoz(this)) })
-        val recibos = LinearLayout(this)
-        recibos.addView(v.botao("Recibos enviados") { startActivity(ReciboActivity.lista(this)) },
-            LinearLayout.LayoutParams(0, v.dp(60), 1f).apply { marginEnd = v.dp(6) })
-        recibos.addView(v.botao("Personalizar") { startActivity(Intent(this, PersonalizarReciboActivity::class.java)) },
-            LinearLayout.LayoutParams(0, v.dp(60), 1f).apply { marginStart = v.dp(6) })
-        v.por(tela, recibos, espaco = 8)
+        // Recibo só no perfil taxista: na Uber e na 99 quem dá o recibo é a plataforma.
+        if (!Config.carregar(this).motoristaDeApp) {
+            v.por(tela, v.item(R.drawable.ic_recibo, "Fazer recibo", "Fale o valor e o trajeto") { startActivity(ReciboActivity.porVoz(this)) })
+            val recibos = LinearLayout(this)
+            recibos.addView(v.botao("Recibos enviados") { startActivity(ReciboActivity.lista(this)) },
+                LinearLayout.LayoutParams(0, v.dp(60), 1f).apply { marginEnd = v.dp(6) })
+            recibos.addView(v.botao("Personalizar") { startActivity(Intent(this, PersonalizarReciboActivity::class.java)) },
+                LinearLayout.LayoutParams(0, v.dp(60), 1f).apply { marginStart = v.dp(6) })
+            v.por(tela, recibos, espaco = 8)
+        }
 
         v.por(tela, v.item(R.drawable.ic_grafico, "Dia, semana e mês", "Quanto entrou, saiu e sobrou; corrigir lançamentos") {
             startActivity(Intent(this, DinheiroActivity::class.java))

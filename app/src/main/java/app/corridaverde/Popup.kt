@@ -23,6 +23,15 @@ class Popup(private val ctx: Context) {
             Cor.VERMELHO -> Color.rgb(0xE5, 0x39, 0x35)
         }
         val o = r.oferta
+        if (cfg.motoristaDeApp) {
+            // Motorista de app: o número grande é o R$/km; a última linha diz o grupo e o mínimo usado, para conferir.
+            val linhasApp = listOf(
+                "R$ ${br(o.valor)}" + (r.rsHora?.let { " · R$ ${br(it)}/h" } ?: ""),
+                "busca ${km(o.buscaKm)} · viagem ${km(o.viagemKm)} ${o.viagemMin} min",
+                "${o.grupo.nome} · verde a partir de R$ ${br(cfg.verde(o.grupo))}/km",
+            ) + (if (r.avisos.isNotEmpty()) listOf("⚠ " + r.avisos.joinToString(" · ")) else emptyList())
+            return exibir(cfg, cor, "R$ ${br(r.rsKm)}/km", linhasApp)
+        }
         val linhas = listOf(
             (o.valorMax?.let { "pelo taxímetro, até R$ ${br(it)}" } ?: "R$ ${br(o.valor)}") +
                 " · taxímetro R$ ${br(r.taximetro)}${if (r.bandeira2) " (B2)" else ""}",

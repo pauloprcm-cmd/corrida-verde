@@ -16,7 +16,7 @@ object Atualizador {
 
     @Volatile private var ocupado = false
 
-    val versaoAtual get() = "1.${BuildConfig.VERSION_CODE}"
+    val versaoAtual get() = BuildConfig.VERSION_NAME
 
     /** Número do build na tag "v1.N" da resposta da API do GitHub. */
     fun numeroDaTag(json: String): Int? =

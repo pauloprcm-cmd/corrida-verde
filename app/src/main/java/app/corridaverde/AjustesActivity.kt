@@ -6,11 +6,13 @@ import android.content.ClipData
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
@@ -23,9 +25,15 @@ class AjustesActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_ajustes)
         findViewById<LinearLayout>(R.id.coluna).addView(Visual(this).topo("Ajustes"), 0)
-        listOf(R.id.buscaMax, R.id.notaMinima, R.id.viagemLonga, R.id.raioCasa).forEach { findViewById<EditText>(it).aceitarVirgula() }
+        listOf(R.id.buscaMax, R.id.notaMinima, R.id.viagemLonga, R.id.raioCasa, *CAMPOS_APP).forEach { findViewById<EditText>(it).aceitarVirgula() }
 
         val cfg = Config.carregar(this)
+        campo(R.id.perfilApp, RadioButton::class.java).isChecked = cfg.motoristaDeApp
+        campo(R.id.perfilTaxi, RadioButton::class.java).isChecked = !cfg.motoristaDeApp
+        mostrarPerfil(cfg.motoristaDeApp)
+        campo(R.id.perfil, RadioGroup::class.java).setOnCheckedChangeListener { _, id -> mostrarPerfil(id == R.id.perfilApp) }
+        listOf(cfg.verdeEconomico, cfg.amareloEconomico, cfg.verdeConforto, cfg.amareloConforto, cfg.verdePremium, cfg.amareloPremium)
+            .zip(CAMPOS_APP.toList()).forEach { (valor, id) -> campo(id, EditText::class.java).setText(Popup.br(valor)) }
         campo(R.id.luxo, RadioButton::class.java).isChecked = cfg.luxo
         campo(R.id.comum, RadioButton::class.java).isChecked = !cfg.luxo
         campo(R.id.limiteVerde, EditText::class.java).setText(cfg.limiteVerde.toString())
@@ -215,8 +223,19 @@ class AjustesActivity : Activity() {
         return status + "\n" + leitura
     }
 
+    /** Taxista vê o taxímetro e a % ; motorista de app vê os mínimos de R$/km. */
+    private fun mostrarPerfil(app: Boolean) {
+        campo(R.id.soTaxi, LinearLayout::class.java).visibility = if (app) View.GONE else View.VISIBLE
+        campo(R.id.soApp, LinearLayout::class.java).visibility = if (app) View.VISIBLE else View.GONE
+    }
+
     private fun lerCampos(avisar: Boolean = true): Config? {
         fun num(id: Int) = campo(id, EditText::class.java).text.toString().trim().replace(',', '.').toDoubleOrNull()
+        val porKm = CAMPOS_APP.map { num(it) }
+        if (porKm.any { it == null } || porKm[1]!! > porKm[0]!! || porKm[3]!! > porKm[2]!! || porKm[5]!! > porKm[4]!!) {
+            if (avisar) Toast.makeText(this, "Confira os valores por km (o amarelo não pode passar do verde)", Toast.LENGTH_LONG).show()
+            return null
+        }
         val verde = num(R.id.limiteVerde)?.toInt()
         val amarelo = num(R.id.limiteAmarelo)?.toInt()
         val busca = num(R.id.buscaMax)
@@ -246,12 +265,20 @@ class AjustesActivity : Activity() {
             radarSom = campo(R.id.radarSom, CheckBox::class.java).isChecked,
             aviso99 = campo(R.id.aviso99, CheckBox::class.java).isChecked,
             bolinha = campo(R.id.bolinha, CheckBox::class.java).isChecked,
+            perfil = if (campo(R.id.perfilApp, RadioButton::class.java).isChecked) Config.APP else Config.TAXI,
+            verdeEconomico = porKm[0]!!,
+            amareloEconomico = porKm[1]!!,
+            verdeConforto = porKm[2]!!,
+            amareloConforto = porKm[3]!!,
+            verdePremium = porKm[4]!!,
+            amareloPremium = porKm[5]!!,
         )
     }
 
     private fun <T : android.view.View> campo(id: Int, tipo: Class<T>): T = tipo.cast(findViewById(id))!!
 
     private companion object {
+        val CAMPOS_APP = arrayOf(R.id.verdeEconomico, R.id.amareloEconomico, R.id.verdeConforto, R.id.amareloConforto, R.id.verdePremium, R.id.amareloPremium)
         const val GUARDAR = 10
         const val RESTAURAR = 11
     }

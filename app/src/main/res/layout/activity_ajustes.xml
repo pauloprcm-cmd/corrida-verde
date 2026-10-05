@@ -16,31 +16,92 @@
         android:paddingEnd="20dp"
         android:paddingBottom="32dp">
 
-        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="0dp" android:text="Taxímetro" />
-
-        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="O aviso compara a oferta com a tabela do táxi de São Paulo." />
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="0dp" android:text="Meu perfil" />
 
         <RadioGroup
+            android:id="@+id/perfil"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
-            <RadioButton android:id="@+id/comum" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Comum" />
+            <RadioButton android:id="@+id/perfilTaxi" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Taxista" />
 
-            <RadioButton android:id="@+id/luxo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Luxo" />
+            <RadioButton android:id="@+id/perfilApp" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Motorista de app" />
         </RadioGroup>
 
-        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Quando fica verde ou amarelo" />
+        <LinearLayout
+            android:id="@+id/soTaxi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="O número grande do aviso é quanto a oferta paga perto do que o taxímetro daria. Abaixo do amarelo, fica vermelho." />
+            <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Taxímetro" />
 
-        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Verde a partir de (% do taxímetro)" />
+            <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="O aviso compara a oferta com a tabela do táxi de São Paulo." />
 
-        <EditText android:id="@+id/limiteVerde" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+            <RadioGroup
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
 
-        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Amarelo a partir de (% do taxímetro)" />
+                <RadioButton android:id="@+id/comum" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Comum" />
 
-        <EditText android:id="@+id/limiteAmarelo" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+                <RadioButton android:id="@+id/luxo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Luxo" />
+            </RadioGroup>
+
+            <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Quando fica verde ou amarelo" />
+
+            <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="O número grande do aviso é quanto a oferta paga perto do que o taxímetro daria. Abaixo do amarelo, fica vermelho." />
+
+            <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Verde a partir de (% do taxímetro)" />
+
+            <EditText android:id="@+id/limiteVerde" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+
+            <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Amarelo a partir de (% do taxímetro)" />
+
+            <EditText android:id="@+id/limiteAmarelo" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/soApp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Quando fica verde ou amarelo" />
+
+            <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="O número grande do aviso é quanto a oferta paga por km, somando a busca e a viagem. Cada grupo de categoria tem o seu mínimo. Abaixo do amarelo, fica vermelho." />
+
+            <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Econômico (UberX, 99Pop)" />
+
+            <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Verde a partir de (R$/km)" />
+
+            <EditText android:id="@+id/verdeEconomico" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+
+            <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Amarelo a partir de (R$/km)" />
+
+            <EditText android:id="@+id/amareloEconomico" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+
+            <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Conforto (Comfort, 99Plus)" />
+
+            <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Verde a partir de (R$/km)" />
+
+            <EditText android:id="@+id/verdeConforto" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+
+            <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Amarelo a partir de (R$/km)" />
+
+            <EditText android:id="@+id/amareloConforto" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+
+            <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Premium (Black)" />
+
+            <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Verde a partir de (R$/km)" />
+
+            <EditText android:id="@+id/verdePremium" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+
+            <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Amarelo a partir de (R$/km)" />
+
+            <EditText android:id="@+id/amareloPremium" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
+        </LinearLayout>
 
         <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Busca maior que (km) baixa uma cor" />
 

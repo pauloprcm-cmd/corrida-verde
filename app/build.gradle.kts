@@ -15,7 +15,8 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = numeroBuild
-        versionName = "1.$numeroBuild"
+        // A versão de teste (ramo beta) aparece como "1.38 teste" na tela do app.
+        versionName = "1.$numeroBuild" + if (System.getenv("GITHUB_REF_NAME") == "beta") " teste" else ""
     }
 
     signingConfigs {

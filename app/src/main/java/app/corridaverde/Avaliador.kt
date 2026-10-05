@@ -65,22 +65,28 @@ object Avaliador {
         // Se o taxímetro estimado passa do máximo, a diferença o motorista perde.
         val recebe = o.valorMax?.let { minOf(it, taximetro) } ?: o.valor
         val pct = (recebe / taximetro * 100).roundToInt()
-        var cor = when {
+        val kmTotal = o.buscaKm + o.viagemKm
+        val minTotal = o.buscaMin + o.viagemMin
+        val rsKm = if (kmTotal > 0) recebe / kmTotal else 0.0
+        // Taxista: % do taxímetro. Motorista de app: R$/km (busca + viagem), com o mínimo do grupo da categoria.
+        var cor = if (cfg.motoristaDeApp) when {
+            rsKm >= cfg.verde(o.grupo) -> Cor.VERDE
+            rsKm >= cfg.amarelo(o.grupo) -> Cor.AMARELO
+            else -> Cor.VERMELHO
+        } else when {
             pct >= cfg.limiteVerde -> Cor.VERDE
             pct >= cfg.limiteAmarelo -> Cor.AMARELO
             else -> Cor.VERMELHO
         }
         val buscaLonga = o.buscaKm > cfg.buscaMaxKm
         if (buscaLonga) cor = if (cor == Cor.VERDE) Cor.AMARELO else Cor.VERMELHO
-        val kmTotal = o.buscaKm + o.viagemKm
-        val minTotal = o.buscaMin + o.viagemMin
         return Resultado(
             oferta = o,
             taximetro = taximetro,
             minParado = Tarifa.minutosParado(o.viagemKm, o.viagemMin).roundToInt(),
             pct = pct,
             cor = cor,
-            rsKm = if (kmTotal > 0) recebe / kmTotal else 0.0,
+            rsKm = rsKm,
             rsHora = if (minTotal > 0) recebe / minTotal * 60 else null,
             bandeira2 = b2,
             buscaLonga = buscaLonga,

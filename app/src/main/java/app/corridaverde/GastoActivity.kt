@@ -59,7 +59,8 @@ class GastoActivity : Activity() {
             return
         }
         // "Recibo de 50 reais, da Paulista até a Vila Mariana": vai para o recibo, que lança o ganho junto.
-        if (LeitorRecibo.ehRecibo(fala)) {
+        // Só no perfil taxista; para o motorista de app, "recibo de 50" vira um ganho comum.
+        if (LeitorRecibo.ehRecibo(fala) && !Config.carregar(this).motoristaDeApp) {
             startActivity(ReciboActivity.daFala(this, fala))
             finish()
             return

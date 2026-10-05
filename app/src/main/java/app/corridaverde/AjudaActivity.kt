@@ -38,7 +38,16 @@ class AjudaActivity : Activity() {
                 "(Configurações › Bateria ou Cuidados com o aparelho › Limites de uso em segundo plano). Se estiver, tire de lá.") {
             addView(v.botaoPrincipal("Verificar problemas") { startActivity(Intent(this@AjudaActivity, VerificarActivity::class.java)) }, cheio())
         }
-        pergunta(tela, "O que o aviso colorido quer dizer?",
+        if (cfg.motoristaDeApp) pergunta(tela, "O que o aviso colorido quer dizer?",
+            "O número grande é quanto a oferta da Uber ou da 99 paga por km, somando a busca até o passageiro e a viagem.\n\n" +
+                "Cada grupo de categoria tem o seu mínimo: Econômico (UberX, 99Pop), Conforto (Comfort, 99Plus) e Premium (Black). " +
+                "A última linha do aviso mostra o grupo que o app reconheceu e o mínimo usado.\n\n" +
+                "Verde: a partir do mínimo verde do grupo. Amarelo: entre o amarelo e o verde. Vermelho: abaixo do amarelo.\n\n" +
+                "Se a busca até o passageiro passar de ${Popup.br(cfg.buscaMaxKm).removeSuffix(",00")} km, a cor cai um nível. " +
+                "Dá para mudar os mínimos em Ajustes.\n\n" +
+                "Na 99, o valor pode subir no fim da corrida (trânsito, pedágio): o aviso mostra o mínimo. " +
+                "Para não ver o aviso na 99, desmarque em Ajustes › Avisos na oferta.")
+        else pergunta(tela, "O que o aviso colorido quer dizer?",
             "O número grande é quanto a oferta da Uber ou da 99 paga perto do que o taxímetro daria na mesma viagem.\n\n" +
                 "Verde: ${cfg.limiteVerde}% ou mais.\nAmarelo: de ${cfg.limiteAmarelo}% a ${cfg.limiteVerde - 1}%.\nVermelho: abaixo de ${cfg.limiteAmarelo}%.\n\n" +
                 "Se a busca até o passageiro passar de ${Popup.br(cfg.buscaMaxKm).removeSuffix(",00")} km, a cor cai um nível. " +
@@ -55,7 +64,7 @@ class AjudaActivity : Activity() {
             "O passageiro perguntou se aceita Pix? Fale “gera um Pix de 70 reais” ou toque em Cobrar no Pix, no Meu dia. " +
                 "Na primeira vez o app pede a sua chave Pix. Depois mostra o QR Code com o valor para o passageiro pagar pelo app do banco.\n\n" +
                 "O app não vê a sua conta: confira no app do seu banco se o Pix caiu.")
-        pergunta(tela, "Como faço um recibo?",
+        if (!cfg.motoristaDeApp) pergunta(tela, "Como faço um recibo?",
             "Para o passageiro de rua, de ponto ou particular. Fale: “recibo de 50 reais, da Avenida Paulista até a Vila Mariana, no Pix”. " +
                 "Você confere o recibo e manda pelo WhatsApp ou pelo e-mail. O valor entra sozinho como ganho de Táxi.\n\n" +
                 "Em Meu dia › Personalizar, escolha o modelo, a cor, a logo e grave a sua assinatura.")
