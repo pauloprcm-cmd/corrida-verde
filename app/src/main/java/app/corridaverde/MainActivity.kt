@@ -2,7 +2,6 @@ package app.corridaverde
 
 import android.Manifest
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -23,7 +22,6 @@ import android.widget.TextView
  * resto ficam nas telas Meu dia, Ajustes, Ajuda e Verificar problemas.
  */
 class MainActivity : Activity() {
-    private var perguntandoPerfil = false
     private lateinit var v: Visual
     private var versao: TextView? = null
 
@@ -38,10 +36,14 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        mostrarTela()
+    }
+
+    private fun mostrarTela() {
+        if (faltaEscolherPerfil()) return montarEscolha()
         montar()
         Notificacao.atualizar(this)
         tirarIconeFalar()
-        escolherPerfil()
         Atualizador.verificar(this, perguntar = true) { runOnUiThread { versao?.text = it } }
     }
 
@@ -144,32 +146,34 @@ class MainActivity : Activity() {
     private fun abrir(c: Class<*>) = startActivity(Intent(this, c))
 
     /**
-     * Na primeira abertura pergunta como a pessoa trabalha. Quem já usava o app antes dos perfis
+     * Na primeira abertura o app pergunta como a pessoa trabalha. Quem já usava o app antes dos perfis
      * (leitura já ligada ou ajustes salvos) continua taxista, sem pergunta.
      */
-    private fun escolherPerfil() {
+    private fun faltaEscolherPerfil(): Boolean {
         val cfg = Config.carregar(this)
-        if (cfg.perfil.isNotEmpty() || perguntandoPerfil) return
+        if (cfg.perfil.isNotEmpty()) return false
         val jaUsava = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(JA_LIGOU, false) ||
             getSharedPreferences("config", Context.MODE_PRIVATE).all.isNotEmpty()
-        if (jaUsava) {
-            cfg.copy(perfil = Config.TAXI).salvar(this)
-            return
-        }
-        perguntandoPerfil = true
+        if (!jaUsava) return true
+        cfg.copy(perfil = Config.TAXI).salvar(this)
+        return false
+    }
+
+    /** Tela da primeira abertura: dois cartões grandes, do mesmo jeito dos botões da tela inicial. */
+    private fun montarEscolha() {
+        val tela = v.tela()
+        tela.addView(v.cabecalho())
+        v.por(tela, v.texto("Como você trabalha?", 28f, negrito = true), espaco = 24)
+        tela.addView(v.texto("Toque na sua opção. Dá para trocar depois em Ajustes.", 17f, cor = v.texto2)
+            .apply { setPadding(0, v.dp(8), 0, 0) })
         val escolher = { perfil: String ->
-            perguntandoPerfil = false
             Config.carregar(this).copy(perfil = perfil).salvar(this)
-            montar()
+            mostrarTela()
         }
-        AlertDialog.Builder(this)
-            .setTitle("Como você trabalha?")
-            .setItems(arrayOf(
-                "Sou taxista\nCompara a corrida com o taxímetro",
-                "Sou motorista de aplicativo\nUberX, Comfort, Black, 99Pop…",
-            )) { _, qual -> escolher(if (qual == 0) Config.TAXI else Config.APP) }
-            .setCancelable(false)
-            .show()
+        v.por(tela, v.item(R.drawable.ic_taxi, "Sou taxista", "Compara a corrida com o taxímetro") { escolher(Config.TAXI) },
+            espaco = 24, altura = v.dp(96))
+        v.por(tela, v.item(R.drawable.ic_carro, "Sou motorista de aplicativo", "UberX, Comfort, Black, 99Pop…") { escolher(Config.APP) },
+            espaco = 14, altura = v.dp(96))
     }
 
     /**
