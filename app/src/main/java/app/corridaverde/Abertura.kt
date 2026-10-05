@@ -86,7 +86,7 @@ object Abertura {
         }
 
         override fun onDraw(c: Canvas) {
-            val lado = min(width, height * 0.6f) * 0.8f
+            val lado = min(width.toFloat(), height * 0.6f) * 0.8f
             val u = lado / 24f
             val cx = width / 2f
             val cy = height * 0.42f
