@@ -640,7 +640,8 @@ class LeitorService : AccessibilityService() {
         guardarEstrutura99()
         val janelas = windows.joinToString("\n") { w ->
             val r = w.root
-            val n = r?.let { runCatching { textosDo(it) }.getOrNull() } ?: emptyList()
+            // Só conta os textos dos apps que o leitor usa: a tela do banco ou de qualquer outro app nunca é lida.
+            val n = r?.takeIf { it.packageName?.toString() in NOMES }?.let { runCatching { textosDo(it) }.getOrNull() } ?: emptyList()
             "tipo ${w.type} · ${r?.packageName ?: "sem acesso"} · ${w.title ?: ""} · ${n.size} textos"
         }
         if (historicoJanelas.lastOrNull()?.substringAfter('\n') != janelas) {

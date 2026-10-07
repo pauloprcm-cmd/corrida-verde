@@ -26,7 +26,7 @@ jobs:
           gradle-version: "8.10.2"
 
       - name: Testes
-        run: gradle testDebugUnitTest
+        run: gradle testGithubDebugUnitTest
 
       - name: Assinatura
         env:
@@ -40,8 +40,16 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          gradle assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk corrida-verde.apk
+          gradle assembleGithubRelease bundlePlayRelease
+          cp app/build/outputs/apk/github/release/app-github-release.apk corrida-verde.apk
+          cp app/build/outputs/bundle/playRelease/app-play-release.aab corrida-verde-play.aab
+
+      # Versão da Play (sem atualizador): fica nos artefatos do build para enviar ao Play Console.
+      - name: Versão Play
+        uses: actions/upload-artifact@v4
+        with:
+          name: corrida-verde-play-1.${{ github.run_number }}
+          path: corrida-verde-play.aab
 
       - name: Release
         if: github.ref_name == 'main'

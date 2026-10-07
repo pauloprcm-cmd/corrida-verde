@@ -31,6 +31,20 @@ android {
         }
     }
 
+    // github: a versão de hoje, com o atualizador. play: vai para a Play Store, sem o atualizador
+    // e sem a permissão de instalar pacotes (a Play proíbe, e os bancos tratam como sinal de risco).
+    flavorDimensions += "loja"
+    productFlavors {
+        create("github") {
+            dimension = "loja"
+            buildConfigField("boolean", "ATUALIZADOR", "true")
+        }
+        create("play") {
+            dimension = "loja"
+            buildConfigField("boolean", "ATUALIZADOR", "false")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

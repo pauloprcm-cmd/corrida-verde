@@ -27,6 +27,8 @@ object Atualizador {
      * Sem perguntar, só instala se o Android deixar fazer isso em silêncio.
      */
     fun verificar(ctx: Context, perguntar: Boolean, aviso: (String) -> Unit = {}) {
+        // Na versão da Play quem atualiza é a própria loja.
+        if (!BuildConfig.ATUALIZADOR) return aviso("Versão $versaoAtual")
         if (ocupado) return
         ocupado = true
         val app = ctx.applicationContext
