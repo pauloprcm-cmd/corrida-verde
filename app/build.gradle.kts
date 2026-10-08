@@ -38,10 +38,13 @@ android {
         create("github") {
             dimension = "loja"
             buildConfigField("boolean", "ATUALIZADOR", "true")
+            buildConfigField("boolean", "GRAVACAO", "true")
         }
         create("play") {
             dimension = "loja"
             buildConfigField("boolean", "ATUALIZADOR", "false")
+            // Gravação da corrida fica de fora da Play no começo (câmera e microfone pedem declaração com vídeo).
+            buildConfigField("boolean", "GRAVACAO", "false")
         }
     }
 

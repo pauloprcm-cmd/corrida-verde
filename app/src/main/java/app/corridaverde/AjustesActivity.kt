@@ -44,6 +44,8 @@ class AjustesActivity : Activity() {
         campo(R.id.posicaoY, EditText::class.java).setText(cfg.posicaoY.toString())
         campo(R.id.diagnostico, CheckBox::class.java).isChecked = cfg.diagnostico
         campo(R.id.gravar, CheckBox::class.java).isChecked = cfg.gravar
+        // Versão da Play: sem a gravação por enquanto, a seção some.
+        if (!BuildConfig.GRAVACAO) listOf(R.id.gravarTitulo, R.id.gravar, R.id.gravarApoio).forEach { findViewById<View>(it).visibility = View.GONE }
         campo(R.id.radar, CheckBox::class.java).isChecked = cfg.radar
         campo(R.id.radarSom, CheckBox::class.java).isChecked = cfg.radarSom
         campo(R.id.aviso99, CheckBox::class.java).apply {

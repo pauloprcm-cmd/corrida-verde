@@ -7,9 +7,24 @@
         android:name="android.permission.REQUEST_INSTALL_PACKAGES"
         tools:node="remove" />
 
+    <!-- Sem a gravação da corrida por enquanto. A câmera continua, para a foto da assinatura do recibo. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" tools:node="remove" />
+
     <application>
         <receiver
             android:name=".ResultadoInstalacao"
+            tools:node="remove" />
+        <activity
+            android:name=".GravarActivity"
+            tools:node="remove" />
+        <service
+            android:name=".GravacaoService"
+            tools:node="remove" />
+        <receiver
+            android:name=".GuardarVideoReceiver"
             tools:node="remove" />
     </application>
 </manifest>

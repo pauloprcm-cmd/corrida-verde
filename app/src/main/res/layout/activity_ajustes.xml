@@ -163,11 +163,11 @@
 
         <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Uma bolinha verde com o microfone, como a da 99: um toque e você fala um ganho ou gasto sem sair da Uber ou da 99. Arraste para onde quiser; ela gruda na borda. Não aparece no Waze, para não atrapalhar a navegação. Para tirar, arraste até o X embaixo da tela ou desmarque aqui." />
 
-        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gravação da corrida" />
+        <TextView android:id="@+id/gravarTitulo" style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gravação da corrida" />
 
         <CheckBox android:id="@+id/gravar" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Botão Gravar corrida na notificação" />
 
-        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Use só no táxi de rua, de ponto ou em corrida particular. Em corrida da Uber ou da 99, não use: a câmera fica ocupada e a gravação do próprio app pode falhar, e é ela que defende você numa reclamação. Grava em 480p (uns 300 MB por hora) na pasta Movies/Corrida Verde; passando de 5 GB, apaga os vídeos mais antigos, menos os que você guardou (ao parar, toque em Guardar este vídeo). Nunca começa nem para sozinha: se ficar ligada muito tempo, ou se chegar oferta da Uber ou da 99, o app avisa com som para você parar." />
+        <TextView android:id="@+id/gravarApoio" style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Use só no táxi de rua, de ponto ou em corrida particular. Em corrida da Uber ou da 99, não use: a câmera fica ocupada e a gravação do próprio app pode falhar, e é ela que defende você numa reclamação. Grava em 480p (uns 300 MB por hora) na pasta Movies/Corrida Verde; passando de 5 GB, apaga os vídeos mais antigos, menos os que você guardou (ao parar, toque em Guardar este vídeo). Nunca começa nem para sozinha: se ficar ligada muito tempo, ou se chegar oferta da Uber ou da 99, o app avisa com som para você parar." />
 
         <Button android:id="@+id/salvar" style="@style/Botao.Principal" android:layout_width="match_parent" android:layout_height="68dp" android:layout_marginTop="28dp" android:text="Salvar ajustes" />
 

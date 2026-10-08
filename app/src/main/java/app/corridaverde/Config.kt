@@ -106,7 +106,7 @@ data class Config(
                 posicaoY = p.getInt("posicaoY", d.posicaoY),
                 diagnostico = p.getBoolean("diagnostico", d.diagnostico) && System.currentTimeMillis() < p.getLong("diagnosticoAte", 0),
                 diagnosticoAte = p.getLong("diagnosticoAte", 0),
-                gravar = p.getBoolean("gravar", d.gravar),
+                gravar = BuildConfig.GRAVACAO && p.getBoolean("gravar", d.gravar),
                 radar = p.getBoolean("radar", d.radar),
                 radarSom = p.getBoolean("radarSom", d.radarSom),
                 aviso99 = p.getBoolean("aviso99", d.aviso99),
