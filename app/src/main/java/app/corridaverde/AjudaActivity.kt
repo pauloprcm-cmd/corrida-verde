@@ -25,7 +25,7 @@ class AjudaActivity : Activity() {
         val cfg = Config.carregar(this)
 
         pergunta(tela, "Como ligar a leitura?", PASSO_A_PASSO) {
-            addView(v.botaoPrincipal("Ir para Acessibilidade") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }, cheio())
+            addView(v.botaoPrincipal("Ir para Acessibilidade") { AvisoLeitura.ligar(this@AjudaActivity) }, cheio())
             addView(v.botao("Liberar configuração restrita") { liberar(this@AjudaActivity) }, cheio())
         }
         pergunta(tela, "O aviso parou de aparecer no meio do dia. Por quê?",
@@ -137,7 +137,7 @@ class AjudaActivity : Activity() {
             AlertDialog.Builder(a)
                 .setTitle(if (jaLigou) "Por que a leitura desligou?" else "Como ligar a leitura")
                 .setMessage(if (jaLigou) POR_QUE_DESLIGA + "\n\n" + PASSO_A_PASSO else PASSO_A_PASSO)
-                .setPositiveButton("Ir para Acessibilidade") { _, _ -> a.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                .setPositiveButton("Ir para Acessibilidade") { _, _ -> AvisoLeitura.ligar(a) }
                 .setNeutralButton("Liberar configuração") { _, _ -> liberar(a) }
                 .setNegativeButton("Fechar", null)
                 .show()

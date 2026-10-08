@@ -53,7 +53,7 @@ class VerificarActivity : Activity() {
         val cfg = Config.carregar(this)
         val lista = mutableListOf(
             Item("Leitura ligada", LeitorService.instancia != null, "A leitura está desligada. Sem ela, o aviso não aparece na Uber.") {
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                AvisoLeitura.ligar(this)
             },
             Item("Notificações permitidas", notificacoes(), "Sem notificação, o botão Falar não aparece na barra do topo (o da tela principal continua funcionando).") {
                 if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {

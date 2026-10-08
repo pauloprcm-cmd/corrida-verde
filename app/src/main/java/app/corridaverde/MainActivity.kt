@@ -9,7 +9,6 @@ import android.content.pm.ShortcutManager
 import android.graphics.Paint
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
@@ -104,7 +103,7 @@ class MainActivity : Activity() {
         else "A leitura ainda não está ligada. Sem ela, o aviso colorido não aparece na Uber nem na 99."
         c.addView(v.texto(explica, 19f).apply { setPadding(0, v.dp(10), 0, v.dp(16)) })
         c.addView(v.botaoPrincipal(if (jaLigou) "Ligar de novo" else "Ligar a leitura") {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            AvisoLeitura.ligar(this@MainActivity)
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, v.dp(64)))
         c.addView(v.texto(if (jaLigou) "Por que isso acontece?" else "Como ligar, passo a passo", 17f, cor = v.verde).apply {
             paintFlags = paintFlags or Paint.UNDERLINE_TEXT_FLAG

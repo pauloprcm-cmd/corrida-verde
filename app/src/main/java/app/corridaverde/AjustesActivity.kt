@@ -6,7 +6,6 @@ import android.content.ClipData
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
@@ -59,7 +58,7 @@ class AjustesActivity : Activity() {
         campo(R.id.raioCasa, EditText::class.java).setText(cfg.raioCasaKm.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString().replace('.', ',') })
         campo(R.id.salvarCasa, Button::class.java).setOnClickListener { salvarCasa() }
 
-        campo(R.id.ativar, Button::class.java).setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        campo(R.id.ativar, Button::class.java).setOnClickListener { AvisoLeitura.ligar(this) }
         campo(R.id.salvar, Button::class.java).setOnClickListener {
             lerCampos()?.let {
                 it.salvar(this)

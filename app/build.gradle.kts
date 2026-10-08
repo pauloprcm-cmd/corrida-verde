@@ -47,7 +47,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8: embaralha os nomes do código (difícil de copiar) e tira o que não é usado (APK menor).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName(if (keystore != null) "release" else "debug")
         }
     }

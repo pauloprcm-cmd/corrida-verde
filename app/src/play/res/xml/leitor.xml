@@ -8,4 +8,4 @@
     android:description="@string/descricao_servico"
     android:isAccessibilityTool="false"
     android:notificationTimeout="50"
-    android:packageNames="com.ubercab.driver,com.app99.driver,com.waze,com.google.android.apps.maps" />
+    android:packageNames="com.ubercab.driver,com.app99.driver,com.waze" />
