@@ -97,7 +97,8 @@ class Visual(private val a: Activity) {
     }
 
     /** Botão grande de menu: ícone verde, texto em negrito e a seta, como "Meu dia ›". */
-    fun item(icone: Int, titulo: String, detalhe: String? = null, acao: () -> Unit): View = LinearLayout(a).apply {
+    /** Linha tocável com ícone, título e detalhe; [bolinha] põe um ponto colorido antes da seta (verde = ligado, vermelho = desligado). */
+    fun item(icone: Int, titulo: String, detalhe: String? = null, bolinha: Int? = null, acao: () -> Unit): View = LinearLayout(a).apply {
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = dp(68)
         setPadding(dp(20), dp(14), dp(16), dp(14))
@@ -110,6 +111,10 @@ class Visual(private val a: Activity) {
         textos.addView(texto(titulo, 20f, negrito = true))
         detalhe?.let { textos.addView(texto(it, 15f, cor = texto2)) }
         addView(textos, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(18) })
+        bolinha?.let { c ->
+            addView(View(a).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(c) } },
+                LinearLayout.LayoutParams(dp(16), dp(16)).apply { marginEnd = dp(12) })
+        }
         addView(ImageView(a).apply { setImageResource(R.drawable.ic_seta) }, LinearLayout.LayoutParams(dp(24), dp(24)))
     }
 

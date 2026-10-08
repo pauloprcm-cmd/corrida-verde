@@ -73,7 +73,8 @@ class MeuDiaActivity : Activity() {
             cfg.indoPraCasa -> "LIGADO: toque para desligar"
             else -> "Desligado: toque para ligar"
         }
-        v.por(tela, v.item(R.drawable.ic_casa, "Indo pra casa", casa) {
+        val bolinha = if (cfg.casa != null) (if (cfg.indoPraCasa) v.verde else v.vermelho) else null
+        v.por(tela, v.item(R.drawable.ic_casa, "Indo pra casa", casa, bolinha) {
             if (cfg.casa == null) {
                 startActivity(Intent(this, AjustesActivity::class.java))
             } else {

@@ -37,7 +37,7 @@ object Notificacao {
             .addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_microfone), "🎤 Falar", registrar).build())
         if (cfg.casa != null) {
             val casa = PendingIntent.getBroadcast(ctx, 3, Intent(ctx, CasaReceiver::class.java), flags)
-            b.addAction(Notification.Action.Builder(null, if (cfg.indoPraCasa) "Desligar casa" else "Indo pra casa", casa).build())
+            b.addAction(Notification.Action.Builder(null, if (cfg.indoPraCasa) "🟢 Indo pra casa" else "🔴 Indo pra casa", casa).build())
         }
         if (cfg.gravar && !GravacaoService.gravando) {
             val gravar = PendingIntent.getActivity(
