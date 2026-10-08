@@ -85,7 +85,10 @@ class MainActivity : Activity() {
         val c = v.cartao(destaque = v.verde)
         c.addView(titulo(R.drawable.ic_ok, "LIGADO", v.verde))
         val cfg = Config.carregar(this)
-        c.addView(v.texto(if (cfg.aviso99) "Lendo as ofertas da Uber e da 99." else "Lendo as ofertas da Uber.", 19f).apply { setPadding(0, v.dp(8), 0, 0) })
+        val le99 = cfg.aviso99 && Build.VERSION.SDK_INT >= 30
+        c.addView(v.texto(if (le99) "Lendo as ofertas da Uber e da 99." else "Lendo as ofertas da Uber.", 19f).apply { setPadding(0, v.dp(8), 0, 0) })
+        // Celular antigo: diz por que a 99 não aparece, em vez de deixar o motorista esperando o aviso.
+        if (cfg.aviso99 && !le99) c.addView(v.texto(Celular.semAviso99, 16f, cor = v.texto2).apply { setPadding(0, v.dp(6), 0, 0) })
         val linha = listOfNotNull(
             if (cfg.motoristaDeApp) "Motorista de app" else "Taxímetro: ${if (cfg.luxo) "Luxo" else "Comum"}",
             "Indo pra casa".takeIf { cfg.indoPraCasa },

@@ -16,6 +16,15 @@ Todos os limites podem ser ajustados no app.
 
 O app **só lê** a tela: não toca, não aceita e não recusa corridas.
 
+## Qual celular serve
+
+- **Android 8 ou mais novo.** O aviso da Uber, o radar, os ganhos e gastos por voz, o recibo e o Pix
+  funcionam em todos.
+- **O aviso da 99 precisa do Android 11 ou mais novo.** A 99 não deixa ler o texto da oferta, então o app
+  tira um print dela, e o Android só permite isso a partir do 11. Num celular mais antigo, o app avisa na
+  tela inicial e o resto funciona normal.
+- Para ver a versão: Configurações › Sobre o telefone › Informações do software › Versão do Android.
+
 ## Instalar
 
 Baixe o APK mais recente:

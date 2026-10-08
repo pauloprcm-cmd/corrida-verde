@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.ClipData
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
@@ -46,7 +47,13 @@ class AjustesActivity : Activity() {
         campo(R.id.gravar, CheckBox::class.java).isChecked = cfg.gravar
         campo(R.id.radar, CheckBox::class.java).isChecked = cfg.radar
         campo(R.id.radarSom, CheckBox::class.java).isChecked = cfg.radarSom
-        campo(R.id.aviso99, CheckBox::class.java).isChecked = cfg.aviso99
+        campo(R.id.aviso99, CheckBox::class.java).apply {
+            isChecked = cfg.aviso99
+            if (Build.VERSION.SDK_INT < 30) {
+                isEnabled = false
+                text = Celular.semAviso99
+            }
+        }
         campo(R.id.bolinha, CheckBox::class.java).isChecked = cfg.bolinha
         campo(R.id.casaEndereco, EditText::class.java).setText(cfg.casaEndereco)
         campo(R.id.raioCasa, EditText::class.java).setText(cfg.raioCasaKm.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString().replace('.', ',') })
