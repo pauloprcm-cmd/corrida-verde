@@ -68,8 +68,8 @@ class Visual(private val a: Activity) {
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = dp(16) })
     }
 
-    /** Topo das telas internas: seta de voltar e o título. */
-    fun topo(titulo: String): View = LinearLayout(a).apply {
+    /** Topo das telas internas: seta de voltar e o título. [aoVoltar] serve para telas com passos dentro da mesma Activity. */
+    fun topo(titulo: String, aoVoltar: () -> Unit = { a.finish() }): View = LinearLayout(a).apply {
         gravity = Gravity.CENTER_VERTICAL
         setPadding(0, 0, 0, dp(16))
         addView(ImageView(a).apply {
@@ -77,7 +77,7 @@ class Visual(private val a: Activity) {
             contentDescription = "Voltar"
             setPadding(dp(10), dp(10), dp(10), dp(10))
             background = toque(forma(cartao, borda, 14))
-            setOnClickListener { a.finish() }
+            setOnClickListener { aoVoltar() }
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
         addView(texto(titulo, 26f, negrito = true), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(14) })
     }

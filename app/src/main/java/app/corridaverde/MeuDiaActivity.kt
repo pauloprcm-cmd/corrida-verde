@@ -55,6 +55,9 @@ class MeuDiaActivity : Activity() {
         // Recibo só no perfil taxista: na Uber e na 99 quem dá o recibo é a plataforma.
         if (!Config.carregar(this).motoristaDeApp) {
             v.por(tela, v.item(R.drawable.ic_recibo, "Fazer recibo", "Fale o valor e o trajeto") { startActivity(ReciboActivity.porVoz(this)) })
+            v.por(tela, v.item(R.drawable.ic_pessoa, "Recibo de cliente fixo", "Várias corridas num recibo só") {
+                startActivity(Intent(this, ClientesActivity::class.java))
+            })
             val recibos = LinearLayout(this)
             recibos.addView(v.botao("Recibos enviados") { startActivity(ReciboActivity.lista(this)) },
                 LinearLayout.LayoutParams(0, v.dp(60), 1f).apply { marginEnd = v.dp(6) })

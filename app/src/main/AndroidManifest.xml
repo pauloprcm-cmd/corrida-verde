@@ -119,6 +119,14 @@
             android:exported="false"
             android:label="Recibo" />
 
+        <!-- Recibo de cliente fixo: várias corridas, cada uma com a sua data, num recibo só. -->
+        <activity
+            android:name=".ClientesActivity"
+            android:exported="false"
+            android:label="Clientes fixos"
+            android:theme="@style/Tema.Escuro"
+            android:windowSoftInputMode="adjustResize" />
+
         <activity
             android:name=".PersonalizarReciboActivity"
             android:exported="false"

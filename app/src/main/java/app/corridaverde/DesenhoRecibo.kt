@@ -13,6 +13,9 @@ import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.TextUtils
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import java.io.File
 import java.time.format.DateTimeFormatter
@@ -68,7 +71,13 @@ object DesenhoRecibo {
             y += 34f
         }
         val corpo = if (simples) 14f else 13f
+        val pe = rodape(c, f)
         y = paragrafo(c, Recibos.frase(f.r), pincel(corpo), y, largura) + 10f
+        if (f.r.varias) {
+            // Entre a tabela e a assinatura ainda vêm o pagamento, a correção e a cidade com a data.
+            val depois = 34f + (if (f.r.pagamento.isNotBlank()) 22f else 0f) + (if (f.r.substitui != null) 18f else 0f)
+            y = tabelaCorridas(c, f, MARGEM, LARGURA - MARGEM, y, topoAssinatura(f, pe) - depois, CLARO, if (simples) PRETO else f.e.cor) + 12f
+        }
         if (f.r.pagamento.isNotBlank()) y = paragrafo(c, "Forma de pagamento: ${f.r.pagamento}.", pincel(corpo), y, largura) + 6f
         f.r.substitui?.let {
             y = paragrafo(c, "Este recibo substitui o nº ${String.format(Locale.ROOT, "%04d", it)}.", pincel(11f, cor = CINZA), y, largura) + 6f
@@ -76,7 +85,6 @@ object DesenhoRecibo {
         y += 6f
         c.drawText("${f.m.cidade.ifBlank { "São Paulo" }}, ${f.r.quando.toLocalDate().format(DATA_LONGA)}.", MARGEM, y + 13f, pincel(corpo))
 
-        val pe = rodape(c, f)
         assinatura(c, f, pe)
     }
 
@@ -105,35 +113,51 @@ object DesenhoRecibo {
         listOfNotNull(
             "Recibo nº:" to numero(f.r),
             "Data:" to f.r.quando.toLocalDate().format(DATA_LONGA),
-            f.r.passageiro.takeIf { it.isNotBlank() }?.let { "Cliente:" to it },
+            f.r.passageiro.takeIf { it.isNotBlank() }?.let { "Cliente:" to Recibos.pagador(f.r) },
             "Cidade:" to f.m.cidade.ifBlank { "São Paulo" },
         ).forEach { (rotulo, valor) -> y = paragrafo(c, marcado("**$rotulo** $valor"), pincel(11.5f), y, w - 2 * m, m) + 3f }
 
-        // Tabela da corrida: DESCRIÇÃO | VALOR | QTD | TOTAL.
+        // O pé primeiro: a tabela de corridas precisa saber até onde pode descer.
+        c.drawText("Página 1/1", w - m, ALTURA - 18f, pincel(8f, cor = CINZA).apply { textAlign = Paint.Align.RIGHT })
+        val pe = rodapeLargo(c, f, ALTURA - 32f, m)
+        val dados = listOfNotNull(
+            f.m.nome.takeIf { f.m.fantasia.isNotBlank() && it.isNotBlank() },
+            f.m.documento.takeIf { it.isNotBlank() },
+            f.m.placa.takeIf { it.isNotBlank() }?.let { "Placa $it" },
+            f.m.cidade.takeIf { it.isNotBlank() },
+        )
+        val linhaAssin = pe - 18f - dados.size * 13f - 16f
+
         y += 12f
-        val col = floatArrayOf(m, m + (w - 2 * m) * 0.42f, m + (w - 2 * m) * 0.62f, m + (w - 2 * m) * 0.78f, w - m)
-        val borda = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = LINHA; strokeWidth = 0.8f }
-        val cabeca = 24f
-        c.drawRect(m, y, w - m, y + cabeca, Paint().apply { color = CLARO })
-        listOf("DESCRIÇÃO", "VALOR", "QTD", "TOTAL").forEachIndexed { i, t ->
-            c.drawText(t, col[i] + 6f, y + 16f, pincel(10f, negrito = true, cor = f.e.cor))
-        }
-        val topoTabela = y
-        y += cabeca
-        val texto = descricaoComData(f.r)
-        val desc = StaticLayout.Builder.obtain(texto, 0, texto.length, pincel(9.5f, negrito = true), (col[1] - col[0] - 10f).toInt())
-            .setLineSpacing(1.5f, 1f).build()
-        val alturaLinha = maxOf(30f, desc.height + 12f)
-        c.save(); c.translate(col[0] + 6f, y + 6f); desc.draw(c); c.restore()
-        val meio = y + alturaLinha / 2 + 3.5f
         val valor = "R$ ${Popup.br(f.r.valor)}"
-        c.drawText(valor, col[1] + 6f, meio, pincel(10f))
-        c.drawText("1 corrida", col[2] + 6f, meio, pincel(10f))
-        c.drawText(valor, col[3] + 6f, meio, pincel(10f))
-        y += alturaLinha
-        c.drawRect(m, topoTabela, w - m, y, borda)
-        c.drawLine(m, topoTabela + cabeca, w - m, topoTabela + cabeca, borda)
-        for (i in 1..3) c.drawLine(col[i], topoTabela, col[i], y, borda)
+        if (f.r.varias) {
+            // Embaixo da tabela vêm o total e até quatro linhas de texto, e depois a assinatura.
+            y = tabelaCorridas(c, f, m, w - m, y, linhaAssin - 46f - 72f, CLARO, f.e.cor)
+        } else {
+            // Tabela da corrida: DESCRIÇÃO | VALOR | QTD | TOTAL.
+            val col = floatArrayOf(m, m + (w - 2 * m) * 0.42f, m + (w - 2 * m) * 0.62f, m + (w - 2 * m) * 0.78f, w - m)
+            val borda = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = LINHA; strokeWidth = 0.8f }
+            val cabeca = 24f
+            c.drawRect(m, y, w - m, y + cabeca, Paint().apply { color = CLARO })
+            listOf("DESCRIÇÃO", "VALOR", "QTD", "TOTAL").forEachIndexed { i, t ->
+                c.drawText(t, col[i] + 6f, y + 16f, pincel(10f, negrito = true, cor = f.e.cor))
+            }
+            val topoTabela = y
+            y += cabeca
+            val texto = descricaoComData(f.r)
+            val desc = StaticLayout.Builder.obtain(texto, 0, texto.length, pincel(9.5f, negrito = true), (col[1] - col[0] - 10f).toInt())
+                .setLineSpacing(1.5f, 1f).build()
+            val alturaLinha = maxOf(30f, desc.height + 12f)
+            c.save(); c.translate(col[0] + 6f, y + 6f); desc.draw(c); c.restore()
+            val meio = y + alturaLinha / 2 + 3.5f
+            c.drawText(valor, col[1] + 6f, meio, pincel(10f))
+            c.drawText("1 corrida", col[2] + 6f, meio, pincel(10f))
+            c.drawText(valor, col[3] + 6f, meio, pincel(10f))
+            y += alturaLinha
+            c.drawRect(m, topoTabela, w - m, y, borda)
+            c.drawLine(m, topoTabela + cabeca, w - m, topoTabela + cabeca, borda)
+            for (i in 1..3) c.drawLine(col[i], topoTabela, col[i], y, borda)
+        }
 
         // Embaixo da tabela: confirmação e pagamento à esquerda, total à direita.
         y += 12f
@@ -150,16 +174,7 @@ object DesenhoRecibo {
         if (f.r.pagamento.isNotBlank()) y = paragrafo(c, marcado("**Forma de pagamento:** ${f.r.pagamento}"), pincel(10f), y, larguraTexto, m) + 1f
         f.r.substitui?.let { paragrafo(c, "Este recibo substitui o nº ${String.format(Locale.ROOT, "%04d", it)}.", pincel(9.5f, cor = CINZA), y + 5f, larguraTexto, m) }
 
-        // Pé: Pix/frase e página; acima, as assinaturas (passageiro à esquerda, motorista à direita).
-        c.drawText("Página 1/1", w - m, ALTURA - 18f, pincel(8f, cor = CINZA).apply { textAlign = Paint.Align.RIGHT })
-        val pe = rodapeLargo(c, f, ALTURA - 32f, m)
-        val dados = listOfNotNull(
-            f.m.nome.takeIf { f.m.fantasia.isNotBlank() && it.isNotBlank() },
-            f.m.documento.takeIf { it.isNotBlank() },
-            f.m.placa.takeIf { it.isNotBlank() }?.let { "Placa $it" },
-            f.m.cidade.takeIf { it.isNotBlank() },
-        )
-        val linhaAssin = pe - 18f - dados.size * 13f - 16f
+        // Acima do pé, as assinaturas (passageiro à esquerda, motorista à direita).
         val comPassageiro = f.r.passageiro.isNotBlank()
         val doMotorista = if (comPassageiro) w * 0.71f else w / 2
         val traco = Paint().apply { color = LINHA; strokeWidth = 1f }
@@ -205,35 +220,49 @@ object DesenhoRecibo {
         c.drawText(Recibos.data(f.r), w - m - 6f, y + 16f, pincel(9.5f).apply { textAlign = Paint.Align.RIGHT })
         y += 36f
 
-        val de = f.r.passageiro.takeIf { it.isNotBlank() }?.let { ", de **$it**" } ?: ""
+        val de = f.r.passageiro.takeIf { it.isNotBlank() }?.let { ", de **${Recibos.pagador(f.r)}**" } ?: ""
         val declaracao = "Declaro que recebi na data de **${f.r.quando.toLocalDate().format(DATA_LONGA)}**, o valor de " +
             "**R$ ${Popup.br(f.r.valor)}** (${Extenso.reais(f.r.valor)})$de, referente aos seguintes serviços:"
         y = paragrafo(c, marcado(declaracao), pincel(10.5f), y, w - 2 * m, m) + 12f
 
+        // O pé primeiro: a tabela de corridas precisa saber até onde pode descer.
+        val pe = rodapeLargo(c, f, ALTURA - 18f, m)
+        val linhas = listOfNotNull(
+            f.m.nome.takeIf { f.m.fantasia.isNotBlank() && it.isNotBlank() }?.uppercase(),
+            f.m.placa.takeIf { it.isNotBlank() }?.let { "Placa: $it" },
+        )
+        val linhaAssin = pe - 16f - linhas.size * 12f - 8f
+
         c.drawText("Serviços", w / 2, y + 10f, pincel(12f, negrito = true).centro())
         y += 18f
-        // Cabeçalho da tabela na cor escolhida, letras brancas.
-        val x = floatArrayOf(m + 6f, w * 0.56f, w * 0.70f, w * 0.81f, w - m - 6f)
-        c.drawRoundRect(m, y, w - m, y + 20f, 3f, 3f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = f.e.cor })
-        c.drawText("Descrição", x[0], y + 14f, pincel(9f, negrito = true, cor = Color.WHITE))
-        c.drawText("Preço", x[1], y + 14f, pincel(9f, negrito = true, cor = Color.WHITE).centro())
-        c.drawText("Unidade", x[2], y + 14f, pincel(9f, negrito = true, cor = Color.WHITE).centro())
-        c.drawText("Quant.", x[3], y + 14f, pincel(9f, negrito = true, cor = Color.WHITE).centro())
-        c.drawText("Total", x[4], y + 14f, pincel(9f, negrito = true, cor = Color.WHITE).apply { textAlign = Paint.Align.RIGHT })
-        y += 23f
-        val descricao = Recibos.descricao(f.r)
-        val desc = StaticLayout.Builder.obtain(descricao, 0, descricao.length, pincel(8.5f), (x[1] - x[0] - 28f).toInt()).build()
-        val alto = desc.height + 18f
-        c.drawRoundRect(m, y, w - m, y + alto, 3f, 3f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0xEE, 0xEE, 0xEE) })
-        c.save(); c.translate(x[0], y + 4f); desc.draw(c); c.restore()
-        c.drawText("${Recibos.data(f.r)} ${Recibos.hora(f.r)}", x[0], y + desc.height + 13f, pincel(7.5f))
         val valor = "R$ ${Popup.br(f.r.valor)}"
-        val linha = y + 14f
-        c.drawText(valor, x[1], linha, pincel(8.5f).centro())
-        c.drawText("Corrida", x[2], linha, pincel(8.5f).centro())
-        c.drawText("1", x[3], linha, pincel(8.5f).centro())
-        c.drawText(valor, x[4], linha, pincel(8.5f).apply { textAlign = Paint.Align.RIGHT })
+        if (f.r.varias) {
+            // Embaixo da tabela: subtotal, total, pagamento e a data em cima da assinatura.
+            val depois = 92f + 62f + (if (f.r.pagamento.isNotBlank()) 48f else 0f) + (if (f.r.substitui != null) 14f else 0f)
+            y = tabelaCorridas(c, f, m, w - m, y, linhaAssin - depois, f.e.cor, Color.WHITE) + 18f
+        } else {
+            // Cabeçalho da tabela na cor escolhida, letras brancas.
+            val x = floatArrayOf(m + 6f, w * 0.56f, w * 0.70f, w * 0.81f, w - m - 6f)
+            c.drawRoundRect(m, y, w - m, y + 20f, 3f, 3f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = f.e.cor })
+            c.drawText("Descrição", x[0], y + 14f, pincel(9f, negrito = true, cor = Color.WHITE))
+            c.drawText("Preço", x[1], y + 14f, pincel(9f, negrito = true, cor = Color.WHITE).centro())
+            c.drawText("Unidade", x[2], y + 14f, pincel(9f, negrito = true, cor = Color.WHITE).centro())
+            c.drawText("Quant.", x[3], y + 14f, pincel(9f, negrito = true, cor = Color.WHITE).centro())
+            c.drawText("Total", x[4], y + 14f, pincel(9f, negrito = true, cor = Color.WHITE).apply { textAlign = Paint.Align.RIGHT })
+            y += 23f
+            val descricao = Recibos.descricao(f.r)
+            val desc = StaticLayout.Builder.obtain(descricao, 0, descricao.length, pincel(8.5f), (x[1] - x[0] - 28f).toInt()).build()
+            val alto = desc.height + 18f
+            c.drawRoundRect(m, y, w - m, y + alto, 3f, 3f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0xEE, 0xEE, 0xEE) })
+            c.save(); c.translate(x[0], y + 4f); desc.draw(c); c.restore()
+            c.drawText("${Recibos.data(f.r)} ${Recibos.hora(f.r)}", x[0], y + desc.height + 13f, pincel(7.5f))
+            val linha = y + 14f
+            c.drawText(valor, x[1], linha, pincel(8.5f).centro())
+            c.drawText("Corrida", x[2], linha, pincel(8.5f).centro())
+            c.drawText("1", x[3], linha, pincel(8.5f).centro())
+            c.drawText(valor, x[4], linha, pincel(8.5f).apply { textAlign = Paint.Align.RIGHT })
         y += alto + 18f
+        }
 
         c.drawText("Subtotal serviços", m, y, pincel(10.5f, negrito = true))
         c.drawText(valor, w - m, y, pincel(10.5f, negrito = true).apply { textAlign = Paint.Align.RIGHT })
@@ -257,13 +286,7 @@ object DesenhoRecibo {
         }
         f.r.substitui?.let { c.drawText("Este recibo substitui o nº ${String.format(Locale.ROOT, "%04d", it)}.", m + 6f, y, pincel(9f, cor = CINZA)) }
 
-        // No pé: Pix/frase; acima, a data, a assinatura e os dados do motorista, no centro.
-        val pe = rodapeLargo(c, f, ALTURA - 18f, m)
-        val linhas = listOfNotNull(
-            f.m.nome.takeIf { f.m.fantasia.isNotBlank() && it.isNotBlank() }?.uppercase(),
-            f.m.placa.takeIf { it.isNotBlank() }?.let { "Placa: $it" },
-        )
-        val linhaAssin = pe - 16f - linhas.size * 12f - 8f
+        // Acima do pé: a data, a assinatura e os dados do motorista, no centro.
         f.assinatura?.let { desenharImagem(c, it, RectF(w / 2 - 70f, linhaAssin - 42f, w / 2 + 70f, linhaAssin - 3f)) }
         c.drawText(Recibos.data(f.r), w / 2, linhaAssin - 50f, pincel(10f).centro())
         c.drawLine(w / 2 - 85f, linhaAssin, w / 2 + 85f, linhaAssin, Paint().apply { color = PRETO; strokeWidth = 0.7f })
@@ -354,7 +377,7 @@ object DesenhoRecibo {
     /** Assinatura (se o motorista fez uma), a linha e os dados dele, acima do pé. */
     private fun assinatura(c: Canvas, f: Folha, pe: Float) {
         val dados = Recibos.dadosDoMotorista(f.m)
-        var base = pe - dados.size * 14f - 8f
+        var base = topoAssinatura(f, pe) + 52f
         f.assinatura?.let { desenharImagem(c, it, RectF(LARGURA / 2f - 90f, base - 52f, LARGURA / 2f + 90f, base - 4f)) }
         c.drawLine(MARGEM + 40f, base, LARGURA - MARGEM - 40f, base, Paint().apply { color = PRETO; strokeWidth = 1f })
         base += 16f
@@ -364,6 +387,61 @@ object DesenhoRecibo {
             c.drawText(linha, LARGURA / 2f, base, if (i == 0) centro else centroCinza)
             base += 14f
         }
+    }
+
+    /** Onde começa o desenho da assinatura nos modelos de parágrafo: nada do recibo pode passar daqui. */
+    private fun topoAssinatura(f: Folha, pe: Float) = pe - Recibos.dadosDoMotorista(f.m).size * 14f - 8f - 52f
+
+    /**
+     * Tabela Data | Trajeto | Valor do recibo de cliente fixo, de [topo] até no máximo [limite]. Com muitas
+     * corridas ou trajetos compridos, a letra diminui até caber. Devolve onde a tabela termina.
+     */
+    private fun tabelaCorridas(c: Canvas, f: Folha, x0: Float, x1: Float, topo: Float, limite: Float, fundoCabeca: Int, corCabeca: Int): Float {
+        val cabeca = 20f
+        var fonte = 10.5f
+        var linhas: List<StaticLayout> = emptyList()
+        while (true) {
+            val larguraData = pincel(fonte).measureText("00/00/0000")
+            val larguraValor = pincel(fonte).measureText("R$ 0.000,00")
+            val larguraTrajeto = (x1 - x0 - 24f - larguraData - larguraValor).toInt()
+            linhas = f.r.corridas.map { trajetoNaTabela(it.trajeto, fonte, larguraTrajeto, if (fonte > 8f) 4 else 2) }
+            val altura = cabeca + linhas.sumOf { (it.height + fonte).toDouble() }.toFloat()
+            if (topo + altura <= limite || fonte <= 7f) break
+            fonte -= 0.5f
+        }
+        val xTrajeto = x0 + 12f + pincel(fonte).measureText("00/00/0000")
+        c.drawRect(x0, topo, x1, topo + cabeca, Paint().apply { color = fundoCabeca })
+        c.drawText("DATA", x0 + 6f, topo + 14f, pincel(8.5f, negrito = true, cor = corCabeca))
+        c.drawText("TRAJETO", xTrajeto, topo + 14f, pincel(8.5f, negrito = true, cor = corCabeca))
+        c.drawText("VALOR", x1 - 6f, topo + 14f, pincel(8.5f, negrito = true, cor = corCabeca).apply { textAlign = Paint.Align.RIGHT })
+        var y = topo + cabeca
+        val traco = Paint().apply { color = LINHA; strokeWidth = 0.6f }
+        f.r.corridas.forEachIndexed { i, corrida ->
+            val l = linhas[i]
+            val base = y + fonte / 2 + l.getLineBaseline(0)
+            c.drawText(Recibos.data(corrida), x0 + 6f, base, pincel(fonte))
+            c.save(); c.translate(xTrajeto, y + fonte / 2); l.draw(c); c.restore()
+            c.drawText("R$ ${Popup.br(corrida.trajeto.valor)}", x1 - 6f, base, pincel(fonte).apply { textAlign = Paint.Align.RIGHT })
+            y += l.height + fonte
+            c.drawLine(x0, y, x1, y, traco)
+        }
+        return y
+    }
+
+    /** O trajeto e, embaixo, a observação em cinza ("Pedágios incluídos"); corta com "…" se passar de [maxLinhas]. */
+    private fun trajetoNaTabela(t: Trajeto, fonte: Float, largura: Int, maxLinhas: Int): StaticLayout {
+        val texto = SpannableStringBuilder(t.descricao)
+        if (t.obs.isNotBlank()) {
+            val ini = texto.length
+            texto.append("\n").append(t.obs)
+            texto.setSpan(ForegroundColorSpan(CINZA), ini, texto.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            texto.setSpan(RelativeSizeSpan(0.88f), ini, texto.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        return StaticLayout.Builder.obtain(texto, 0, texto.length, pincel(fonte), maxOf(largura, 40))
+            .setLineSpacing(1f, 1f)
+            .setMaxLines(maxLinhas)
+            .setEllipsize(TextUtils.TruncateAt.END)
+            .build()
     }
 
     /** A prévia: o mesmo desenho, com [larguraPx] pixels de largura. */

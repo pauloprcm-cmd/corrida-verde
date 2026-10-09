@@ -91,6 +91,35 @@ data class Config(
         const val APP = "app"
         const val DURACAO_DIAGNOSTICO = 24 * 60 * 60_000L
 
+        /**
+         * Dia da primeira abertura (AAAA-MM-DD), de onde vão contar os 30 dias grátis. Fica no "config", que
+         * entra no backup do Google e na cópia: quem desinstala e instala de novo recebe a data de volta e
+         * não ganha outros 30 dias. Não faz parte do [Config] para o [salvar] nunca mexer nela.
+         */
+        private const val PRIMEIRO_USO = "primeiroUso"
+
+        /** Grava hoje como primeira abertura se ainda não houver data, e devolve a data guardada. */
+        fun marcarPrimeiroUso(ctx: Context): LocalDate {
+            val p = ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
+            p.getString(PRIMEIRO_USO, null)?.let { d -> runCatching { LocalDate.parse(d) }.getOrNull()?.let { return it } }
+            val hoje = LocalDate.now()
+            p.edit().putString(PRIMEIRO_USO, hoje.toString()).apply()
+            return hoje
+        }
+
+        fun primeiroUso(ctx: Context): String? =
+            ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE).getString(PRIMEIRO_USO, null)
+
+        /** Depois de restaurar uma cópia, fica a data mais antiga entre a deste celular e a da cópia. */
+        fun manterPrimeiroUso(ctx: Context, antes: String?) {
+            val p = ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
+            maisAntiga(antes, p.getString(PRIMEIRO_USO, null))?.let { p.edit().putString(PRIMEIRO_USO, it).commit() }
+        }
+
+        /** A data mais antiga das duas (AAAA-MM-DD se compara como texto); ignora o que não for data. */
+        fun maisAntiga(a: String?, b: String?): String? =
+            listOfNotNull(a, b).filter { runCatching { LocalDate.parse(it) }.isSuccess }.minOrNull()
+
         fun carregar(ctx: Context): Config {
             val p = ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
             val d = Config()

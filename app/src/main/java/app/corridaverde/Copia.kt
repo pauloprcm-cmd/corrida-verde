@@ -20,7 +20,7 @@ import java.util.zip.ZipOutputStream
 object Copia {
     /** Só estes arquivos entram e saem da cópia; nada de diagnóstico nem vídeo. */
     private val ARQUIVOS = listOf(
-        "corridas.tsv", "totais.tsv", "gastos.tsv", "recibos.tsv", "destinos.tsv", "recibo_logo.png", "recibo_assinatura.png",
+        "corridas.tsv", "totais.tsv", "gastos.tsv", "recibos.tsv", "clientes.tsv", "destinos.tsv", "recibo_logo.png", "recibo_assinatura.png",
     )
     private val PREFERENCIAS = listOf("config", "motorista", "recibo_estilo", "pix")
     private const val MARCA = "corrida-verde-copia.json"
@@ -83,6 +83,7 @@ object Copia {
             if (conteudo == null) f.delete() else f.writeBytes(conteudo)
         }
         val prefs = marca.optJSONObject("preferencias") ?: JSONObject()
+        val primeiroUso = Config.primeiroUso(ctx)
         PREFERENCIAS.forEach { nome ->
             val e = ctx.getSharedPreferences(nome, Context.MODE_PRIVATE).edit().clear()
             prefs.optJSONObject(nome)?.let { valores ->
@@ -100,6 +101,8 @@ object Copia {
             }
             e.commit()
         }
+        // Uma cópia antiga ou sem a data não pode recomeçar os 30 dias grátis.
+        Config.manterPrimeiroUso(ctx, primeiroUso)
         return true
     }
 

@@ -63,7 +63,14 @@ class ReciboActivity : Activity() {
         motorista = Motorista.carregar(this)
         if (savedInstanceState != null) return
         val inicio = {
+            val pronto = intent.getStringExtra(EXTRA_PRONTO)?.let { Recibos.deLinha(it) }
             when {
+                pronto != null -> {
+                    // Recibo de cliente fixo, montado na ClientesActivity: vai direto para a prévia.
+                    substitui = pronto.substitui
+                    lancarGanho = intent.getBooleanExtra(EXTRA_LANCAR, false)
+                    telaPrevia(pronto)
+                }
                 intent.getBooleanExtra(EXTRA_LISTA, false) -> telaLista()
                 intent.getBooleanExtra(EXTRA_OUVIR, false) -> ouvir()
                 else -> formularioDaFala(intent.getStringExtra(EXTRA_FALA))
@@ -228,6 +235,12 @@ class ReciboActivity : Activity() {
         botao("E-mail") { email(emitido()) }
         botao("Outro app (PDF)") { startActivity(Intent.createChooser(intentPdf(emitido()), "Enviar recibo")) }
         botao("✏️ Corrigir") {
+            if (r.varias) {
+                // Recibo de cliente fixo: a correção é na tela das corridas.
+                startActivity(ClientesActivity.corrigir(this, r, lancarGanho))
+                finish()
+                return@botao
+            }
             if (r.numero > 0) substitui = r.numero
             telaFormulario(r.copy(numero = 0), null)
         }
@@ -249,7 +262,10 @@ class ReciboActivity : Activity() {
                 setOnClickListener { substitui = null; telaPrevia(r) }
             }
             linha.addView(texto("Nº ${r.numeroTexto} · ${r.quando.format(DATA)} ${r.quando.format(HORA)} · R$ ${Popup.br(r.valor)}", 17f, negrito = true))
-            val detalhe = listOfNotNull(r.passageiro.ifBlank { null }, r.ate.ifBlank { null }?.let { "até $it" }).joinToString(" · ")
+            val detalhe = listOfNotNull(
+                r.passageiro.ifBlank { null },
+                if (r.varias) "${r.corridas.size} corridas" else r.ate.ifBlank { null }?.let { "até $it" },
+            ).joinToString(" · ")
             if (detalhe.isNotBlank()) linha.addView(texto(detalhe, 15f))
             corrigidoPor[r.numero]?.let { linha.addView(texto("Substituído pelo nº ${numero(it)}", 14f, cor = VERMELHO)) }
             tela.addView(linha)
@@ -308,7 +324,7 @@ class ReciboActivity : Activity() {
             if (r.email.isNotBlank()) putExtra(Intent.EXTRA_EMAIL, arrayOf(r.email))
             putExtra(Intent.EXTRA_SUBJECT, "Recibo de táxi nº ${r.numeroTexto} – ${r.quando.format(DATA)}")
             val ola = r.passageiro.split(' ').firstOrNull()?.takeIf { it.isNotBlank() }?.let { "Olá, $it." } ?: "Olá."
-            putExtra(Intent.EXTRA_TEXT, "$ola\n\nSegue o recibo da corrida.\n\n${Recibos.texto(r, motorista)}")
+            putExtra(Intent.EXTRA_TEXT, "$ola\n\nSegue o recibo ${if (r.varias) "das corridas" else "da corrida"}.\n\n${Recibos.texto(r, motorista)}")
         }
         try {
             startActivity(Intent(i).apply { selector = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")) })
@@ -411,6 +427,8 @@ class ReciboActivity : Activity() {
         private const val EXTRA_FALA = "fala"
         private const val EXTRA_OUVIR = "ouvir"
         private const val EXTRA_LISTA = "lista"
+        private const val EXTRA_PRONTO = "pronto"
+        private const val EXTRA_LANCAR = "lancar"
         private val APPS_DE_RUA = setOf("Táxi", "Particular")
         private val DATA = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         private val HORA = DateTimeFormatter.ofPattern("HH:mm")
@@ -424,5 +442,10 @@ class ReciboActivity : Activity() {
         fun porVoz(ctx: Context) = Intent(ctx, ReciboActivity::class.java).putExtra(EXTRA_OUVIR, true)
 
         fun lista(ctx: Context) = Intent(ctx, ReciboActivity::class.java).putExtra(EXTRA_LISTA, true)
+
+        /** Prévia e envio de um recibo já montado (cliente fixo); [lancar] põe o total no Meu dinheiro ao enviar. */
+        fun pronto(ctx: Context, r: Recibo, lancar: Boolean) = Intent(ctx, ReciboActivity::class.java)
+            .putExtra(EXTRA_PRONTO, Recibos.paraLinha(r))
+            .putExtra(EXTRA_LANCAR, lancar)
     }
 }

@@ -68,6 +68,11 @@ class AjudaActivity : Activity() {
             "Para o passageiro de rua, de ponto ou particular. Fale: “recibo de 50 reais, da Avenida Paulista até a Vila Mariana, no Pix”. " +
                 "Você confere o recibo e manda pelo WhatsApp ou pelo e-mail. O valor entra sozinho como ganho de Táxi.\n\n" +
                 "Em Meu dia › Personalizar, escolha o modelo, a cor, a logo e grave a sua assinatura.")
+        if (!cfg.motoristaDeApp) pergunta(tela, "Como junto várias corridas num recibo só?",
+            "Para o cliente fixo que paga a semana de uma vez. Em Meu dia › Recibo de cliente fixo, cadastre o passageiro uma vez, " +
+                "com os trajetos que ele costuma fazer e o preço de cada um.\n\n" +
+                "Na hora do recibo, busque pelo nome, escolha a data do pagamento e adicione as corridas: o dia e o trajeto de cada uma. " +
+                "Cabem até 8 corridas por recibo. O total soma sozinho e entra como ganho de Táxi no dia do pagamento.")
         pergunta(tela, "Como funciona o alerta de radar?",
             "Funciona só navegando pelo Waze ou pela 99. Quando eles avisam de um radar, a tela ganha uma borda amarela e aparece a placa do limite com a distância.\n\n" +
                 "No Google Maps e na navegação da Uber o alerta não funciona: eles só desenham o radar no mapa, sem dizer a que distância ele está. " +

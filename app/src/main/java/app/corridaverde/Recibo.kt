@@ -2,6 +2,7 @@ package app.corridaverde
 
 import android.content.Context
 import java.io.File
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -59,8 +60,59 @@ data class Recibo(
     val email: String = "",
     /** Número do recibo que este corrige: recibo emitido não se edita, sai outro no lugar. */
     val substitui: Int? = null,
+    /** CPF ou CNPJ de quem pagou (cliente fixo); vazio = não sai no recibo. */
+    val documento: String = "",
+    /** Recibo de cliente fixo: as corridas pagas de uma vez. Vazio = recibo de uma corrida só (de, até, quando). */
+    val corridas: List<CorridaRecibo> = emptyList(),
 ) {
     val numeroTexto get() = String.format(Locale.ROOT, "%04d", numero)
+
+    /** Recibo de cliente fixo, com a tabela de corridas. */
+    val varias get() = corridas.isNotEmpty()
+
+    companion object {
+        /** O que cabe na folha A5 sem apertar a letra. */
+        const val MAX_CORRIDAS = 8
+    }
+}
+
+/** Um trajeto que o cliente fixo costuma fazer, com o preço combinado. Não tem data: ela entra no recibo. */
+data class Trajeto(val tipo: String, val de: String, val ate: String, val valor: Double, val obs: String = "") {
+    /** "(Ida) Residência → Aeroporto de Congonhas", como no recibo. */
+    val descricao get() = buildString {
+        if (tipo.isNotBlank()) append("($tipo) ")
+        append(listOf(de, ate).filter { it.isNotBlank() }.joinToString(" → "))
+    }.trim()
+
+    companion object {
+        val TIPOS = listOf("Ida", "Volta", "Ida e volta")
+    }
+}
+
+/** Uma corrida do recibo de cliente fixo: o trajeto e o dia em que foi feito. */
+data class CorridaRecibo(val dia: LocalDate, val trajeto: Trajeto)
+
+/**
+ * Listas dentro de uma coluna do .tsv: os campos se separam por U+001F e os itens por U+001E, caracteres que
+ * ninguém digita. Assim o arquivo continua com uma linha por recibo ou por cliente.
+ */
+object Lista {
+    private const val CAMPO = '\u001F'
+    private const val ITEM = '\u001E'
+
+    fun limpo(s: String) = s.filter { it != CAMPO && it != ITEM }.replace(Regex("""[\t\n\r]"""), " ")
+
+    fun juntar(itens: List<List<String>>) = itens.joinToString(ITEM.toString()) { campos -> campos.joinToString(CAMPO.toString()) { limpo(it) } }
+
+    fun separar(texto: String): List<List<String>> = if (texto.isEmpty()) emptyList() else texto.split(ITEM).map { it.split(CAMPO) }
+
+    fun trajeto(t: Trajeto) = listOf(t.tipo, t.de, t.ate, t.valor.toString(), t.obs)
+
+    fun trajeto(c: List<String>) = Trajeto(c[0], c[1], c[2], c[3].toDouble(), c.getOrElse(4) { "" })
+
+    fun corridas(cs: List<CorridaRecibo>) = juntar(cs.map { listOf(it.dia.toString()) + trajeto(it.trajeto) })
+
+    fun corridas(texto: String) = separar(texto).map { CorridaRecibo(LocalDate.parse(it[0]), trajeto(it.drop(1))) }
 }
 
 /** O que o motorista falou: "recibo de 50 reais, da Avenida Paulista até a Vila Mariana, no Pix". */
@@ -194,20 +246,39 @@ object Recibos {
 
     fun paraLinha(r: Recibo) = listOf(
         r.numero, r.quando, r.valor, r.passageiro, r.de, r.ate, r.pagamento, r.telefone, r.email, r.substitui ?: "",
+        r.documento, Lista.corridas(r.corridas),
     ).joinToString("\t") { it.toString().replace(Regex("""[\t\n\r]"""), " ") }
 
+    /** As duas últimas colunas (documento e corridas) só existem desde o recibo de cliente fixo. */
     fun deLinha(l: String): Recibo? = runCatching {
         val c = l.split('\t')
-        Recibo(c[0].toInt(), LocalDateTime.parse(c[1]), c[2].toDouble(), c[3], c[4], c[5], c[6], c[7], c[8], c[9].toIntOrNull())
+        Recibo(
+            c[0].toInt(), LocalDateTime.parse(c[1]), c[2].toDouble(), c[3], c[4], c[5], c[6], c[7], c[8], c[9].toIntOrNull(),
+            c.getOrElse(10) { "" }, Lista.corridas(c.getOrElse(11) { "" }),
+        )
     }.getOrNull()
 
     fun data(r: Recibo): String = r.quando.format(DATA)
 
+    fun data(c: CorridaRecibo): String = c.dia.format(DATA)
+
+    /** Uma corrida do recibo de cliente fixo em uma linha: "29/09/2026 – (Ida) Casa → Congonhas – R$ 130,00". */
+    fun linha(c: CorridaRecibo): String =
+        listOf(data(c), c.trajeto.descricao, c.trajeto.obs, "R$ ${Popup.br(c.trajeto.valor)}").filter { it.isNotBlank() }.joinToString(" – ")
+
     fun hora(r: Recibo): String = r.quando.format(HORA)
+
+    /** Quem pagou, com o CPF ou CNPJ quando o cliente fixo tem: "Marta Oliveira (CPF 123.456.789-00)". */
+    fun pagador(r: Recibo): String =
+        if (r.documento.isBlank() || r.passageiro.isBlank()) r.passageiro else "${r.passageiro} (CPF/CNPJ ${r.documento})"
 
     /** A frase principal do recibo, usada no PDF e na mensagem. */
     fun frase(r: Recibo): String = buildString {
-        append(if (r.passageiro.isNotBlank()) "Recebi de ${r.passageiro} a quantia de " else "Recebi a quantia de ")
+        append(if (r.passageiro.isNotBlank()) "Recebi de ${pagador(r)} a quantia de " else "Recebi a quantia de ")
+        if (r.varias) {
+            append("R$ ${Popup.br(r.valor)} (${Extenso.reais(r.valor)}), em ${data(r)}, referente às seguintes corridas de táxi:")
+            return@buildString
+        }
         append("R$ ${Popup.br(r.valor)} (${Extenso.reais(r.valor)}), referente a corrida de táxi em ${data(r)} às ${hora(r)}")
         if (r.de.isNotBlank()) append(", de ${r.de}")
         if (r.ate.isNotBlank()) append(if (r.de.isNotBlank()) " até ${r.ate}" else ", até ${r.ate}")
@@ -237,6 +308,8 @@ object Recibos {
         appendLine("RECIBO DE TÁXI Nº ${r.numeroTexto}")
         appendLine()
         appendLine(frase(r))
+        r.corridas.forEach { appendLine("• ${linha(it)}") }
+        if (r.varias) appendLine("Total: R$ ${Popup.br(r.valor)}")
         if (r.pagamento.isNotBlank()) appendLine("Pagamento: ${r.pagamento}.")
         r.substitui?.let { appendLine("Este recibo substitui o nº ${String.format(Locale.ROOT, "%04d", it)}.") }
         appendLine()
