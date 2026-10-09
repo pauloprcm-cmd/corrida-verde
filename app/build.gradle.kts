@@ -39,12 +39,16 @@ android {
             dimension = "loja"
             buildConfigField("boolean", "ATUALIZADOR", "true")
             buildConfigField("boolean", "GRAVACAO", "true")
+            // Versão do GitHub (o Paulo e quem ele escolhe): sem período grátis nem limite de uso.
+            buildConfigField("boolean", "PERIODO_GRATIS", "false")
         }
         create("play") {
             dimension = "loja"
             buildConfigField("boolean", "ATUALIZADOR", "false")
             // Gravação da corrida fica de fora da Play no começo (câmera e microfone pedem declaração com vídeo).
             buildConfigField("boolean", "GRAVACAO", "false")
+            // Os 30 dias grátis contam da primeira abertura (Config.marcarPrimeiroUso).
+            buildConfigField("boolean", "PERIODO_GRATIS", "true")
         }
     }
 
