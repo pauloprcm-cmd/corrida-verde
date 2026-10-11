@@ -84,6 +84,18 @@ object Dinheiro {
 
     fun hoje(ctx: Context) = balanco(ctx, Visao.DIA, LocalDate.now())
 
+    /**
+     * O olho do "Hoje sobrou" (tela inicial e Meu dia), como o da 99: escondido, o passageiro que olha
+     * a tela não vê quanto o motorista ganhou. Fica guardado até tocar de novo. A notificação não esconde.
+     */
+    fun escondido(ctx: Context) = ctx.getSharedPreferences("inicio", Context.MODE_PRIVATE).getBoolean("valores_escondidos", false)
+
+    fun alternarEscondido(ctx: Context) {
+        ctx.getSharedPreferences("inicio", Context.MODE_PRIVATE).edit().putBoolean("valores_escondidos", !escondido(ctx)).apply()
+    }
+
+    const val OCULTO = "R$ ••••••"
+
     /** "R$ 4.870,00" e, se negativo, "− R$ 20,00". */
     fun rs(v: Double) = (if (v < 0) "− " else "") + "R$ " + String.format(PT, "%,.2f", kotlin.math.abs(v))
 

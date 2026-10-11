@@ -30,10 +30,15 @@ class MeuDiaActivity : Activity() {
         // Quanto sobrou hoje, com ganhos por app e o último consumo. Toque abre dia, semana e mês.
         val b = Dinheiro.hoje(this)
         val quadro = v.cartao()
-        quadro.addView(v.texto("Hoje sobrou", 17f, cor = v.texto2))
-        quadro.addView(v.texto(Dinheiro.rs(b.sobrou), 40f, negrito = true, cor = if (b.sobrou < 0) v.vermelhoClaro else v.texto))
-        quadro.addView(v.texto("Ganhos ${Dinheiro.rs(b.entrou)}   ·   Gastos ${Dinheiro.rs(b.gastou)}", 17f).apply { setPadding(0, v.dp(4), 0, 0) })
-        if (b.porApp.isNotEmpty()) {
+        val esconde = Dinheiro.escondido(this)
+        quadro.addView(v.rotuloComOlho("Hoje sobrou", esconde) { Dinheiro.alternarEscondido(this); montar() })
+        if (esconde) {
+            quadro.addView(v.texto(Dinheiro.OCULTO, 40f, negrito = true))
+        } else {
+            quadro.addView(v.texto(Dinheiro.rs(b.sobrou), 40f, negrito = true, cor = if (b.sobrou < 0) v.vermelhoClaro else v.texto))
+            quadro.addView(v.texto("Ganhos ${Dinheiro.rs(b.entrou)}   ·   Gastos ${Dinheiro.rs(b.gastou)}", 17f).apply { setPadding(0, v.dp(4), 0, 0) })
+        }
+        if (b.porApp.isNotEmpty() && !esconde) {
             quadro.addView(v.texto(b.porApp.entries.joinToString(" · ") { "${it.key} ${Dinheiro.rs(it.value)}" }, 15f, cor = v.texto2))
         }
         Gastos.consumo(Gastos.todos(this))?.let {

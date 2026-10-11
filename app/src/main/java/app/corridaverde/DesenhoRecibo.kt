@@ -44,12 +44,17 @@ object DesenhoRecibo {
 
     fun desenhar(c: Canvas, f: Folha) {
         c.drawColor(Color.WHITE)
-        marcaDagua(c, f)
         when (f.e.modelo) {
-            Modelo.TABELA -> return desenharTabela(c, f)
-            Modelo.COMPLETO -> return desenharCompleto(c, f)
-            else -> {}
+            Modelo.TABELA -> desenharTabela(c, f)
+            Modelo.COMPLETO -> desenharCompleto(c, f)
+            else -> desenharBasico(c, f)
         }
+        // Por último: desenhada antes, as caixas cinza e a faixa do total cobriam a logo.
+        marcaDagua(c, f)
+    }
+
+    /** Modelos Simples, Clássico e Moderno: cabeçalho, caixa do valor, a frase do recibo e a assinatura. */
+    private fun desenharBasico(c: Canvas, f: Folha) {
         val topo = when (f.e.modelo) {
             Modelo.CLASSICO -> cabecalhoClassico(c, f)
             Modelo.MODERNO -> cabecalhoModerno(c, f)
@@ -88,7 +93,10 @@ object DesenhoRecibo {
         assinatura(c, f, pe)
     }
 
-    /** A logo personalizada bem clarinha no meio da folha, por trás de tudo. */
+    /**
+     * A logo personalizada bem clarinha no meio da folha, por cima de tudo para nenhuma caixa cobrir. O fundo
+     * branco da imagem vira transparente, senão apareceria um retângulo claro em cima da faixa do total.
+     */
     private fun marcaDagua(c: Canvas, f: Folha) {
         val logo = f.logo ?: return
         if (!f.e.marcaDagua || f.e.modelo == Modelo.SIMPLES) return
@@ -96,7 +104,19 @@ object DesenhoRecibo {
         val h = ALTURA.toFloat()
         val lado = w * 0.62f
         val caixa = RectF((w - lado) / 2, (h - lado) / 2, (w + lado) / 2, (h + lado) / 2)
-        desenharImagem(c, logo, caixa, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG).apply { alpha = 22 })
+        desenharImagem(c, semBranco(logo), caixa, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG).apply { alpha = 30 })
+    }
+
+    /** Cópia da imagem em que quanto mais perto do branco, mais transparente (o amarelo continua forte). */
+    private fun semBranco(b: Bitmap): Bitmap {
+        val px = IntArray(b.width * b.height)
+        b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
+        for (i in px.indices) {
+            val p = px[i]
+            val claro = minOf(Color.red(p), Color.green(p), Color.blue(p))
+            px[i] = Color.argb(Color.alpha(p) * (255 - claro) / 255, Color.red(p), Color.green(p), Color.blue(p))
+        }
+        return Bitmap.createBitmap(px, b.width, b.height, Bitmap.Config.ARGB_8888)
     }
 
     /** Modelo Tabela: logo e "Recibo Nº" no topo, dados em linhas, tabela da corrida e as duas assinaturas embaixo. */
@@ -261,7 +281,10 @@ object DesenhoRecibo {
             c.drawText("Corrida", x[2], linha, pincel(8.5f).centro())
             c.drawText("1", x[3], linha, pincel(8.5f).centro())
             c.drawText(valor, x[4], linha, pincel(8.5f).apply { textAlign = Paint.Align.RIGHT })
-        y += alto + 18f
+            y += alto + 18f
+            // Uma corrida só: o total desce para perto da assinatura e o meio da folha fica livre para a logo.
+            val bloco = 74f + (if (f.r.pagamento.isNotBlank()) 48f else 0f) + (if (f.r.substitui != null) 14f else 0f)
+            y = maxOf(y, linhaAssin - 66f - bloco)
         }
 
         c.drawText("Subtotal serviços", m, y, pincel(10.5f, negrito = true))

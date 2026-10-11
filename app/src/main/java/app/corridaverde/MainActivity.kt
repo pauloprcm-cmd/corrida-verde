@@ -123,7 +123,12 @@ class MainActivity : Activity() {
         c.background = v.toque(v.forma(v.cartao, v.cartao, 22, 0))
         c.isClickable = true
         c.setOnClickListener { abrir(MeuDiaActivity::class.java) }
-        c.addView(v.texto("Hoje sobrou", 17f, cor = v.texto2))
+        val esconde = Dinheiro.escondido(this)
+        c.addView(v.rotuloComOlho("Hoje sobrou", esconde) { Dinheiro.alternarEscondido(this); mostrarTela() })
+        if (esconde) {
+            c.addView(v.texto(Dinheiro.OCULTO, 40f, negrito = true))
+            return c
+        }
         c.addView(v.texto(Dinheiro.rs(b.sobrou), 40f, negrito = true, cor = if (b.sobrou < 0) v.vermelhoClaro else v.texto))
         if (detalhe) {
             val linha = android.text.SpannableStringBuilder()

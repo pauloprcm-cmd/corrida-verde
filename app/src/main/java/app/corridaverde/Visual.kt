@@ -90,6 +90,19 @@ class Visual(private val a: Activity) {
         setLineSpacing(0f, 1.15f)
     }
 
+    /** "Hoje sobrou" com o olho à direita, que esconde ou mostra os valores do quadro. */
+    fun rotuloComOlho(t: String, escondido: Boolean, alternar: () -> Unit) = LinearLayout(a).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        addView(texto(t, 17f, cor = texto2), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(ImageView(a).apply {
+            setImageResource(if (escondido) R.drawable.ic_olho_fechado else R.drawable.ic_olho)
+            contentDescription = if (escondido) "Mostrar valores" else "Esconder valores"
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            background = toque(forma(cartao, cartao, 24, 0))
+            setOnClickListener { alternar() }
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+    }
+
     /** Título pequeno de seção, em verde e maiúsculas. */
     fun secao(t: String) = texto(t.uppercase(), 14f, negrito = true, cor = verde).apply {
         letterSpacing = 0.08f
