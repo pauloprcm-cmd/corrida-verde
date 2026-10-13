@@ -41,6 +41,8 @@ object LeitorOferta {
     // Categoria Táxi: "R$ 31 - R$ 46" (sem centavos). O valor final fica entre os dois.
     private val FAIXA = Regex("""R\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)\s*[-–—]\s*R\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)""")
     private val POR_UNIDADE = Regex("""^\s*/\s*(km|h|min)""", RegexOption.IGNORE_CASE)
+    // Acréscimo dentro do valor ("+R$ 3,75 incluído"), que no Black fica entre o valor e a busca.
+    private val INCLUIDO = Regex("""^\s*inclu""", RegexOption.IGNORE_CASE)
     private val TRECHO = Regex(
         """((?:\d+\s*h(?:oras?|r)?\s*(?:e\s+)?)?(?:\d+\s*min(?:utos?)?)?)\s*\(\s*(\d+(?:[.,]\d+)?)\s*(km|m)\s*\)""",
         RegexOption.IGNORE_CASE,
@@ -61,8 +63,12 @@ object LeitorOferta {
         if (trechos.size < 2) return null
 
         val faixa = FAIXA.findAll(tela).lastOrNull { it.range.first < trechos[0].range.first }
-        // O valor da corrida é o último "R$" antes da busca que não seja R$/km.
-        val valores = VALOR.findAll(tela).filter { !POR_UNIDADE.containsMatchIn(tela.substring(it.range.last + 1)) }.toList()
+        // O valor da corrida é o último "R$" antes da busca que não seja R$/km nem o acréscimo "+R$ 3,75 incluído".
+        val valores = VALOR.findAll(tela).filter {
+            val depois = tela.substring(it.range.last + 1)
+            !POR_UNIDADE.containsMatchIn(depois) && !INCLUIDO.containsMatchIn(depois) &&
+                !tela.substring(0, it.range.first).trimEnd().endsWith('+')
+        }.toList()
         val valor = faixa?.let { dinheiro(it.groupValues[1]) } ?: (valores.lastOrNull { it.range.first < trechos[0].range.first } ?: valores.firstOrNull())
             ?.let { dinheiro(it.groupValues[1]) } ?: return null
 

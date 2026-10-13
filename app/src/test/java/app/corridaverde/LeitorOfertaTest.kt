@@ -93,6 +93,19 @@ class LeitorOfertaTest {
     }
 
     @Test
+    fun blackComAcrescimoIncluidoLeOValorDaCorrida() {
+        // Print de 13/10/2026: o "+R$ 3,75 incluído" fica entre o valor e a busca e era lido como o valor.
+        val o = LeitorOferta.ler(listOf("Black", "R$ 34,19", "R$4,07/km aprox.", "4,95 (597)", "Verificado", "+R$ 3,75 incluído",
+            "7 min (1.6 km)", "Avenida Imperatriz Leopoldina, Vila Leopoldina, São Paulo", "16 minutos (6.8 km)",
+            "Natura NASP, Natura NASP, Jaguará", "Selecionar"))!!
+        assertEquals(34.19, o.valor, 0.001)
+        assertEquals(6.8, o.viagemKm, 0.001)
+        assertEquals(Grupo.PREMIUM, o.grupo)
+        // Mesmo se o "+" vier num texto e o valor no outro.
+        assertEquals(34.19, LeitorOferta.ler(listOf("Black", "R$ 34,19", "+", "R$ 3,75", "incluído", "7 min (1.6 km)", "16 minutos (6.8 km)"))!!.valor, 0.001)
+    }
+
+    @Test
     fun leHorasMetrosEParadas() {
         val o = LeitorOferta.ler(listOf("R$ 1.180,00", "3 min (800 m)", "1 h 5 min (45.2 km)", "10 min (3.1 km)"))!!
         assertEquals(1180.0, o.valor, 0.001)
