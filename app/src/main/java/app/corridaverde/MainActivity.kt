@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     }
 
     private fun mostrarTela() {
+        if (!Termos.aceitou(this)) return montarTermos()
         if (faltaEscolherPerfil()) return montarEscolha()
         montar()
         Notificacao.atualizar(this)
@@ -167,6 +168,31 @@ class MainActivity : Activity() {
         if (!jaUsava) return true
         cfg.copy(perfil = Config.TAXI).salvar(this)
         return false
+    }
+
+    /** Boas-vindas com o aceite dos termos: uma linha discreta com os links e o Continuar (desenho aprovado em 20/10/2026). */
+    private fun montarTermos() {
+        val tela = v.tela()
+        tela.addView(v.cabecalho())
+        tela.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
+        tela.addView(v.texto("Saiba na hora se a corrida vale a pena.", 30f, negrito = true))
+        v.por(tela, v.texto("O aviso verde, amarelo ou vermelho aparece em cima da oferta da Uber e da 99, " +
+            "comparando com o taxímetro ou com o valor por km.", 17f, cor = v.texto2), espaco = 16)
+        fun cor(c: Int, t: String) = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(View(this@MainActivity).apply { background = v.forma(c, c, 5, 0) }, LinearLayout.LayoutParams(v.dp(10), v.dp(10)))
+            addView(v.texto(t, 17f), LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                .apply { marginStart = v.dp(12) })
+        }
+        v.por(tela, cor(v.verde, "Corrida boa fica verde"), espaco = 20)
+        v.por(tela, cor(getColor(R.color.amarelo), "Mais ou menos fica amarela"))
+        v.por(tela, cor(getColor(R.color.vermelho), "Corrida ruim fica vermelha"))
+        tela.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
+        v.por(tela, Termos.linhaDoAceite(v, this).apply { gravity = Gravity.CENTER_HORIZONTAL }, espaco = 32)
+        v.por(tela, v.botaoPrincipal("Continuar") {
+            Termos.aceitar(this)
+            mostrarTela()
+        }, espaco = 16, altura = v.dp(64))
     }
 
     /** Tela da primeira abertura: dois cartões grandes, do mesmo jeito dos botões da tela inicial. */

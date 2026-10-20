@@ -90,6 +90,11 @@ class AjudaActivity : Activity() {
         }
         pergunta(tela, "O app aceita ou recusa corrida sozinho?",
             "Não. O Corrida Verde só lê a tela e mostra o aviso. Quem aceita ou recusa é sempre você, no app da Uber.")
+        pergunta(tela, "Termos de uso e privacidade",
+            "As regras de uso do app e o que ele faz com os seus dados. Resumo: ganhos, gastos, recibos e clientes ficam só no seu celular.") {
+            addView(v.botao("Termos de uso") { Termos.abrir(this@AjudaActivity, "termos") }, cheio())
+            addView(v.botao("Política de privacidade") { Termos.abrir(this@AjudaActivity, "privacidade") }, cheio())
+        }
     }
 
     /** Uma pergunta que abre e fecha com um toque; [extra] acrescenta botões dentro da resposta. */
