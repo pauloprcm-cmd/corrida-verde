@@ -8,12 +8,12 @@ val keystore = System.getenv("KEYSTORE_FILE")
 
 android {
     namespace = "app.corridaverde"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "app.corridaverde"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = numeroBuild
         // A versão de teste (ramo beta) aparece como "1.38 teste" na tela do app.
         versionName = "1.$numeroBuild" + if (System.getenv("GITHUB_REF_NAME") == "beta") " teste" else ""
