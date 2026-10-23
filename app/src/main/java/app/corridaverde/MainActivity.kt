@@ -24,13 +24,13 @@ import android.widget.TextView
 class MainActivity : Activity() {
     private lateinit var v: Visual
     private var versao: TextView? = null
-    /** Veio do LeitorService logo depois de ligar a leitura pelo passo a passo: mostra o "Pronto!". */
-    private var mostrarPronto = false
+    /** Acabou um passo a passo ([LEITURA] ou [BATERIA]): mostra o "Pronto!" dele. */
+    private var pronto: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         v = Visual(this)
-        mostrarPronto = intent.getBooleanExtra(LIGOU, false)
+        pronto = intent.getStringExtra(PRONTO)
         // Só a versão da Play tem os 30 dias grátis; a do GitHub não tem limite de uso.
         if (BuildConfig.PERIODO_GRATIS) Config.marcarPrimeiroUso(this)
         Abertura.talvezMostrar(this, savedInstanceState)
@@ -43,20 +43,32 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         mostrarTela()
-        if (mostrarPronto && LeitorService.instancia != null) pronto()
+        when (pronto) {
+            LEITURA -> if (LeitorService.instancia != null) prontoLeitura()
+            BATERIA -> if (BateriaActivity.livre(this)) mostrarPronto(
+                "A bateria está liberada. O celular não vai mais desligar o Corrida Verde no meio do dia.")
+        }
         // Girar a tela recria a Activity com o mesmo Intent: o "Pronto!" não pode voltar.
-        mostrarPronto = false
-        intent.removeExtra(LIGOU)
+        pronto = null
+        intent.removeExtra(PRONTO)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.getBooleanExtra(LIGOU, false)) mostrarPronto = true
+        intent.getStringExtra(PRONTO)?.let { pronto = it }
     }
 
-    /** Fecha o passo a passo de ligar com a confirmação em letra grande. */
-    private fun pronto() {
+    /** Leitura ligada; se a bateria ainda estiver restrita, já emenda o passo a passo dela. */
+    private fun prontoLeitura() {
+        val oferta = "Agora é só abrir a Uber ou a 99: quando chegar uma oferta, o aviso colorido aparece por cima."
+        if (BateriaActivity.livre(this)) return mostrarPronto("A leitura está ligada. $oferta")
+        mostrarPronto("A leitura está ligada.\n\nFalta só mais uma coisa: liberar a bateria, para o celular não desligar o aviso no fim da tarde.",
+            botao = "Continuar", depois = { abrir(BateriaActivity::class.java) })
+    }
+
+    /** Fecha um passo a passo com a confirmação em letra grande. */
+    private fun mostrarPronto(texto: String, botao: String = "Entendi", depois: (() -> Unit)? = null) {
         val c = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -64,9 +76,10 @@ class MainActivity : Activity() {
         }
         c.addView(ImageView(this).apply { setImageResource(R.drawable.ic_ok) }, LinearLayout.LayoutParams(v.dp(72), v.dp(72)))
         c.addView(v.texto("Pronto!", 32f, negrito = true, cor = v.verde).apply { setPadding(0, v.dp(12), 0, 0) })
-        c.addView(v.texto("A leitura está ligada. Agora é só abrir a Uber ou a 99: quando chegar uma oferta, o aviso colorido aparece por cima.", 19f)
-            .apply { gravity = Gravity.CENTER_HORIZONTAL; setPadding(0, v.dp(12), 0, 0) })
-        AlertDialog.Builder(this).setView(c).setPositiveButton("Entendi", null).show()
+        c.addView(v.texto(texto, 19f).apply { gravity = Gravity.CENTER_HORIZONTAL; setPadding(0, v.dp(12), 0, 0) })
+        val d = AlertDialog.Builder(this).setView(c).setPositiveButton(botao) { _, _ -> depois?.invoke() }
+        if (depois != null) d.setNegativeButton("Agora não", null)
+        d.show()
     }
 
     private fun mostrarTela() {
@@ -92,6 +105,8 @@ class MainActivity : Activity() {
         val tela = v.tela()
         tela.addView(v.cabecalho())
         v.por(tela, if (ligado) quadroLigado() else quadroDesligado(jaLigou), espaco = 0)
+        // A economia de bateria desliga a leitura no fim da tarde sem avisar: o alerta fica à vista, não só no Verificar problemas.
+        if (ligado && !BateriaActivity.livre(this)) v.por(tela, quadroBateria(), espaco = 16)
         v.por(tela, quadroSobrou(ligado), espaco = 16)
         // O caminho mais curto para a voz: o maior botão da tela (o da notificação fica escondido para muita gente).
         v.por(tela, v.botaoPrincipal("Falar ganho ou gasto") { abrir(GastoActivity::class.java) }
@@ -142,6 +157,16 @@ class MainActivity : Activity() {
             setPadding(0, v.dp(16), 0, v.dp(4))
             setOnClickListener { AjudaActivity.comoLigar(this@MainActivity, jaLigou) }
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        return c
+    }
+
+    private fun quadroBateria(): View {
+        val c = v.cartao(destaque = v.amarelo)
+        c.addView(v.texto("Falta 1 coisa", 24f, negrito = true, cor = v.amarelo))
+        c.addView(v.texto("O celular pode desligar a leitura para poupar bateria. Aí o aviso some no fim da tarde.", 18f)
+            .apply { setPadding(0, v.dp(8), 0, v.dp(16)) })
+        c.addView(v.botaoPrincipal("Resolver agora") { abrir(BateriaActivity::class.java) },
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, v.dp(64)))
         return c
     }
 
@@ -251,7 +276,9 @@ class MainActivity : Activity() {
     }
 
     companion object {
-        const val LIGOU = "ligou"
+        const val PRONTO = "pronto"
+        const val LEITURA = "leitura"
+        const val BATERIA = "bateria"
         private const val PREFS = "inicio"
         private const val JA_LIGOU = "ja_ligou"
     }

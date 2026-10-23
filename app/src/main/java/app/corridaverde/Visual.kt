@@ -23,6 +23,7 @@ class Visual(private val a: Activity) {
     val cartao = cor(R.color.cartao)
     val borda = cor(R.color.borda)
     val verde = cor(R.color.verde)
+    val amarelo = cor(R.color.amarelo)
     val vermelho = cor(R.color.vermelho)
     val vermelhoFundo = cor(R.color.vermelho_fundo)
     val vermelhoClaro = cor(R.color.vermelho_claro)

@@ -180,7 +180,7 @@ class LeitorService : AccessibilityService() {
         // Ligou pelo passo a passo: traz o app de volta com o "Pronto!", sem a pessoa ter que achar o caminho.
         // O atraso deixa o aviso do Permitir fechar antes.
         if (AvisoLeitura.ligouAgora(this)) handler.postDelayed({
-            startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.LIGOU, true).addFlags(
+            startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.PRONTO, MainActivity.LEITURA).addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         }, 800)
         handler.postDelayed(buscarAtualizacao, 60_000)

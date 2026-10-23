@@ -32,11 +32,12 @@ class AjudaActivity : Activity() {
             "Quase sempre é a economia de bateria do celular: para poupar bateria, ele fecha o Corrida Verde sem avisar. " +
                 "Aí o aviso da Uber e da 99, o alerta de radar e o botão Falar da notificação param até você ligar a leitura de novo. " +
                 "Seus ganhos, gastos e recibos continuam guardados.\n\n" +
-                "Para não acontecer mais, deixe o app Sem restrições: segure o dedo no ícone do Corrida Verde, toque em Informações do app › Bateria " +
-                "(ou Uso da bateria) e escolha Sem restrições. A bateria quase não sente: o app só trabalha quando aparece uma oferta ou um radar.\n\n" +
+                "Para não acontecer mais, toque em Liberar a bateria e siga os 2 passos. Ou faça na mão: segure o dedo no ícone do Corrida Verde, toque em Informações do app › Bateria " +
+                "(ou Uso da bateria) e escolha Não restrito (em alguns celulares: Sem restrições). A bateria quase não sente: o app só trabalha quando aparece uma oferta ou um radar.\n\n" +
                 "No Samsung, confira também se o Corrida Verde não está em Apps em suspensão profunda " +
                 "(Configurações › Bateria ou Cuidados com o aparelho › Limites de uso em segundo plano). Se estiver, tire de lá.") {
-            addView(v.botaoPrincipal("Verificar problemas") { startActivity(Intent(this@AjudaActivity, VerificarActivity::class.java)) }, cheio())
+            addView(v.botaoPrincipal("Liberar a bateria") { startActivity(Intent(this@AjudaActivity, BateriaActivity::class.java)) }, cheio())
+            addView(v.botao("Verificar problemas") { startActivity(Intent(this@AjudaActivity, VerificarActivity::class.java)) }, cheio())
         }
         if (cfg.motoristaDeApp) pergunta(tela, "O que o aviso colorido quer dizer?",
             "O número grande é quanto a oferta da Uber ou da 99 paga por km, somando a busca até o passageiro e a viagem.\n\n" +

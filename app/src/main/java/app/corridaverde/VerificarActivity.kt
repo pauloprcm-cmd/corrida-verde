@@ -62,11 +62,9 @@ class VerificarActivity : Activity() {
                     startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
                 }
             },
-            Item("Fora da economia de bateria", (getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName),
-                "O celular pode desligar o app para poupar bateria. Na tela que abrir, toque em Bateria (ou Uso da bateria) e escolha Sem restrições.") {
-                // A página do próprio app: a lista geral de otimização vem filtrada em muitos celulares (Samsung) e o app some dela.
-                runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
-                    .onFailure { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+            Item("Fora da economia de bateria", BateriaActivity.livre(this),
+                "O celular pode desligar o app para poupar bateria, e o aviso some no fim da tarde. Toque em Resolver e siga os 2 passos.") {
+                startActivity(Intent(this, BateriaActivity::class.java))
             },
             Item("App Uber Driver instalado", instalado(UBER), "Não achei o app de motorista da Uber neste celular.") {
                 abrirLoja(UBER)

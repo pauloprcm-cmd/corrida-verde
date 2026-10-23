@@ -73,6 +73,13 @@
             android:label="Ligar a leitura"
             android:theme="@style/Tema.Escuro" />
 
+        <!-- Passo a passo para tirar o app da economia de bateria (Bateria › Não restrito). -->
+        <activity
+            android:name=".BateriaActivity"
+            android:exported="false"
+            android:label="Bateria sem restrição"
+            android:theme="@style/Tema.Escuro" />
+
         <activity
             android:name=".VerificarActivity"
             android:exported="false"

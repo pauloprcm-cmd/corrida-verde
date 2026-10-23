@@ -1,6 +1,5 @@
 package app.corridaverde
 
-import android.app.Activity
 import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
@@ -11,13 +10,11 @@ import android.widget.LinearLayout
 import android.widget.Switch
 
 /**
- * Passo a passo antes de abrir a Acessibilidade, para quem tem pouca prática com o celular: o botão
- * no topo e os desenhos do que vai aparecer (no Samsung, Aplicativos instalados antes do nome do app).
- * No teste de 23/10/2026 o usuário tocou nos desenhos achando que eram botões: agora eles também
- * abrem as configurações. Quando a leitura liga, o [LeitorService] traz a tela inicial de volta, com o "Pronto!".
+ * Passo a passo antes de abrir a Acessibilidade, para quem tem pouca prática com o celular (no Samsung,
+ * Aplicativos instalados antes do nome do app). Quando a leitura liga, o [LeitorService] traz a tela
+ * inicial de volta, com o "Pronto!".
  */
-class LigarLeituraActivity : Activity() {
-    private lateinit var v: Visual
+class LigarLeituraActivity : ManualActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,42 +42,12 @@ class LigarLeituraActivity : Activity() {
             v.por(tela, v.texto("Apareceu “Configuração restrita” e a chave não liga? Veja em Ajuda › Como ligar a leitura.", 16f, cor = v.texto2), espaco = 20)
     }
 
-    private val samsung = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
-
-    private fun abrir() = v.botaoPrincipal("Abrir as configurações") { AvisoLeitura.abrirConfiguracoes(this) }
+    override fun abrirConfiguracoes() = AvisoLeitura.abrirConfiguracoes(this)
 
     override fun onResume() {
         super.onResume()
         // Ligou e voltou por conta própria (sem a volta automática): não há mais o que mostrar aqui.
         if (LeitorService.instancia != null) finish()
-    }
-
-    /** Número verde, o que fazer em letra grande, o desenho e, se tiver, uma dica embaixo. */
-    private fun passo(tela: LinearLayout, n: Int, titulo: String, desenho: View, dica: String?) {
-        val c = v.cartao()
-        c.addView(LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            addView(v.texto("$n", 22f, negrito = true, cor = v.fundo).apply {
-                gravity = Gravity.CENTER
-                background = v.forma(v.verde, v.verde, 20, 0)
-            }, LinearLayout.LayoutParams(v.dp(40), v.dp(40)))
-            addView(v.texto(titulo, 22f, negrito = true), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                .apply { marginStart = v.dp(14) })
-        })
-        // Quem toca no desenho achando que é botão também chega nas configurações.
-        desenho.setOnClickListener { AvisoLeitura.abrirConfiguracoes(this) }
-        c.addView(desenho, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            .apply { topMargin = v.dp(16) })
-        dica?.let { c.addView(v.texto(it, 16f, cor = v.texto2).apply { setPadding(0, v.dp(12), 0, 0) }) }
-        v.por(tela, c, espaco = 18)
-    }
-
-    /** Uma linha como a da lista do Android, com o contorno verde mostrando onde tocar. */
-    private fun linha(): LinearLayout = LinearLayout(this).apply {
-        gravity = Gravity.CENTER_VERTICAL
-        minimumHeight = v.dp(64)
-        setPadding(v.dp(16), v.dp(10), v.dp(16), v.dp(10))
-        background = v.forma(v.fundo, v.verde, 14, 3)
     }
 
     private fun desenhoSamsung() = linha().apply {
