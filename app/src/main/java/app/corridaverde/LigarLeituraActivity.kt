@@ -11,9 +11,10 @@ import android.widget.LinearLayout
 import android.widget.Switch
 
 /**
- * Passo a passo antes de abrir a Acessibilidade, para quem tem pouca prática com o celular: três
- * desenhos do que vai aparecer (o nome do app, a chave, o Permitir) e um botão só. Quando a leitura
- * liga, o [LeitorService] traz a tela inicial de volta sozinho, com o "Pronto!".
+ * Passo a passo antes de abrir a Acessibilidade, para quem tem pouca prática com o celular: o botão
+ * no topo e os desenhos do que vai aparecer (no Samsung, Aplicativos instalados antes do nome do app).
+ * No teste de 23/10/2026 o usuário tocou nos desenhos achando que eram botões: agora eles também
+ * abrem as configurações. Quando a leitura liga, o [LeitorService] traz a tela inicial de volta, com o "Pronto!".
  */
 class LigarLeituraActivity : Activity() {
     private lateinit var v: Visual
@@ -23,23 +24,30 @@ class LigarLeituraActivity : Activity() {
         v = Visual(this)
         val tela = v.tela()
         tela.addView(v.topo("Ligar a leitura"))
-        tela.addView(v.texto("São 3 toques no celular. Depois, o Corrida Verde volta sozinho para cá.", 19f))
+        val passos = if (samsung) 4 else 3
+        tela.addView(v.texto("Toque no botão verde. No celular, faça os $passos passos abaixo. Depois, o Corrida Verde volta sozinho para cá.", 19f))
+        v.por(tela, abrir(), espaco = 20, altura = v.dp(68))
 
-        passo(tela, 1, "Toque em Corrida Verde", desenhoNome(),
-            "Não achou? No Samsung, ele fica dentro de Apps instalados. Em outros celulares, em Serviços instalados ou Aplicativos baixados.")
-        passo(tela, 2, "Ligue a chave", desenhoChave(), null)
-        passo(tela, 3, "Toque em Permitir", desenhoPermitir(),
+        v.por(tela, v.secao("O que tocar nas configurações"), espaco = 8)
+        var n = 0
+        if (samsung) passo(tela, ++n, "Toque em Aplicativos instalados", desenhoSamsung(),
+            "Fica no fim da lista. Em alguns Samsung o nome é Serviços instalados.")
+        passo(tela, ++n, "Toque em Corrida Verde", desenhoNome(),
+            if (samsung) null else "Não achou? Procure em Apps instalados, Serviços instalados ou Aplicativos baixados.")
+        passo(tela, ++n, "Ligue a chave", desenhoChave(), null)
+        passo(tela, ++n, "Toque em Permitir", desenhoPermitir(),
             "O Android avisa que o app pode ver a tela. O Corrida Verde só lê a oferta e o aviso de radar: não toca em nada.")
 
-        // Só quem instala fora da Play (versão do GitHub) cai na "Configuração restrita" do Android 13+.
-        if (BuildConfig.ATUALIZADOR && Build.VERSION.SDK_INT >= 33) {
-            v.por(tela, v.texto("Apareceu “Configuração restrita” e a chave não liga? Toque em Liberar configuração restrita, " +
-                "depois no ⋮ (canto de cima, à direita) e em Permitir configurações restritas. Volte aqui e comece de novo.", 16f, cor = v.texto2), espaco = 24)
-            v.por(tela, v.botao("Liberar configuração restrita") { AjudaActivity.liberar(this) })
-        }
-
-        v.por(tela, v.botaoPrincipal("Abrir as configurações") { AvisoLeitura.abrirConfiguracoes(this) }, espaco = 28, altura = v.dp(68))
+        v.por(tela, abrir(), espaco = 24, altura = v.dp(68))
+        // Só quem instala fora da Play (versão do GitHub) cai na "Configuração restrita" do Android 13+. Sem botão
+        // aqui: no teste, o botão de liberar levou para o lugar errado quem não precisava dele.
+        if (BuildConfig.ATUALIZADOR && Build.VERSION.SDK_INT >= 33)
+            v.por(tela, v.texto("Apareceu “Configuração restrita” e a chave não liga? Veja em Ajuda › Como ligar a leitura.", 16f, cor = v.texto2), espaco = 20)
     }
+
+    private val samsung = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+
+    private fun abrir() = v.botaoPrincipal("Abrir as configurações") { AvisoLeitura.abrirConfiguracoes(this) }
 
     override fun onResume() {
         super.onResume()
@@ -59,6 +67,8 @@ class LigarLeituraActivity : Activity() {
             addView(v.texto(titulo, 22f, negrito = true), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 .apply { marginStart = v.dp(14) })
         })
+        // Quem toca no desenho achando que é botão também chega nas configurações.
+        desenho.setOnClickListener { AvisoLeitura.abrirConfiguracoes(this) }
         c.addView(desenho, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             .apply { topMargin = v.dp(16) })
         dica?.let { c.addView(v.texto(it, 16f, cor = v.texto2).apply { setPadding(0, v.dp(12), 0, 0) }) }
@@ -73,6 +83,11 @@ class LigarLeituraActivity : Activity() {
         background = v.forma(v.fundo, v.verde, 14, 3)
     }
 
+    private fun desenhoSamsung() = linha().apply {
+        addView(v.texto("Aplicativos instalados", 19f), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(ImageView(this@LigarLeituraActivity).apply { setImageResource(R.drawable.ic_seta) }, LinearLayout.LayoutParams(v.dp(24), v.dp(24)))
+    }
+
     private fun desenhoNome() = linha().apply {
         addView(ImageView(this@LigarLeituraActivity).apply { setImageResource(R.mipmap.ic_launcher) }, LinearLayout.LayoutParams(v.dp(40), v.dp(40)))
         addView(v.texto("Corrida Verde", 19f), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -80,7 +95,8 @@ class LigarLeituraActivity : Activity() {
     }
 
     private fun desenhoChave() = linha().apply {
-        addView(v.texto("Usar Corrida Verde", 19f), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        // Escrito como cada celular mostra a chave.
+        addView(v.texto(if (samsung) "Ativado" else "Usar Corrida Verde", 19f), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         // Só desenho: a chave aparece ligada e não responde ao toque.
         addView(Switch(this@LigarLeituraActivity).apply {
             isChecked = true
@@ -97,7 +113,7 @@ class LigarLeituraActivity : Activity() {
         orientation = LinearLayout.VERTICAL
         setPadding(v.dp(16), v.dp(14), v.dp(16), v.dp(14))
         background = v.forma(v.fundo, v.borda, 14)
-        addView(v.texto("Permitir que Corrida Verde tenha controle total do dispositivo?", 16f, cor = v.texto2))
+        addView(v.texto("Permitir que o Corrida Verde tenha controle total do seu dispositivo?", 16f, cor = v.texto2))
         addView(LinearLayout(this@LigarLeituraActivity).apply {
             gravity = Gravity.CENTER_VERTICAL or Gravity.END
             setPadding(0, v.dp(12), 0, 0)
