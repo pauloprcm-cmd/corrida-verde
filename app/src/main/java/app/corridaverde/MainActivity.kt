@@ -2,6 +2,7 @@ package app.corridaverde
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -23,10 +24,13 @@ import android.widget.TextView
 class MainActivity : Activity() {
     private lateinit var v: Visual
     private var versao: TextView? = null
+    /** Veio do LeitorService logo depois de ligar a leitura pelo passo a passo: mostra o "Pronto!". */
+    private var mostrarPronto = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         v = Visual(this)
+        mostrarPronto = intent.getBooleanExtra(LIGOU, false)
         // Só a versão da Play tem os 30 dias grátis; a do GitHub não tem limite de uso.
         if (BuildConfig.PERIODO_GRATIS) Config.marcarPrimeiroUso(this)
         Abertura.talvezMostrar(this, savedInstanceState)
@@ -39,6 +43,30 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         mostrarTela()
+        if (mostrarPronto && LeitorService.instancia != null) pronto()
+        // Girar a tela recria a Activity com o mesmo Intent: o "Pronto!" não pode voltar.
+        mostrarPronto = false
+        intent.removeExtra(LIGOU)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(LIGOU, false)) mostrarPronto = true
+    }
+
+    /** Fecha o passo a passo de ligar com a confirmação em letra grande. */
+    private fun pronto() {
+        val c = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(v.dp(24), v.dp(28), v.dp(24), v.dp(8))
+        }
+        c.addView(ImageView(this).apply { setImageResource(R.drawable.ic_ok) }, LinearLayout.LayoutParams(v.dp(72), v.dp(72)))
+        c.addView(v.texto("Pronto!", 32f, negrito = true, cor = v.verde).apply { setPadding(0, v.dp(12), 0, 0) })
+        c.addView(v.texto("A leitura está ligada. Agora é só abrir a Uber ou a 99: quando chegar uma oferta, o aviso colorido aparece por cima.", 19f)
+            .apply { gravity = Gravity.CENTER_HORIZONTAL; setPadding(0, v.dp(12), 0, 0) })
+        AlertDialog.Builder(this).setView(c).setPositiveButton("Entendi", null).show()
     }
 
     private fun mostrarTela() {
@@ -222,8 +250,9 @@ class MainActivity : Activity() {
         sm.disableShortcuts(listOf("falar"), "Agora o Falar é a bolinha verde em cima da Uber e da 99. Pode remover este ícone.")
     }
 
-    private companion object {
-        const val PREFS = "inicio"
-        const val JA_LIGOU = "ja_ligou"
+    companion object {
+        const val LIGOU = "ligou"
+        private const val PREFS = "inicio"
+        private const val JA_LIGOU = "ja_ligou"
     }
 }

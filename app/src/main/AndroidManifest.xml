@@ -66,6 +66,13 @@
             android:label="Ajuda"
             android:theme="@style/Tema.Escuro" />
 
+        <!-- Passo a passo de ligar a leitura, com os desenhos do que aparece no Android. -->
+        <activity
+            android:name=".LigarLeituraActivity"
+            android:exported="false"
+            android:label="Ligar a leitura"
+            android:theme="@style/Tema.Escuro" />
+
         <activity
             android:name=".VerificarActivity"
             android:exported="false"

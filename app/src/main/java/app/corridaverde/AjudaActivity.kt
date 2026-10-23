@@ -127,11 +127,11 @@ class AjudaActivity : Activity() {
 
     companion object {
         private const val PASSO_A_PASSO =
-            "1. Toque em Ligar a leitura (tela inicial). Abre a tela Acessibilidade do Android.\n\n" +
+            "1. Toque em Ligar a leitura (tela inicial) e depois em Abrir as configurações. Abre a tela Acessibilidade do Android.\n\n" +
                 "2. Procure Apps instalados (em alguns celulares: Serviços instalados ou Aplicativos baixados).\n\n" +
                 "3. Toque em Corrida Verde e ligue a chave.\n\n" +
                 "4. O Android avisa que o app pode ver a tela. Toque em Permitir. O Corrida Verde só lê a oferta e o aviso de radar: não toca em nada.\n\n" +
-                "5. Volte para este app. No topo deve aparecer LIGADO, em verde.\n\n" +
+                "5. O Corrida Verde volta sozinho e mostra Pronto! (se não voltar, abra o app). No topo deve aparecer LIGADO, em verde.\n\n" +
                 "Apareceu “Configuração restrita” e a chave não liga? Isso acontece com apps instalados fora da Play Store. " +
                 "Toque em Liberar configuração restrita, depois no ⋮ (canto de cima, à direita) e em Permitir configurações restritas. " +
                 "Confirme com o PIN ou a digital e repita os passos de 1 a 4."
