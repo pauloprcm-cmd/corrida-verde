@@ -123,6 +123,23 @@
 
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Onde o aviso aparece" />
 
+        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Lado da tela" />
+
+        <RadioGroup
+            android:id="@+id/ladoAviso"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton android:id="@+id/ladoEsquerda" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Esquerda" />
+
+            <RadioButton android:id="@+id/ladoCentro" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Centro" />
+
+            <RadioButton android:id="@+id/ladoDireita" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Direita" />
+        </RadioGroup>
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ao escolher, aparece um aviso de teste no lugar novo." />
+
         <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Distância do aviso até o topo da tela" />
 
         <EditText android:id="@+id/posicaoY" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" />

@@ -75,7 +75,13 @@ class Popup(private val ctx: Context) {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            gravity = Gravity.TOP or when (cfg.ladoAviso) {
+                Config.ESQUERDA -> Gravity.START
+                Config.DIREITA -> Gravity.END
+                else -> Gravity.CENTER_HORIZONTAL
+            }
+            // Nos cantos, uma folga da borda da tela.
+            if (cfg.ladoAviso != Config.CENTRO) x = dp(8)
             y = dp(cfg.posicaoY)
         }
         wm.addView(caixa, lp)

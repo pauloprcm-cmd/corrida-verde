@@ -42,6 +42,15 @@ class AjustesActivity : Activity() {
         campo(R.id.notaMinima, EditText::class.java).setText(cfg.notaMinima.toString().replace('.', ','))
         campo(R.id.viagemLonga, EditText::class.java).setText(cfg.viagemLongaKm.toString().replace('.', ','))
         campo(R.id.posicaoY, EditText::class.java).setText(cfg.posicaoY.toString())
+        campo(R.id.ladoAviso, RadioGroup::class.java).apply {
+            check(when (cfg.ladoAviso) { Config.ESQUERDA -> R.id.ladoEsquerda; Config.DIREITA -> R.id.ladoDireita; else -> R.id.ladoCentro })
+            // Escolheu o lado: grava e já mostra o aviso de teste lá.
+            setOnCheckedChangeListener { _, _ ->
+                val c = lerCampos(avisar = false) ?: return@setOnCheckedChangeListener
+                c.salvar(this@AjustesActivity)
+                LeitorService.instancia?.testar()
+            }
+        }
         campo(R.id.diagnostico, CheckBox::class.java).isChecked = cfg.diagnostico
         campo(R.id.gravar, CheckBox::class.java).isChecked = cfg.gravar
         // Versão da Play: sem a gravação por enquanto, a seção some.
@@ -265,6 +274,11 @@ class AjustesActivity : Activity() {
             notaMinima = nota,
             viagemLongaKm = viagem,
             posicaoY = y,
+            ladoAviso = when (campo(R.id.ladoAviso, RadioGroup::class.java).checkedRadioButtonId) {
+                R.id.ladoEsquerda -> Config.ESQUERDA
+                R.id.ladoDireita -> Config.DIREITA
+                else -> Config.CENTRO
+            },
             diagnostico = diagnostico,
             // Ligou agora: conta as 24 h a partir daqui.
             diagnosticoAte = if (diagnostico && !atual.diagnostico) System.currentTimeMillis() + Config.DURACAO_DIAGNOSTICO else atual.diagnosticoAte,

@@ -13,6 +13,8 @@ data class Config(
     val notaMinima: Double = 4.7,
     val viagemLongaKm: Double = 25.0,
     val posicaoY: Int = 60,
+    /** Lado da tela do aviso da oferta: [CENTRO] (padrão), [ESQUERDA] ou [DIREITA]. O do radar não muda. */
+    val ladoAviso: String = CENTRO,
     val diagnostico: Boolean = false,
     /** Até quando o modo diagnóstico fica ligado (24 h depois de ligar), para ninguém esquecer ele lendo a tela. */
     val diagnosticoAte: Long = 0,
@@ -65,6 +67,7 @@ data class Config(
             .putFloat("notaMinima", notaMinima.toFloat())
             .putFloat("viagemLongaKm", viagemLongaKm.toFloat())
             .putInt("posicaoY", posicaoY)
+            .putString("ladoAviso", ladoAviso)
             .putBoolean("diagnostico", diagnostico)
             .putLong("diagnosticoAte", diagnosticoAte)
             .putBoolean("gravar", gravar)
@@ -89,6 +92,9 @@ data class Config(
         private const val ARQUIVO = "config"
         const val TAXI = "taxi"
         const val APP = "app"
+        const val ESQUERDA = "esquerda"
+        const val CENTRO = "centro"
+        const val DIREITA = "direita"
         const val DURACAO_DIAGNOSTICO = 24 * 60 * 60_000L
 
         /**
@@ -133,6 +139,7 @@ data class Config(
                 notaMinima = p.getFloat("notaMinima", d.notaMinima.toFloat()).toDouble(),
                 viagemLongaKm = p.getFloat("viagemLongaKm", d.viagemLongaKm.toFloat()).toDouble(),
                 posicaoY = p.getInt("posicaoY", d.posicaoY),
+                ladoAviso = p.getString("ladoAviso", d.ladoAviso) ?: d.ladoAviso,
                 diagnostico = p.getBoolean("diagnostico", d.diagnostico) && System.currentTimeMillis() < p.getLong("diagnosticoAte", 0),
                 diagnosticoAte = p.getLong("diagnosticoAte", 0),
                 gravar = BuildConfig.GRAVACAO && p.getBoolean("gravar", d.gravar),
