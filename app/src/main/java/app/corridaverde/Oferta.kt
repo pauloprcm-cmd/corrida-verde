@@ -43,8 +43,9 @@ object LeitorOferta {
     private val POR_UNIDADE = Regex("""^\s*/\s*(km|h|min)""", RegexOption.IGNORE_CASE)
     // Acréscimo dentro do valor ("+R$ 3,75 incluído"), que no Black fica entre o valor e a busca.
     private val INCLUIDO = Regex("""^\s*inclu""", RegexOption.IGNORE_CASE)
+    // "8 min (1.4 km)" ou, desde 26/10/2026, "8 min • 1.4 km".
     private val TRECHO = Regex(
-        """((?:\d+\s*h(?:oras?|r)?\s*(?:e\s+)?)?(?:\d+\s*min(?:utos?)?)?)\s*\(\s*(\d+(?:[.,]\d+)?)\s*(km|m)\s*\)""",
+        """((?:\d+\s*h(?:oras?|r)?\s*(?:e\s+)?)?(?:\d+\s*min(?:utos?)?)?)\s*(?:\(|[•·])\s*(\d+(?:[.,]\d+)?)\s*(km|m)\b\s*\)?""",
         RegexOption.IGNORE_CASE,
     )
     private val HORAS = Regex("""(\d+)\s*h""", RegexOption.IGNORE_CASE)
@@ -58,7 +59,7 @@ object LeitorOferta {
     fun ler(textos: List<String>): Oferta? {
         val tela = textos.joinToString("\n").replace(' ', ' ').replace(' ', ' ')
 
-        // Trechos "8 min (1.4 km)": o primeiro é a busca, os demais são a viagem (com paradas).
+        // Trechos "8 min (1.4 km)" ou "8 min • 1.4 km": o primeiro é a busca, os demais são a viagem (com paradas).
         val trechos = TRECHO.findAll(tela).filter { it.groupValues[1].isNotBlank() }.toList()
         if (trechos.size < 2) return null
 
