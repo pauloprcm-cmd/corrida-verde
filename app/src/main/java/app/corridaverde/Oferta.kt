@@ -42,7 +42,8 @@ object LeitorOferta {
     private val FAIXA = Regex("""R\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)\s*[-–—]\s*R\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)""")
     private val POR_UNIDADE = Regex("""^\s*/\s*(km|h|min)""", RegexOption.IGNORE_CASE)
     // Acréscimo dentro do valor ("+R$ 3,75 incluído"), que no Black fica entre o valor e a busca.
-    private val INCLUIDO = Regex("""^\s*inclu""", RegexOption.IGNORE_CASE)
+    // Não confundir com o "Inclui um valor extra de R$ 4" do Táxi Promo, que vem depois do valor da corrida.
+    private val INCLUIDO = Regex("""^\s*inclu[íi]d""", RegexOption.IGNORE_CASE)
     // "8 min (1.4 km)" ou, desde 26/10/2026, "8 min • 1.4 km".
     private val TRECHO = Regex(
         """((?:\d+\s*h(?:oras?|r)?\s*(?:e\s+)?)?(?:\d+\s*min(?:utos?)?)?)\s*(?:\(|[•·])\s*(\d+(?:[.,]\d+)?)\s*(km|m)\b\s*\)?""",
