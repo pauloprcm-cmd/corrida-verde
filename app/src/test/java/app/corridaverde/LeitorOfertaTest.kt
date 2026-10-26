@@ -269,4 +269,47 @@ class LeitorOfertaTest {
         assertEquals(4.98, o.nota!!, 0.001)
         assertEquals("Rua Cariacica, 78, Jardim Santa Cruz", o.destino)
     }
+
+    @Test
+    fun leTrechoComPontoNoLugarDosParenteses() {
+        // Diagnóstico de 26/10/2026: a Uber passou a escrever "7 min • 2.6 km".
+        val o = LeitorOferta.ler(listOf(
+            "UberX", "Exclusivo", "R$ 56,36", "Est. de R\$2,26/km", "7 min • 2.6 km", "Rua A, Cachoeirinha, São Paulo",
+            "4,92 (1007)", "Verificado", "1 h e 3 min • 22.3 km", "Cidade de Deus, Osasco", "Viagem longa (mais de 45 min)", "Aceitar",
+        ))!!
+        assertEquals(56.36, o.valor, 0.001)
+        assertEquals(2.6, o.buscaKm, 0.001)
+        assertEquals(7, o.buscaMin)
+        assertEquals(22.3, o.viagemKm, 0.001)
+        assertEquals(63, o.viagemMin)
+        assertEquals(4.92, o.nota!!, 0.001)
+        assertEquals("Cidade de Deus, Osasco", o.destino)
+    }
+
+    @Test
+    fun leTaxiPromoComValorExtraNoFormatoNovo() {
+        // Print de 26/10/2026, 07:30: "Inclui um valor extra de R$ 4" fica entre o valor e a busca.
+        val o = LeitorOferta.ler(listOf(
+            "Táxi Promo", "R$ 62,42", "Inclui um valor extra de R$ 4", "8 min • 1.8 km", "Rua A, Santana",
+            "4,68 (1313)", "Verificado", "31 minutos • 12.2 km", "R. Padre Adelino, 901, Belém, São Paulo", "Viagem",
+        ))!!
+        assertEquals(62.42, o.valor, 0.001)
+        assertEquals(1.8, o.buscaKm, 0.001)
+        assertEquals(12.2, o.viagemKm, 0.001)
+        assertEquals(31, o.viagemMin)
+        assertEquals("R. Padre Adelino, 901, Belém, São Paulo", o.destino)
+    }
+
+    @Test
+    fun leFaixaDoTaxiNoFormatoNovo() {
+        // Print de 26/10/2026, 07:38.
+        val o = LeitorOferta.ler(listOf(
+            "Táxi", "R$ 28 - R$ 40", "9 min • 0.7 km", "Rua A, Santana", "4,61 (1073)",
+            "21 minutos • 5.5 km", "R. Voluntários da Pátria, 3693, Santana, São Paulo", "Viagem",
+        ))!!
+        assertEquals(28.0, o.valor, 0.001)
+        assertEquals(40.0, o.valorMax!!, 0.001)
+        assertEquals(0.7, o.buscaKm, 0.001)
+        assertEquals(5.5, o.viagemKm, 0.001)
+    }
 }
