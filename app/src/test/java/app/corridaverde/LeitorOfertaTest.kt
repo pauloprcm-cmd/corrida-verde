@@ -312,4 +312,58 @@ class LeitorOfertaTest {
         assertEquals(0.7, o.buscaKm, 0.001)
         assertEquals(5.5, o.viagemKm, 0.001)
     }
+
+    @Test
+    fun totalDoTaxiEmbaixoDoValorNaoViraBuscaNemParada() {
+        // Prints de 28/10/2026: "8 min • 1.7 km" embaixo da faixa é a busca mais a viagem.
+        val o = LeitorOferta.ler(listOf(
+            "Táxi", "R$ 12 - R$ 16", "8 min • 1.7 km", "1 min • 0.2 km", "Rua João Cachoeira, Itaim Bibi, São Paulo",
+            "4,84 (732)", "Verificado", "7 minutos • 1.5 km", "Avenida Brigadeiro Faria Lima, 4440, Itaim Bibi, São Paulo",
+            "Tenho interesse",
+        ))!!
+        assertEquals(12.0, o.valor, 0.001)
+        assertEquals(16.0, o.valorMax!!, 0.001)
+        assertEquals(0.2, o.buscaKm, 0.001)
+        assertEquals(1, o.buscaMin)
+        assertEquals(1.5, o.viagemKm, 0.001)
+        assertEquals(7, o.viagemMin)
+        assertEquals(0, o.paradas)
+        assertEquals("Avenida Brigadeiro Faria Lima, 4440, Itaim Bibi, São Paulo", o.destino)
+    }
+
+    @Test
+    fun totalDoTaxiComValorExtraEDoTaxiPromo() {
+        val extra = LeitorOferta.ler(listOf(
+            "Táxi", "R$ 29 - R$ 42", "27 min • 4.3 km", "Inclui um valor extra de R$ 9", "3 min • 0.8 km",
+            "Avenida Lavandisca, Moema, São Paulo", "4,86 (1435)", "Verificado", "24 minutos • 3.5 km",
+            "Google | Ed. Pátio Victor Malzoni, Saída Rua Iguatemi/Fazano, Itaim Bibi", "Tenho interesse",
+        ))!!
+        assertEquals(29.0, extra.valor, 0.001)
+        assertEquals(0.8, extra.buscaKm, 0.001)
+        assertEquals(3.5, extra.viagemKm, 0.001)
+        assertEquals(24, extra.viagemMin)
+        assertEquals(0, extra.paradas)
+
+        val promo = LeitorOferta.ler(listOf(
+            "Táxi Promo", "R$ 19,34", "24 min • 3.9 km", "4 min • 0.9 km", "R. Quintana, Cidade Monções, São Paulo",
+            "4,80 (1899)", "Verificado", "20 minutos • 3.0 km", "R. Comendador Miguel Calfat, 307, Vila Olímpia, São Paulo",
+        ))!!
+        assertEquals(19.34, promo.valor, 0.001)
+        assertEquals(0.9, promo.buscaKm, 0.001)
+        assertEquals(3.0, promo.viagemKm, 0.001)
+        assertEquals(20, promo.viagemMin)
+        assertEquals(0, promo.paradas)
+    }
+
+    @Test
+    fun totalComParadaContaSoAParadaDeVerdade() {
+        val o = LeitorOferta.ler(listOf(
+            "Táxi", "R$ 30 - R$ 44", "35 min • 9.0 km", "5 min • 1.0 km", "Rua A, São Paulo", "1 parada",
+            "10 minutos • 3.0 km", "Rua B, São Paulo", "20 minutos • 5.0 km", "Rua C, São Paulo",
+        ))!!
+        assertEquals(1.0, o.buscaKm, 0.001)
+        assertEquals(8.0, o.viagemKm, 0.001)
+        assertEquals(30, o.viagemMin)
+        assertEquals(1, o.paradas)
+    }
 }
