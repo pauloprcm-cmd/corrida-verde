@@ -1,5 +1,7 @@
 package app.corridaverde
 
+import kotlin.math.abs
+
 /** Uma oferta lida da tela da Uber. Distâncias em km, tempos em minutos. */
 data class Oferta(
     val valor: Double,
@@ -61,7 +63,10 @@ object LeitorOferta {
         val tela = textos.joinToString("\n").replace(' ', ' ').replace(' ', ' ')
 
         // Trechos "8 min (1.4 km)" ou "8 min • 1.4 km": o primeiro é a busca, os demais são a viagem (com paradas).
-        val trechos = TRECHO.findAll(tela).filter { it.groupValues[1].isNotBlank() }.toList()
+        val todos = TRECHO.findAll(tela).filter { it.groupValues[1].isNotBlank() }.toList()
+        // Desde 28/10/2026 o Táxi mostra o total ("8 min • 1.7 km") embaixo do valor, antes da busca: é a soma dos
+        // outros trechos e não pode virar busca nem parada.
+        val trechos = if (todos.size >= 3 && ehTotal(todos[0], todos.drop(1))) todos.drop(1) else todos
         if (trechos.size < 2) return null
 
         val faixa = FAIXA.findAll(tela).lastOrNull { it.range.first < trechos[0].range.first }
@@ -118,6 +123,11 @@ object LeitorOferta {
 
     private val REAL_DO_OCR = Regex("""\bR\s?[S5]\s?(?=\d)""")
     private val NOTA_99 = Regex("""\b([1-5][,.]\d{2})\D{0,4}\d+\s*corridas""", RegexOption.IGNORE_CASE)
+
+    /** O trecho é a soma dos outros (a Uber arredonda cada um para 0,1 km e para o minuto). */
+    private fun ehTotal(total: MatchResult, resto: List<MatchResult>) =
+        abs(km(total) - resto.sumOf { km(it) }) <= 0.05 * resto.size + 0.01 &&
+            abs(minutos(total.groupValues[1]) - resto.sumOf { minutos(it.groupValues[1]) }) <= resto.size
 
     private fun dinheiro(s: String) = s.replace(".", "").replace(',', '.').toDouble()
 
