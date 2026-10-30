@@ -264,6 +264,21 @@ class LeitorOfertaTest {
     }
 
     @Test
+    fun leViagemDeMaisDeUmaHoraPeloPrint() {
+        // Diagnóstico de 30/10/2026, 08:09: "1 h e 3 min" saiu "lhe3min" e a viagem ficava com 3 min.
+        val o = LeitorOferta.lerUberDoPrint(listOf(
+            "2 UberX Exclusivo", "R$ 43,07", "28", "lhe 13 min 22.6 kmEst. de R$1,91/km", "10 min 3.0 km",
+            "R. Desemb. Rodrigues Sette, Jardir.", "Peri, São Paulo", "★ 4,91 (837)", "Verificado", "lhe3min 19.6 km",
+            "Rua Doutor Diogo de Faria, 1036, Vila", "Mariana, São Paulo", "AT Viagem longa (mais de 45 min)", "Aceitar",
+        ))!!
+        assertEquals(43.07, o.valor, 0.001)
+        assertEquals(3.0, o.buscaKm, 0.001)
+        assertEquals(10, o.buscaMin)
+        assertEquals(19.6, o.viagemKm, 0.001)
+        assertEquals(63, o.viagemMin)
+    }
+
+    @Test
     fun telaInicialDaUberPeloPrintNaoEOferta() {
         assertNull(LeitorOferta.lerUberDoPrint(listOf("Procurando viagens", "R$ 0,00", "HOJE", "Osasco", "015", "348")))
     }

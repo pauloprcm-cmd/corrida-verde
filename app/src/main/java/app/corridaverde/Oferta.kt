@@ -128,6 +128,7 @@ object LeitorOferta {
         // fecha e o total virava a busca.
         val tela = linhas.filterNot { EST_DO_TOTAL.containsMatchIn(it) }.joinToString("\n")
             .replace(REAL_DO_OCR) { "R\$" }
+            .replace(HORA_DO_OCR) { m -> m.groupValues[1].map { DIGITO_DO_OCR[it] ?: it }.joinToString("") + " h e " }
             .replace(NUMERO_DO_OCR) { m -> m.value.map { DIGITO_DO_OCR[it] ?: it }.joinToString("") }
             .replace(PONTO_DO_OCR) { "${it.groupValues[1]} • " }
         return ler(listOf(tela))
@@ -138,6 +139,8 @@ object LeitorOferta {
     private val EST_DO_TOTAL = Regex("""\bEst\.?\s*de\b""", RegexOption.IGNORE_CASE)
     // Número antes de "min" ou "km" com letra no lugar de algarismo ("1l min", "l.4 km"); precisa ter um algarismo.
     private val NUMERO_DO_OCR = Regex("""(?<![\w.,])(?=[\dlI|O.,]*\d)[\dlI|O]+(?:[.,][\dlI|O]+)?(?=\s*(?:min|k?m\b))""")
+    // "1 h e 3 min" sai do OCR como "lhe3min" ou "1he 3 min".
+    private val HORA_DO_OCR = Regex("""(?<!\w)([\dlI|]{1,2})\s*h\s*(?:e\s*)?(?=\d+\s*min)""")
     private val DIGITO_DO_OCR = mapOf('l' to '1', 'I' to '1', '|' to '1', 'O' to '0')
     private val PONTO_DO_OCR = Regex("""(min(?:utos?)?)\s*[.\-·*°+]?\s*(?=\d+(?:[.,]\d+)?\s*k?m\b)""", RegexOption.IGNORE_CASE)
 

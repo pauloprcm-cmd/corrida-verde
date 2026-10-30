@@ -622,8 +622,9 @@ class LeitorService : AccessibilityService() {
                     printsDaUber++
                     val fundoLiso = fundoDeCartao(cartao)
                     // Sem o fundo branco (ou preto) do cartão é só o mapa: nem passa pelo OCR, que é o que gasta bateria.
-                    // Medido em 30/10/2026: o mapa dá 35% a 44%, o cartão 73% a 78%.
-                    if (fundoLiso < FUNDO_DO_CARTAO) {
+                    // Medido em 30/10/2026: o mapa dá 35% a 44%, o cartão 65% a 78%. Com o aviso na tela, o OCR lê
+                    // sempre: um cartão comprido (Exclusivo, viagem longa) já deu 65% e o aviso sumia antes da hora.
+                    if (fundoLiso < FUNDO_DO_CARTAO && chaveUber == null) {
                         tela.recycle()
                         cartao.recycle()
                         return@runCatching tratarPrintUber(null, cartaoNaTela = false)
@@ -669,11 +670,13 @@ class LeitorService : AccessibilityService() {
                     .filter { abs(it.angle) <= 15 && !(it.text.length <= 3 && (it.boundingBox?.left ?: 0) > largura * 3 / 4) }
                     .sortedBy { it.boundingBox?.top ?: 0 }.map { it.text }
                 val oferta = LeitorOferta.lerUberDoPrint(linhas)
+                // Valor e tempo/distância no texto: o cartão ainda está lá, só não deu para ler desta vez.
+                val restoDoCartao = linhas.any { "R$" in it || "RS" in it } && linhas.any { PARECE_OFERTA.containsMatchIn(it) }
                 val agora = System.currentTimeMillis()
                 anotarUber("$hora fundo ${(fundoLiso * 100).toInt()}% · OCR ${agora - inicio} ms" +
                     (if (oferta != null && chaveUber == null && pedido > 0) " · do evento ao aviso ${agora - pedido} ms" else "") + ": " +
                     "${oferta ?: "oferta NÃO reconhecida"} | " + linhas.joinToString(" | ").replace('\n', ' ').take(400))
-                tratarPrintUber(oferta, cartaoNaTela = true)
+                tratarPrintUber(oferta, cartaoNaTela = restoDoCartao)
             }
             .addOnFailureListener(noFundo) { erro ->
                 cartao.recycle()
@@ -684,8 +687,8 @@ class LeitorService : AccessibilityService() {
     }
 
     /**
-     * Só na linha de trabalho. Achou a oferta: mostra e confere de novo daqui a pouco. Sem o fundo do cartão no print,
-     * o cartão sumiu: esconde na hora. Com o fundo mas sem oferta lida (cartão subindo, OCR errou), só na 2ª vez.
+     * Só na linha de trabalho. Achou a oferta: mostra e confere de novo daqui a pouco. Sem nada de oferta no texto do
+     * print, o cartão sumiu: esconde na hora. Com valor e km no texto mas sem oferta lida (OCR errou), só na 2ª vez.
      */
     private fun tratarPrintUber(oferta: Oferta?, cartaoNaTela: Boolean) {
         if (oferta != null) {
@@ -931,7 +934,7 @@ class LeitorService : AccessibilityService() {
         /** O Android 11+ aceita um print a cada 333 ms (a conferir no diagnóstico: se recusar, volta ao longo). */
         private const val INTERVALO_CURTO = 400L
         /** Parte do meio do print com o fundo liso do cartão da Uber, a partir da qual vale ler com o OCR. */
-        private const val FUNDO_DO_CARTAO = 0.6
+        private const val FUNDO_DO_CARTAO = 0.55
         private const val ID_OFERTA_99 = "$NOVENTA_E_NOVE:id/broad_order_container"
         private const val LIMITE_NOS = 400
         private const val LIMITE_NOS_RADAR = 1500
