@@ -563,26 +563,36 @@ class LeitorService : AccessibilityService() {
             mostrar(oferta)
             fundo.removeCallbacks(conferir)
             fundo.postDelayed(conferir, 400)
-        } else if (BuildConfig.UBER_POR_PRINT) agendarPrintUber()
+        } else if (BuildConfig.UBER_POR_PRINT) agendarPrintUber(textosDoEvento.isNotEmpty())
         val cfg = Config.carregar(this)
         if (cfg.diagnostico) salvarDiagnostico("Uber", textos, oferta, tipo, classe)
     }
 
-    /** Só na linha de trabalho. Com o aviso na tela, quem tira os prints é o próprio [lerCartaoUber]. */
-    private fun agendarPrintUber() {
-        if (Build.VERSION.SDK_INT < 30 || chaveUber != null || fundo.hasCallbacks(lerCartaoUber)) return
+    /**
+     * Só na linha de trabalho. Com o aviso na tela, quem tira os prints é o próprio [lerCartaoUber]; mas evento com
+     * texto ("Procurando viagens", "Página inicial") é a tela de baixo voltando: o cartão sumiu, confere já.
+     */
+    private fun agendarPrintUber(comTexto: Boolean) {
+        if (Build.VERSION.SDK_INT < 30) return
+        val livre = ultimoPrintUber + INTERVALO_PRINT_UBER - System.currentTimeMillis()
+        if (chaveUber != null) {
+            if (!comTexto) return
+            fundo.removeCallbacks(lerCartaoUber)
+            fundo.postDelayed(lerCartaoUber, livre.coerceAtLeast(0))
+            return
+        }
+        if (fundo.hasCallbacks(lerCartaoUber)) return
         // Pelo menos 150 ms: o cartão ainda está subindo quando chega o primeiro evento.
-        val espera = (ultimoPrintUber + INTERVALO_PRINT_UBER - System.currentTimeMillis()).coerceAtLeast(150)
-        fundo.postDelayed(lerCartaoUber, espera)
+        fundo.postDelayed(lerCartaoUber, livre.coerceAtLeast(150))
     }
 
     @TargetApi(30)
     private fun tirarPrintUber() {
-        if (!telaLigada()) return tratarPrintUber(null)
+        if (!telaLigada()) return tratarPrintUber(null, cartaoNaTela = false)
         // A Uber manda evento mesmo por trás de outro app: o print é só com a Uber ou a 99 na frente (o cartão da Uber
         // pode subir por cima da 99), nunca com o banco ou outro app. O cartão da 99 é lido pelo print dela.
         val frente = appNaFrente()
-        if (ofertaNa99 || (frente != null && frente !in APPS_DA_BOLINHA)) return tratarPrintUber(null)
+        if (ofertaNa99 || (frente != null && frente !in APPS_DA_BOLINHA)) return tratarPrintUber(null, cartaoNaTela = false)
         ultimoPrintUber = System.currentTimeMillis()
         diagUber = Config.carregar(this).diagnostico
         takeScreenshot(Display.DEFAULT_DISPLAY, noFundo, object : TakeScreenshotCallback {
@@ -598,10 +608,11 @@ class LeitorService : AccessibilityService() {
                     printsDaUber++
                     val fundoLiso = fundoDeCartao(cartao)
                     // Sem o fundo branco (ou preto) do cartão é só o mapa: nem passa pelo OCR, que é o que gasta bateria.
-                    if (fundoLiso < 0.35) {
+                    // Medido em 30/10/2026: o mapa dá 35% a 44%, o cartão 73% a 78%.
+                    if (fundoLiso < FUNDO_DO_CARTAO) {
                         tela.recycle()
                         cartao.recycle()
-                        return@runCatching tratarPrintUber(null)
+                        return@runCatching tratarPrintUber(null, cartaoNaTela = false)
                     }
                     printsComCartaoUber++
                     if (diagUber) File(ArquivosProvider.pasta(this@LeitorService), PRINT_UBER).outputStream().use {
@@ -611,7 +622,7 @@ class LeitorService : AccessibilityService() {
                     lerTextoUber(cartao, hora, fundoLiso)
                 }.onFailure {
                     anotarUber("$hora print falhou: ${it.message}")
-                    tratarPrintUber(null)
+                    tratarPrintUber(null, cartaoNaTela = true)
                 }
                 r.hardwareBuffer.close()
             }
@@ -639,25 +650,28 @@ class LeitorService : AccessibilityService() {
                 val oferta = LeitorOferta.lerUberDoPrint(linhas)
                 anotarUber("$hora fundo ${(fundoLiso * 100).toInt()}% · leu em ${System.currentTimeMillis() - inicio} ms: " +
                     "${oferta ?: "oferta NÃO reconhecida"} | " + linhas.joinToString(" | ").replace('\n', ' ').take(400))
-                tratarPrintUber(oferta)
+                tratarPrintUber(oferta, cartaoNaTela = true)
             }
             .addOnFailureListener(noFundo) { erro ->
                 cartao.recycle()
                 // Logo depois de instalar, o Google Play ainda pode estar baixando o leitor de texto.
                 anotarUber("$hora o leitor de texto falhou: ${erro.message}")
-                tratarPrintUber(null)
+                tratarPrintUber(null, cartaoNaTela = true)
             }
     }
 
-    /** Só na linha de trabalho. Achou o cartão: mostra e confere de novo daqui a pouco; sumiu duas vezes: esconde. */
-    private fun tratarPrintUber(oferta: Oferta?) {
+    /**
+     * Só na linha de trabalho. Achou a oferta: mostra e confere de novo daqui a pouco. Sem o fundo do cartão no print,
+     * o cartão sumiu: esconde na hora. Com o fundo mas sem oferta lida (cartão subindo, OCR errou), só na 2ª vez.
+     */
+    private fun tratarPrintUber(oferta: Oferta?, cartaoNaTela: Boolean) {
         if (oferta != null) {
             semCartaoUber = 0
             chaveUber = oferta.chave
             mostrar(oferta)
         } else {
             val chave = chaveUber ?: return
-            if (++semCartaoUber < 2 && telaLigada()) {
+            if (cartaoNaTela && ++semCartaoUber < 2 && telaLigada()) {
                 fundo.postDelayed(lerCartaoUber, INTERVALO_PRINT_UBER)
                 return
             }
@@ -891,6 +905,8 @@ class LeitorService : AccessibilityService() {
         const val PRINT_UBER = "oferta-uber.jpg"
         /** O Android só deixa tirar um print por segundo. */
         private const val INTERVALO_PRINT_UBER = 1_100L
+        /** Parte do meio do print com o fundo liso do cartão da Uber, a partir da qual vale ler com o OCR. */
+        private const val FUNDO_DO_CARTAO = 0.6
         private const val ID_OFERTA_99 = "$NOVENTA_E_NOVE:id/broad_order_container"
         private const val LIMITE_NOS = 400
         private const val LIMITE_NOS_RADAR = 1500

@@ -248,6 +248,22 @@ class LeitorOfertaTest {
     }
 
     @Test
+    fun leUberPeloPrintComLetraNoLugarDoNumero() {
+        // Diagnóstico de 30/10/2026, 07:44: "11 min" saiu "1l min" e o total virava a busca (8,5 km no lugar de 2,3).
+        val o = LeitorOferta.lerUberDoPrint(listOf(
+            ")CARA", "AS", "2 UberX", "R$ 19,33", "lar", "dl 32 min 8.5 km • Est. de R$2,27/km", "e 1l min 2.3 km",
+            "Rua Aratanji, Cachoeirinha, São", "Paulo", "4,85 (888)", "Verificado", "IR|", "21 minutos •6.2 km",
+            "R. Salete, 200, Santana, São Paulo", "Tenho interesse", "A", "Inde",
+        ))!!
+        assertEquals(19.33, o.valor, 0.001)
+        assertEquals(2.3, o.buscaKm, 0.001)
+        assertEquals(11, o.buscaMin)
+        assertEquals(6.2, o.viagemKm, 0.001)
+        assertEquals(21, o.viagemMin)
+        assertEquals("R. Salete, 200, Santana, São Paulo", o.destino)
+    }
+
+    @Test
     fun telaInicialDaUberPeloPrintNaoEOferta() {
         assertNull(LeitorOferta.lerUberDoPrint(listOf("Procurando viagens", "R$ 0,00", "HOJE", "Osasco", "015", "348")))
     }

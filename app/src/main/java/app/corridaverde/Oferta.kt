@@ -124,12 +124,21 @@ object LeitorOferta {
      * que não se declaram ferramenta de acessibilidade). Depois de consertar o que o OCR troca, é a leitura de sempre.
      */
     fun lerUberDoPrint(linhas: List<String>): Oferta? {
-        val tela = linhas.joinToString("\n").replace(REAL_DO_OCR) { "R\$" }.replace(PONTO_DO_OCR) { "${it.groupValues[1]} • " }
+        // A linha do total ("32 min • 8.5 km • Est. de R$2,27/km") sai fora: com um trecho mal lido, a soma não
+        // fecha e o total virava a busca.
+        val tela = linhas.filterNot { EST_DO_TOTAL.containsMatchIn(it) }.joinToString("\n")
+            .replace(REAL_DO_OCR) { "R\$" }
+            .replace(NUMERO_DO_OCR) { m -> m.value.map { DIGITO_DO_OCR[it] ?: it }.joinToString("") }
+            .replace(PONTO_DO_OCR) { "${it.groupValues[1]} • " }
         return ler(listOf(tela))
     }
 
     private val CORTADO = Regex("""\s*\S*(\.{3}|…)$""")
     // O "•" entre o tempo e a distância ("6 min • 1.4 km") às vezes sai do OCR como ".", "-", "*" ou some.
+    private val EST_DO_TOTAL = Regex("""\bEst\.?\s*de\b""", RegexOption.IGNORE_CASE)
+    // Número antes de "min" ou "km" com letra no lugar de algarismo ("1l min", "l.4 km"); precisa ter um algarismo.
+    private val NUMERO_DO_OCR = Regex("""(?<![\w.,])(?=[\dlI|O.,]*\d)[\dlI|O]+(?:[.,][\dlI|O]+)?(?=\s*(?:min|k?m\b))""")
+    private val DIGITO_DO_OCR = mapOf('l' to '1', 'I' to '1', '|' to '1', 'O' to '0')
     private val PONTO_DO_OCR = Regex("""(min(?:utos?)?)\s*[.\-·*°+]?\s*(?=\d+(?:[.,]\d+)?\s*k?m\b)""", RegexOption.IGNORE_CASE)
 
     private val REAL_DO_OCR = Regex("""\bR\s?[S5]\s?(?=\d)""")
