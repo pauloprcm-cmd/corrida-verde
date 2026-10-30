@@ -174,7 +174,10 @@ class AjustesActivity : Activity() {
                         Notificacao.atualizar(this)
                         Toast.makeText(this, "Pronto: dados restaurados", Toast.LENGTH_LONG).show()
                         restaurando = true
-                        recreate()
+                        // Abre a tela do zero: o recreate() devolvia aos campos o texto de antes (os ajustes antigos),
+                        // e ao sair da tela eles eram salvos por cima dos da cópia.
+                        finish()
+                        startActivity(Intent(this, AjustesActivity::class.java))
                     }
                     .setNegativeButton("Cancelar", null)
                     .show()
