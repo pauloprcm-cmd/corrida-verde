@@ -98,8 +98,9 @@ class AjustesActivity : Activity() {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"), RESTAURAR)
         }
         campo(R.id.compartilhar, Button::class.java).setOnClickListener {
-            // Com o print da oferta da 99 (teste da leitura por imagem), a imagem vai junto com o texto.
-            val print = File(ArquivosProvider.pasta(this), LeitorService.PRINT_99).takeIf { it.isFile }
+            // Com o print da oferta da 99 ou da Uber (leitura por imagem), o mais novo vai junto com o texto.
+            val print = listOf(LeitorService.PRINT_99, LeitorService.PRINT_UBER).map { File(ArquivosProvider.pasta(this), it) }
+                .filter { it.isFile }.maxByOrNull { it.lastModified() }
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, diagnostico())

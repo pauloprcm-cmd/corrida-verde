@@ -119,7 +119,18 @@ object LeitorOferta {
         return base.copy(valor = valor, valorMax = null, nota = nota ?: base.nota, destino = destino)
     }
 
+    /**
+     * Cartão da oferta da Uber lido do print pelo OCR (versão da Play: a Uber esconde o texto do cartão dos leitores
+     * que não se declaram ferramenta de acessibilidade). Depois de consertar o que o OCR troca, é a leitura de sempre.
+     */
+    fun lerUberDoPrint(linhas: List<String>): Oferta? {
+        val tela = linhas.joinToString("\n").replace(REAL_DO_OCR) { "R\$" }.replace(PONTO_DO_OCR) { "${it.groupValues[1]} • " }
+        return ler(listOf(tela))
+    }
+
     private val CORTADO = Regex("""\s*\S*(\.{3}|…)$""")
+    // O "•" entre o tempo e a distância ("6 min • 1.4 km") às vezes sai do OCR como ".", "-", "*" ou some.
+    private val PONTO_DO_OCR = Regex("""(min(?:utos?)?)\s*[.\-·*°+]?\s*(?=\d+(?:[.,]\d+)?\s*k?m\b)""", RegexOption.IGNORE_CASE)
 
     private val REAL_DO_OCR = Regex("""\bR\s?[S5]\s?(?=\d)""")
     private val NOTA_99 = Regex("""\b([1-5][,.]\d{2})\D{0,4}\d+\s*corridas""", RegexOption.IGNORE_CASE)

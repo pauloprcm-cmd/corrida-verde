@@ -213,6 +213,46 @@ class LeitorOfertaTest {
     }
 
     @Test
+    fun leUberXPeloPrint() {
+        // Print de 30/10/2026, 07:02, na versão da Play (o texto do cartão não chega): como o OCR devolve,
+        // com sobras do mapa na borda e o "•" lido como ponto.
+        val o = LeitorOferta.lerUberDoPrint(listOf(
+            "UberX", "R$ 35,85", "48 min • 23.9 km • Est. de R$1,50/km", "6 min . 1.4 km", "RI",
+            "Rua José Francisco, Brasilândia,", "São Paulo", "4,94 (338)", "42 minutos • 22.5 km",
+            "Av. Sylvio Honório Álvares Penteado,", "370, Alphaville, Barueri", "Tenho interesse",
+        ))!!
+        assertEquals(35.85, o.valor, 0.001)
+        assertEquals(1.4, o.buscaKm, 0.001)
+        assertEquals(6, o.buscaMin)
+        assertEquals(22.5, o.viagemKm, 0.001)
+        assertEquals(42, o.viagemMin)
+        assertEquals(4.94, o.nota!!, 0.001)
+        assertEquals(0, o.paradas)
+        assertEquals(Grupo.ECONOMICO, o.grupo)
+    }
+
+    @Test
+    fun leBlackPeloPrintComRSemCifraoESemPonto() {
+        // Print de 30/10/2026, 06:57 (cartão escuro por cima da 99): o "$" lido como S e o "•" que sumiu.
+        val o = LeitorOferta.lerUberDoPrint(listOf(
+            "Black", "Exclusivo", "RS 27,76", "34 min • 10.1 km • Est. de R$2,75/km", "9 min 3.0 km",
+            "Rua Serra do Paru, Mandaqui, São", "Paulo", "4,96 (407)", "Verificado", "25 minutos • 7.1 km",
+            "Av. Leôncio de Magalhães, 1.000,", "Jardim São Paulo, São Paulo", "Aceitar",
+        ))!!
+        assertEquals(27.76, o.valor, 0.001)
+        assertEquals(3.0, o.buscaKm, 0.001)
+        assertEquals(9, o.buscaMin)
+        assertEquals(7.1, o.viagemKm, 0.001)
+        assertEquals(25, o.viagemMin)
+        assertEquals(Grupo.PREMIUM, o.grupo)
+    }
+
+    @Test
+    fun telaInicialDaUberPeloPrintNaoEOferta() {
+        assertNull(LeitorOferta.lerUberDoPrint(listOf("Procurando viagens", "R$ 0,00", "HOJE", "Osasco", "015", "348")))
+    }
+
+    @Test
     fun le99PgtoNoAppSemPegarOAMaisPorCorrida() {
         val o = LeitorOferta.ler99(listOf(
             "Pgto. no app", "1", "R$14,70", "1,4x", "R$3,78/km", "R$4,02 a mais por corrida", "5,00 • 31 corridas • Cartão verif.",

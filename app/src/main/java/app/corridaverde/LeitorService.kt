@@ -127,6 +127,21 @@ class LeitorService : AccessibilityService() {
             }
         }
     }
+    /**
+     * Oferta da Uber pelo print (só na versão da Play, [BuildConfig.UBER_POR_PRINT]; só na linha de trabalho).
+     * Cada leva de eventos da Uber vale um print, no máximo um a cada [INTERVALO_PRINT_UBER]; com o aviso na tela,
+     * os prints seguem até o cartão sumir.
+     */
+    private var ultimoPrintUber = 0L
+    /** Chave do aviso que veio do print da Uber, para esconder só ele quando o cartão some. */
+    private var chaveUber: String? = null
+    /** Prints seguidos sem o cartão enquanto o aviso está na tela: um só pode ser o cartão ainda subindo. */
+    private var semCartaoUber = 0
+    private var diagUber = false
+    private var printsDaUber = 0
+    private var printsComCartaoUber = 0
+    private val leiturasUber = ArrayDeque<String>()
+    private val lerCartaoUber = Runnable { if (Build.VERSION.SDK_INT >= 30) runCatching { tirarPrintUber() } }
     /** Cada texto com R$ que a Uber e a 99 mostram, com o texto de antes e o de depois. */
     private val textosComValor = LinkedHashMap<String, String>()
 
@@ -548,9 +563,136 @@ class LeitorService : AccessibilityService() {
             mostrar(oferta)
             fundo.removeCallbacks(conferir)
             fundo.postDelayed(conferir, 400)
-        }
+        } else if (BuildConfig.UBER_POR_PRINT) agendarPrintUber()
         val cfg = Config.carregar(this)
         if (cfg.diagnostico) salvarDiagnostico("Uber", textos, oferta, tipo, classe)
+    }
+
+    /** Só na linha de trabalho. Com o aviso na tela, quem tira os prints é o próprio [lerCartaoUber]. */
+    private fun agendarPrintUber() {
+        if (Build.VERSION.SDK_INT < 30 || chaveUber != null || fundo.hasCallbacks(lerCartaoUber)) return
+        // Pelo menos 150 ms: o cartão ainda está subindo quando chega o primeiro evento.
+        val espera = (ultimoPrintUber + INTERVALO_PRINT_UBER - System.currentTimeMillis()).coerceAtLeast(150)
+        fundo.postDelayed(lerCartaoUber, espera)
+    }
+
+    @TargetApi(30)
+    private fun tirarPrintUber() {
+        if (!telaLigada()) return tratarPrintUber(null)
+        // A Uber manda evento mesmo por trás de outro app: o print é só com a Uber ou a 99 na frente (o cartão da Uber
+        // pode subir por cima da 99), nunca com o banco ou outro app. O cartão da 99 é lido pelo print dela.
+        val frente = appNaFrente()
+        if (ofertaNa99 || (frente != null && frente !in APPS_DA_BOLINHA)) return tratarPrintUber(null)
+        ultimoPrintUber = System.currentTimeMillis()
+        diagUber = Config.carregar(this).diagnostico
+        takeScreenshot(Display.DEFAULT_DISPLAY, noFundo, object : TakeScreenshotCallback {
+            override fun onSuccess(r: ScreenshotResult) {
+                val hora = LocalTime.now().withNano(0)
+                runCatching {
+                    val hw = Bitmap.wrapHardwareBuffer(r.hardwareBuffer, r.colorSpace) ?: error("sem imagem")
+                    val tela = hw.copy(Bitmap.Config.ARGB_8888, false)
+                    hw.recycle()
+                    // O cartão fica na metade de baixo, preso ao rodapé (por cima da Uber ou da 99).
+                    val topo = tela.height * 35 / 100
+                    val cartao = Bitmap.createBitmap(tela, 0, topo, tela.width, tela.height - topo)
+                    printsDaUber++
+                    val fundoLiso = fundoDeCartao(cartao)
+                    // Sem o fundo branco (ou preto) do cartão é só o mapa: nem passa pelo OCR, que é o que gasta bateria.
+                    if (fundoLiso < 0.35) {
+                        tela.recycle()
+                        cartao.recycle()
+                        return@runCatching tratarPrintUber(null)
+                    }
+                    printsComCartaoUber++
+                    if (diagUber) File(ArquivosProvider.pasta(this@LeitorService), PRINT_UBER).outputStream().use {
+                        tela.compress(Bitmap.CompressFormat.JPEG, 85, it)
+                    }
+                    tela.recycle()
+                    lerTextoUber(cartao, hora, fundoLiso)
+                }.onFailure {
+                    anotarUber("$hora print falhou: ${it.message}")
+                    tratarPrintUber(null)
+                }
+                r.hardwareBuffer.close()
+            }
+
+            override fun onFailure(codigo: Int) {
+                anotarUber("${LocalTime.now().withNano(0)} o Android recusou o print (código $codigo)")
+                // Com o aviso na tela, tenta de novo (o print da 99 pode ter pegado a vez).
+                if (chaveUber != null) fundo.postDelayed(lerCartaoUber, INTERVALO_PRINT_UBER)
+            }
+        })
+    }
+
+    /** O recorte só fica na memória até o OCR devolver o texto. */
+    private fun lerTextoUber(cartao: Bitmap, hora: LocalTime, fundoLiso: Double) {
+        val ocr = reconhecedor ?: TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS).also { reconhecedor = it }
+        val inicio = System.currentTimeMillis()
+        ocr.process(InputImage.fromBitmap(cartao, 0))
+            .addOnSuccessListener(noFundo) { t ->
+                val largura = cartao.width
+                cartao.recycle()
+                // De cima para baixo; sem texto inclinado (rua do mapa) nem pedacinhos do mapa na borda direita.
+                val linhas = t.textBlocks.flatMap { it.lines }
+                    .filter { abs(it.angle) <= 15 && !(it.text.length <= 3 && (it.boundingBox?.left ?: 0) > largura * 3 / 4) }
+                    .sortedBy { it.boundingBox?.top ?: 0 }.map { it.text }
+                val oferta = LeitorOferta.lerUberDoPrint(linhas)
+                anotarUber("$hora fundo ${(fundoLiso * 100).toInt()}% · leu em ${System.currentTimeMillis() - inicio} ms: " +
+                    "${oferta ?: "oferta NÃO reconhecida"} | " + linhas.joinToString(" | ").replace('\n', ' ').take(400))
+                tratarPrintUber(oferta)
+            }
+            .addOnFailureListener(noFundo) { erro ->
+                cartao.recycle()
+                // Logo depois de instalar, o Google Play ainda pode estar baixando o leitor de texto.
+                anotarUber("$hora o leitor de texto falhou: ${erro.message}")
+                tratarPrintUber(null)
+            }
+    }
+
+    /** Só na linha de trabalho. Achou o cartão: mostra e confere de novo daqui a pouco; sumiu duas vezes: esconde. */
+    private fun tratarPrintUber(oferta: Oferta?) {
+        if (oferta != null) {
+            semCartaoUber = 0
+            chaveUber = oferta.chave
+            mostrar(oferta)
+        } else {
+            val chave = chaveUber ?: return
+            if (++semCartaoUber < 2 && telaLigada()) {
+                fundo.postDelayed(lerCartaoUber, INTERVALO_PRINT_UBER)
+                return
+            }
+            chaveUber = null
+            handler.post { if (chaveAtual == chave) esconder.run() }
+            return
+        }
+        fundo.removeCallbacks(lerCartaoUber)
+        fundo.postDelayed(lerCartaoUber, INTERVALO_PRINT_UBER)
+    }
+
+    /**
+     * Quanto do meio do recorte é fundo de cartão da Uber: branco puro, ou preto/cinza bem escuro sem cor. O mapa
+     * claro é cinza-azulado (nunca branco puro) e o escuro tem cor, então quase não conta.
+     */
+    private fun fundoDeCartao(b: Bitmap): Double {
+        var liso = 0
+        var n = 0
+        for (y in b.height / 10 until b.height * 9 / 10 step 24) for (x in b.width / 10 until b.width * 9 / 10 step 24) {
+            val p = b.getPixel(x, y)
+            val maior = maxOf(Color.red(p), Color.green(p), Color.blue(p))
+            val menor = minOf(Color.red(p), Color.green(p), Color.blue(p))
+            if (menor >= 248 || (maior <= 40 && maior - menor <= 12)) liso++
+            n++
+        }
+        return if (n == 0) 0.0 else liso.toDouble() / n
+    }
+
+    /** Só com o diagnóstico ligado. */
+    private fun anotarUber(linha: String) {
+        if (!diagUber) return
+        leiturasUber.addLast(linha)
+        while (leiturasUber.size > 10) leiturasUber.removeFirst()
+        ultimoStatus = 0
+        salvarStatus()
     }
 
     private fun mostrar(oferta: Oferta) {
@@ -678,6 +820,11 @@ class LeitorService : AccessibilityService() {
             appendLine("--- oferta da 99: print e leitura (códigos: 1 desligue e ligue a leitura, 2 cedo demais, 5 tela protegida) ---")
             if (Build.VERSION.SDK_INT < 30) appendLine("Este Android não deixa tirar print (precisa do Android 11)")
             prints99.forEach { appendLine(it) }
+            if (BuildConfig.UBER_POR_PRINT) {
+                appendLine("--- oferta da Uber pelo print (versão da Play) ---")
+                appendLine("Prints: $printsDaUber · com cara de cartão (foram ao OCR): $printsComCartaoUber")
+                leiturasUber.forEach { appendLine(it) }
+            }
         }
         File(filesDir, ARQUIVO_STATUS).writeText(texto)
     }
@@ -699,6 +846,9 @@ class LeitorService : AccessibilityService() {
             ultimoStatus = 0
             ultimaEstrutura99 = 0
             prints99.clear()
+            leiturasUber.clear()
+            printsDaUber = 0
+            printsComCartaoUber = 0
             ofertaNa99 = false
             ultimoPrint99 = 0
             apagarArquivosDoDiagnostico(this)
@@ -738,6 +888,9 @@ class LeitorService : AccessibilityService() {
         const val ARQUIVO_STATUS = "status.txt"
         /** Fica na pasta do [ArquivosProvider] para ir junto com o diagnóstico; o cache não entra no backup. */
         const val PRINT_99 = "oferta-99.jpg"
+        const val PRINT_UBER = "oferta-uber.jpg"
+        /** O Android só deixa tirar um print por segundo. */
+        private const val INTERVALO_PRINT_UBER = 1_100L
         private const val ID_OFERTA_99 = "$NOVENTA_E_NOVE:id/broad_order_container"
         private const val LIMITE_NOS = 400
         private const val LIMITE_NOS_RADAR = 1500
@@ -750,6 +903,7 @@ class LeitorService : AccessibilityService() {
             File(ctx.filesDir, ARQUIVO_STATUS).delete()
             File(ctx.filesDir, ARQUIVO_DIAGNOSTICO).delete()
             File(ArquivosProvider.pasta(ctx), PRINT_99).delete()
+            File(ArquivosProvider.pasta(ctx), PRINT_UBER).delete()
         }
     }
 }

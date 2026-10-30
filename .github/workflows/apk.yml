@@ -40,8 +40,9 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          gradle assembleGithubRelease bundlePlayRelease
+          gradle assembleGithubRelease bundlePlayRelease assemblePlayRelease
           cp app/build/outputs/apk/github/release/app-github-release.apk corrida-verde.apk
+          cp app/build/outputs/apk/play/release/app-play-release.apk corrida-verde-play.apk
           cp app/build/outputs/bundle/playRelease/app-play-release.aab corrida-verde-play.aab
 
       # Versão da Play (sem atualizador): fica nos artefatos do build para enviar ao Play Console.
@@ -72,4 +73,6 @@ jobs:
           git push -f origin teste
           gh release view teste >/dev/null 2>&1 || gh release create teste --prerelease --title "Versão de teste" --notes "Versão de teste"
           gh release upload teste corrida-verde.apk --clobber
+          # A versão da Play para instalar direto e testar sem esperar a revisão da Google.
+          gh release upload teste corrida-verde-play.apk --clobber
           gh release edit teste --prerelease --title "Corrida Verde 1.${{ github.run_number }} (teste)" --notes "$NOTAS"

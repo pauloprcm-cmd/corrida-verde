@@ -41,6 +41,7 @@ android {
             buildConfigField("boolean", "GRAVACAO", "true")
             // Versão do GitHub (o Paulo e quem ele escolhe): sem período grátis nem limite de uso.
             buildConfigField("boolean", "PERIODO_GRATIS", "false")
+            buildConfigField("boolean", "UBER_POR_PRINT", "false")
         }
         create("play") {
             dimension = "loja"
@@ -49,6 +50,9 @@ android {
             buildConfigField("boolean", "GRAVACAO", "false")
             // Os 30 dias grátis contam da primeira abertura (Config.marcarPrimeiroUso).
             buildConfigField("boolean", "PERIODO_GRATIS", "true")
+            // Aqui o leitor não se declara ferramenta de acessibilidade (alerta dos bancos), e a Uber esconde o texto
+            // do cartão da oferta desses leitores: a oferta é lida do print, como a da 99.
+            buildConfigField("boolean", "UBER_POR_PRINT", "true")
         }
     }
 
