@@ -3,10 +3,10 @@
 App Android para taxista de São Paulo. Lê a oferta de corrida no app de motorista da Uber e mostra um popup
 com quanto ela paga em relação ao taxímetro da Prefeitura de SP:
 
-- **Verde**: 100% do taxímetro ou mais
-- **Amarelo**: de 85% a 100%
-- **Vermelho**: abaixo de 85%
-- Busca acima de 3 km rebaixa um nível.
+- **Verde**: 80% do taxímetro ou mais
+- **Amarelo**: de 70% a 80%
+- **Vermelho**: abaixo de 70%
+- Busca acima de 2 km rebaixa um nível.
 
 O taxímetro usa a tabela vigente desde 11/08/2025 (comum: R$ 6,55 + R$ 4,80/km + R$ 55,50/hora parada;
 luxo: R$ 9,83 + R$ 7,20/km + R$ 83,25/hora parada), com bandeira 2 (+30% no km) das 20h às 6h de segunda a

@@ -7,9 +7,10 @@ data class Config(
     /** [TAXI] ou [APP]; vazio enquanto a pessoa não escolheu (primeira abertura). */
     val perfil: String = "",
     val luxo: Boolean = false,
-    val limiteVerde: Int = 100,
-    val limiteAmarelo: Int = 85,
-    val buscaMaxKm: Double = 3.0,
+    /** Padrões do taxista escolhidos pelo Paulo em 30/10/2026 (antes 100, 85 e 3,0 km). */
+    val limiteVerde: Int = 80,
+    val limiteAmarelo: Int = 70,
+    val buscaMaxKm: Double = 2.0,
     val notaMinima: Double = 4.7,
     val viagemLongaKm: Double = 25.0,
     val posicaoY: Int = 60,
@@ -129,15 +130,16 @@ data class Config(
         fun carregar(ctx: Context): Config {
             val p = ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
             val d = Config()
-            fun real(chave: String, padrao: Double) = p.getFloat(chave, padrao.toFloat()).toDouble()
+            // Guardado como Float: 4,7 voltava como 4,699999809265137 na tela de Ajustes. Arredonda a 2 casas.
+            fun real(chave: String, padrao: Double) = Math.round(p.getFloat(chave, padrao.toFloat()) * 100.0) / 100.0
             return Config(
                 perfil = p.getString("perfil", d.perfil) ?: "",
                 luxo = p.getBoolean("luxo", d.luxo),
                 limiteVerde = p.getInt("limiteVerde", d.limiteVerde),
                 limiteAmarelo = p.getInt("limiteAmarelo", d.limiteAmarelo),
-                buscaMaxKm = p.getFloat("buscaMaxKm", d.buscaMaxKm.toFloat()).toDouble(),
-                notaMinima = p.getFloat("notaMinima", d.notaMinima.toFloat()).toDouble(),
-                viagemLongaKm = p.getFloat("viagemLongaKm", d.viagemLongaKm.toFloat()).toDouble(),
+                buscaMaxKm = real("buscaMaxKm", d.buscaMaxKm),
+                notaMinima = real("notaMinima", d.notaMinima),
+                viagemLongaKm = real("viagemLongaKm", d.viagemLongaKm),
                 posicaoY = p.getInt("posicaoY", d.posicaoY),
                 ladoAviso = p.getString("ladoAviso", d.ladoAviso) ?: d.ladoAviso,
                 diagnostico = p.getBoolean("diagnostico", d.diagnostico) && System.currentTimeMillis() < p.getLong("diagnosticoAte", 0),
@@ -159,7 +161,7 @@ data class Config(
                     val lon = b.toDoubleOrNull()
                     if (lat != null && lon != null) Ponto(lat, lon) else null
                 },
-                raioCasaKm = p.getFloat("raioCasaKm", d.raioCasaKm.toFloat()).toDouble(),
+                raioCasaKm = real("raioCasaKm", d.raioCasaKm),
                 indoPraCasaDia = p.getString("indoPraCasaDia", "") ?: "",
             )
         }
