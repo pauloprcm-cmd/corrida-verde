@@ -304,7 +304,20 @@ class LeitorService : AccessibilityService() {
         return w.root?.packageName?.toString()
     }
 
-    private fun telaLigada() = getSystemService(PowerManager::class.java).isInteractive &&
+    /**
+     * Fora da Uber a oferta sobe numa janela flutuante dela, por cima do app da frente. A bolinha "Uber →" também é
+     * janela flutuante, mas pequena: só conta janela com pelo menos um quinto da altura da tela.
+     */
+    private fun cartaoFlutuanteDaUber(): Boolean {
+        val altura = resources.displayMetrics.heightPixels
+        val r = Rect()
+        return windows.any { w ->
+            w.type != AccessibilityWindowInfo.TYPE_APPLICATION && w.root?.packageName?.toString() == UBER &&
+                r.also { w.getBoundsInScreen(it) }.height() >= altura / 5
+        }
+    }
+
+    private fun telaLigada() =getSystemService(PowerManager::class.java).isInteractive &&
         !getSystemService(KeyguardManager::class.java).isKeyguardLocked
 
     private fun agendarRadar(app: String) {
@@ -623,9 +636,11 @@ class LeitorService : AccessibilityService() {
     private fun tirarPrintUber() {
         if (!telaLigada()) return tratarPrintUber(null, cartaoNaTela = false)
         // A Uber manda evento mesmo por trás de outro app: o print é só com a Uber ou a 99 na frente (o cartão da Uber
-        // pode subir por cima da 99), nunca com o banco ou outro app. O cartão da 99 é lido pelo print dela.
+        // pode subir por cima da 99), ou com o cartão flutuante da Uber por cima de outro app (Waze, Chrome, Play:
+        // visto em 30/10/2026). O cartão da 99 é lido pelo print dela.
         val frente = appNaFrente()
-        if (ofertaNa99 || (frente != null && frente !in APPS_DA_BOLINHA)) return tratarPrintUber(null, cartaoNaTela = false)
+        if (ofertaNa99 || (frente != null && frente !in APPS_DA_BOLINHA && !cartaoFlutuanteDaUber()))
+            return tratarPrintUber(null, cartaoNaTela = false)
         ultimoPrintUber = System.currentTimeMillis()
         diagUber = Config.carregar(this).diagnostico
         takeScreenshot(Display.DEFAULT_DISPLAY, naFilaUber, object : TakeScreenshotCallback {
@@ -854,7 +869,8 @@ class LeitorService : AccessibilityService() {
             val r = w.root
             // Só conta os textos dos apps que o leitor usa: a tela do banco ou de qualquer outro app nunca é lida.
             val n = r?.takeIf { it.packageName?.toString() in NOMES }?.let { runCatching { textosDo(it) }.getOrNull() } ?: emptyList()
-            "tipo ${w.type} · ${r?.packageName ?: "sem acesso"} · ${w.title ?: ""} · ${n.size} textos"
+            val b = Rect().also { w.getBoundsInScreen(it) }
+            "tipo ${w.type} · ${r?.packageName ?: "sem acesso"} · ${w.title ?: ""} · ${n.size} textos · ${b.width()}x${b.height()}"
         }
         if (historicoJanelas.lastOrNull()?.substringAfter('\n') != janelas) {
             historicoJanelas.addLast("${LocalTime.now().withNano(0)}\n$janelas")
