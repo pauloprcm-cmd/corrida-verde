@@ -129,10 +129,17 @@ class LeitorService : AccessibilityService() {
     }
     /**
      * Oferta da Uber pelo print (só na versão da Play, [BuildConfig.UBER_POR_PRINT]; só na linha de trabalho).
-     * Cada leva de eventos da Uber vale um print, no máximo um a cada [INTERVALO_PRINT_UBER]; com o aviso na tela,
+     * Cada leva de eventos da Uber vale um print, no máximo um a cada [intervaloUber]; com o aviso na tela,
      * os prints seguem até o cartão sumir.
      */
     private var ultimoPrintUber = 0L
+    /**
+     * Menor espera entre dois prints. Começa em [INTERVALO_CURTO]; se o Android recusar por pressa, fica em
+     * [INTERVALO_LONGO] até a leitura ser religada.
+     */
+    private var intervaloUber = INTERVALO_CURTO
+    /** Quando chegou o evento que pediu o print em curso, para medir quanto o aviso demora. */
+    private var pedidoUber = 0L
     /** Chave do aviso que veio do print da Uber, para esconder só ele quando o cartão some. */
     private var chaveUber: String? = null
     /** Prints seguidos sem o cartão enquanto o aviso está na tela: um só pode ser o cartão ainda subindo. */
@@ -200,6 +207,10 @@ class LeitorService : AccessibilityService() {
         }, 800)
         handler.postDelayed(buscarAtualizacao, 60_000)
         handler.post(notificar)
+        // O primeiro OCR carrega o leitor de texto e demora: carrega já, para a primeira oferta não pagar por isso.
+        if (BuildConfig.UBER_POR_PRINT) fundo.post {
+            runCatching { leitorDeTexto().process(InputImage.fromBitmap(Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888), 0)) }
+        }
     }
 
     override fun onDestroy() {
@@ -431,9 +442,8 @@ class LeitorService : AccessibilityService() {
 
     /** O recorte só fica na memória até o OCR devolver o texto. */
     private fun lerTexto99(cartao: Bitmap, hora: LocalTime) {
-        val ocr = reconhecedor ?: TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS).also { reconhecedor = it }
         val inicio = System.currentTimeMillis()
-        ocr.process(InputImage.fromBitmap(cartao, 0))
+        leitorDeTexto().process(InputImage.fromBitmap(cartao, 0))
             .addOnSuccessListener(noFundo) { t ->
                 // De cima para baixo, como o motorista lê. Texto inclinado é nome de rua do mapa.
                 val todas = t.textBlocks.flatMap { it.lines }.filter { abs(it.angle) <= 15 }.sortedBy { it.boundingBox?.top ?: 0 }
@@ -458,6 +468,9 @@ class LeitorService : AccessibilityService() {
                 anotar99("$hora o leitor de texto falhou: ${erro.message}")
             }
     }
+
+    private fun leitorDeTexto() =
+        reconhecedor ?: TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS).also { reconhecedor = it }
 
     /** O cartão da 99 é escuro e o mapa em volta é claro: confere o fundo logo fora das pontas do texto. */
     private fun noCartao(b: Bitmap, r: Rect): Boolean {
@@ -574,7 +587,7 @@ class LeitorService : AccessibilityService() {
      */
     private fun agendarPrintUber(comTexto: Boolean) {
         if (Build.VERSION.SDK_INT < 30) return
-        val livre = ultimoPrintUber + INTERVALO_PRINT_UBER - System.currentTimeMillis()
+        val livre = ultimoPrintUber + intervaloUber - System.currentTimeMillis()
         if (chaveUber != null) {
             if (!comTexto) return
             fundo.removeCallbacks(lerCartaoUber)
@@ -582,8 +595,9 @@ class LeitorService : AccessibilityService() {
             return
         }
         if (fundo.hasCallbacks(lerCartaoUber)) return
-        // Pelo menos 150 ms: o cartão ainda está subindo quando chega o primeiro evento.
-        fundo.postDelayed(lerCartaoUber, livre.coerceAtLeast(150))
+        pedidoUber = System.currentTimeMillis()
+        // Um respiro: o cartão ainda está subindo quando chega o primeiro evento.
+        fundo.postDelayed(lerCartaoUber, livre.coerceAtLeast(80))
     }
 
     @TargetApi(30)
@@ -630,16 +644,23 @@ class LeitorService : AccessibilityService() {
             override fun onFailure(codigo: Int) {
                 anotarUber("${LocalTime.now().withNano(0)} o Android recusou o print (código $codigo)")
                 // Com o aviso na tela, tenta de novo (o print da 99 pode ter pegado a vez).
-                if (chaveUber != null) fundo.postDelayed(lerCartaoUber, INTERVALO_PRINT_UBER)
+                if (codigo == AccessibilityService.ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT && intervaloUber < INTERVALO_LONGO) {
+                    intervaloUber = INTERVALO_LONGO
+                    anotarUber("${LocalTime.now().withNano(0)} o Android não deixa print tão seguido: agora 1 por segundo")
+                }
+                if (chaveUber != null) fundo.postDelayed(lerCartaoUber, intervaloUber)
             }
         })
     }
 
     /** O recorte só fica na memória até o OCR devolver o texto. */
-    private fun lerTextoUber(cartao: Bitmap, hora: LocalTime, fundoLiso: Double) {
-        val ocr = reconhecedor ?: TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS).also { reconhecedor = it }
+    private fun lerTextoUber(inteiro: Bitmap, hora: LocalTime, fundoLiso: Double) {
+        // 70% do tamanho: o texto do cartão segue grande para o OCR, que fica mais rápido.
+        val cartao = Bitmap.createScaledBitmap(inteiro, inteiro.width * 7 / 10, inteiro.height * 7 / 10, true)
+        if (cartao !== inteiro) inteiro.recycle()
         val inicio = System.currentTimeMillis()
-        ocr.process(InputImage.fromBitmap(cartao, 0))
+        val pedido = pedidoUber
+        leitorDeTexto().process(InputImage.fromBitmap(cartao, 0))
             .addOnSuccessListener(noFundo) { t ->
                 val largura = cartao.width
                 cartao.recycle()
@@ -648,7 +669,9 @@ class LeitorService : AccessibilityService() {
                     .filter { abs(it.angle) <= 15 && !(it.text.length <= 3 && (it.boundingBox?.left ?: 0) > largura * 3 / 4) }
                     .sortedBy { it.boundingBox?.top ?: 0 }.map { it.text }
                 val oferta = LeitorOferta.lerUberDoPrint(linhas)
-                anotarUber("$hora fundo ${(fundoLiso * 100).toInt()}% · leu em ${System.currentTimeMillis() - inicio} ms: " +
+                val agora = System.currentTimeMillis()
+                anotarUber("$hora fundo ${(fundoLiso * 100).toInt()}% · OCR ${agora - inicio} ms" +
+                    (if (oferta != null && chaveUber == null && pedido > 0) " · do evento ao aviso ${agora - pedido} ms" else "") + ": " +
                     "${oferta ?: "oferta NÃO reconhecida"} | " + linhas.joinToString(" | ").replace('\n', ' ').take(400))
                 tratarPrintUber(oferta, cartaoNaTela = true)
             }
@@ -672,7 +695,7 @@ class LeitorService : AccessibilityService() {
         } else {
             val chave = chaveUber ?: return
             if (cartaoNaTela && ++semCartaoUber < 2 && telaLigada()) {
-                fundo.postDelayed(lerCartaoUber, INTERVALO_PRINT_UBER)
+                fundo.postDelayed(lerCartaoUber, intervaloUber)
                 return
             }
             chaveUber = null
@@ -680,7 +703,7 @@ class LeitorService : AccessibilityService() {
             return
         }
         fundo.removeCallbacks(lerCartaoUber)
-        fundo.postDelayed(lerCartaoUber, INTERVALO_PRINT_UBER)
+        fundo.postDelayed(lerCartaoUber, intervaloUber)
     }
 
     /**
@@ -904,7 +927,9 @@ class LeitorService : AccessibilityService() {
         const val PRINT_99 = "oferta-99.jpg"
         const val PRINT_UBER = "oferta-uber.jpg"
         /** O Android só deixa tirar um print por segundo. */
-        private const val INTERVALO_PRINT_UBER = 1_100L
+        private const val INTERVALO_LONGO = 1_100L
+        /** O Android 11+ aceita um print a cada 333 ms (a conferir no diagnóstico: se recusar, volta ao longo). */
+        private const val INTERVALO_CURTO = 400L
         /** Parte do meio do print com o fundo liso do cartão da Uber, a partir da qual vale ler com o OCR. */
         private const val FUNDO_DO_CARTAO = 0.6
         private const val ID_OFERTA_99 = "$NOVENTA_E_NOVE:id/broad_order_container"
