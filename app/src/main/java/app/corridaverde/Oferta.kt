@@ -58,45 +58,94 @@ object LeitorOferta {
     private val NAO_ENDERECO = Regex("""^(selecionar|aceitar|recusar|ver todas|combina|\d+ solicita|verificado|exclusivo)""", RegexOption.IGNORE_CASE)
     private val PARADAS = Regex("""\b(\d+)\s*paradas?\b""", RegexOption.IGNORE_CASE)
 
+    /** Um trecho do cartão ("8 min • 1.4 km"); no print, o km pode estar com o ponto que o OCR perdeu de volta. */
+    private class Trecho(val m: MatchResult, val km: Double, val min: Int)
+
     /** Lê os textos da tela (na ordem da árvore). Devolve null se não houver oferta. */
-    fun ler(textos: List<String>): Oferta? {
+    fun ler(textos: List<String>): Oferta? = ler(textos, doPrint = false, totalJaSaiu = false)
+
+    /**
+     * [doPrint]: texto do OCR, que às vezes perde o ponto do km ("7.2 km" vira "72 km": 6 ofertas em 30/10/2026).
+     * [totalJaSaiu]: a linha do total com "Est. de R$/km" já foi tirada antes.
+     */
+    private fun ler(textos: List<String>, doPrint: Boolean, totalJaSaiu: Boolean): Oferta? {
         val tela = textos.joinToString("\n").replace(' ', ' ').replace(' ', ' ')
 
         // Trechos "8 min (1.4 km)" ou "8 min • 1.4 km": o primeiro é a busca, os demais são a viagem (com paradas).
-        val todos = TRECHO.findAll(tela).filter { it.groupValues[1].isNotBlank() }.toList()
+        val lidos = TRECHO.findAll(tela).filter { it.groupValues[1].isNotBlank() }
+            .map { Trecho(it, km(it), minutos(it.groupValues[1])) }.toList()
+        if (lidos.isEmpty()) return null
+        val opcoes = if (doPrint) comPontoDeVolta(lidos) else listOf(lidos)
         // Desde 28/10/2026 o Táxi mostra o total ("8 min • 1.7 km") embaixo do valor, antes da busca: é a soma dos
         // outros trechos e não pode virar busca nem parada.
-        val trechos = if (todos.size >= 3 && ehTotal(todos[0], todos.drop(1))) todos.drop(1) else todos
+        val comTotal = opcoes.firstOrNull { it.size >= 3 && ehTotal(it[0], it.drop(1)) }
+        val trechos = when {
+            comTotal != null -> comTotal.drop(1)
+            // No print, o trecho logo embaixo do valor (sem a linha "Est. de") é o total. Se a soma não fecha, o OCR
+            // errou um número ou perdeu a linha da viagem (30/10/2026: o total virou busca e o aviso deu 624%).
+            // Sem aviso é melhor que aviso errado: o próximo print tenta de novo.
+            doPrint && !totalJaSaiu && logoAbaixoDoValor(tela, lidos[0]) &&
+                (lidos.size >= 3 || TAXI.containsMatchIn(tela.substring(0, lidos[0].m.range.first))) -> return null
+            doPrint -> opcoes.firstOrNull { plausivel(it) } ?: return null
+            else -> lidos
+        }
         if (trechos.size < 2) return null
 
-        val faixa = FAIXA.findAll(tela).lastOrNull { it.range.first < trechos[0].range.first }
+        val faixa = FAIXA.findAll(tela).lastOrNull { it.range.first < trechos[0].m.range.first }
         // O valor da corrida é o último "R$" antes da busca que não seja R$/km nem o acréscimo "+R$ 3,75 incluído".
         val valores = VALOR.findAll(tela).filter {
             val depois = tela.substring(it.range.last + 1)
             !POR_UNIDADE.containsMatchIn(depois) && !INCLUIDO.containsMatchIn(depois) &&
                 !tela.substring(0, it.range.first).trimEnd().endsWith('+')
         }.toList()
-        val valor = faixa?.let { dinheiro(it.groupValues[1]) } ?: (valores.lastOrNull { it.range.first < trechos[0].range.first } ?: valores.firstOrNull())
+        val valor = faixa?.let { dinheiro(it.groupValues[1]) } ?: (valores.lastOrNull { it.range.first < trechos[0].m.range.first } ?: valores.firstOrNull())
             ?.let { dinheiro(it.groupValues[1]) } ?: return null
 
         val busca = trechos[0]
         val viagem = trechos.drop(1)
         return Oferta(
             valor = valor,
-            buscaKm = km(busca),
-            buscaMin = minutos(busca.groupValues[1]),
-            viagemKm = viagem.sumOf { km(it) },
-            viagemMin = viagem.sumOf { minutos(it.groupValues[1]) },
+            buscaKm = busca.km,
+            buscaMin = busca.min,
+            viagemKm = viagem.sumOf { it.km },
+            viagemMin = viagem.sumOf { it.min },
             nota = NOTA.find(tela)?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull(),
             // A Uber escreve "1 parada"; sem o texto, cada trecho a mais depois da busca e da viagem é uma parada.
             paradas = PARADAS.find(tela)?.groupValues?.get(1)?.toInt() ?: maxOf(0, trechos.size - 2),
             valorMax = faixa?.let { dinheiro(it.groupValues[2]) },
             // O endereço vem logo depois do último trecho ("30 minutos (6.1 km)").
-            destino = tela.substring(viagem.last().range.last + 1).lines().map { it.trim() }
+            destino = tela.substring(viagem.last().m.range.last + 1).lines().map { it.trim() }
                 .firstOrNull { it.length >= 5 && it.any(Char::isLetter) && !NAO_ENDERECO.containsMatchIn(it) },
             // A categoria vem antes da busca; o endereço do destino pode ter "Black" ou "Comfort" no nome.
-            grupo = Grupo.da(tela.substring(0, busca.range.first)),
+            grupo = Grupo.da(tela.substring(0, busca.m.range.first)),
         )
+    }
+
+    /**
+     * A leitura como veio e, depois, com o ponto de volta nos km sem casa decimal ("72 km" → 7.2): a Uber sempre
+     * escreve o km com uma casa, então "72" no print é o OCR que perdeu o ponto. Primeiro as que mudam menos.
+     */
+    private fun comPontoDeVolta(lidos: List<Trecho>): List<List<Trecho>> {
+        val semPonto = lidos.indices.filter { i ->
+            val n = lidos[i].m.groupValues[2]
+            lidos[i].m.groupValues[3].equals("km", ignoreCase = true) && n.length in 2..3 && n.all(Char::isDigit)
+        }.take(4)
+        return (0 until (1 shl semPonto.size)).sortedBy { Integer.bitCount(it) }.map { trocados ->
+            lidos.mapIndexed { i, t ->
+                val k = semPonto.indexOf(i)
+                if (k >= 0 && trocados and (1 shl k) != 0) Trecho(t.m, t.km / 10, t.min) else t
+            }
+        }
+    }
+
+    /** Nenhum trecho mais rápido que 90 km/h (72 km em 28 min é o ponto que sumiu, não a viagem). */
+    private fun plausivel(trechos: List<Trecho>) = trechos.all { it.km <= 2 || (it.min > 0 && it.km / it.min * 60 <= 90) }
+
+    /** Entre o valor e o trecho só há sobras do mapa (até 3 letras por linha, como "MI" e "PA"). */
+    private fun logoAbaixoDoValor(tela: String, t: Trecho): Boolean {
+        val antes = tela.substring(0, t.m.range.first)
+        val valor = VALOR_DO_PRINT.findAll(antes).lastOrNull() ?: return false
+        return antes.substring(valor.range.last + 1).lines().all { it.trim().length <= 3 }
     }
 
     /**
@@ -131,8 +180,29 @@ object LeitorOferta {
             .replace(HORA_DO_OCR) { m -> m.groupValues[1].map { DIGITO_DO_OCR[it] ?: it }.joinToString("") + " h e " }
             .replace(NUMERO_DO_OCR) { m -> m.value.map { DIGITO_DO_OCR[it] ?: it }.joinToString("") }
             .replace(PONTO_DO_OCR) { "${it.groupValues[1]} • " }
-        return ler(listOf(tela))
+        return ler(listOf(tela), doPrint = true, totalJaSaiu = linhas.any { EST_DO_TOTAL.containsMatchIn(it) })
     }
+
+    /** Como está o cartão da Uber no print, além da oferta. */
+    enum class Cartao { NORMAL, EM_TRANSICAO, ENCERRADO }
+
+    /**
+     * Depois do "Tenho interesse" o cartão fica esmaecido ("Combinação em andamento") e o OCR erra os números; quando
+     * a oferta acaba ("não está mais disponível", "Encontramos outro motorista") o texto velho ainda aparece.
+     */
+    fun cartaoDoPrint(linhas: List<String>): Cartao {
+        val tela = linhas.joinToString(" ")
+        return when {
+            ENCERRADO.containsMatchIn(tela) -> Cartao.ENCERRADO
+            EM_TRANSICAO.containsMatchIn(tela) -> Cartao.EM_TRANSICAO
+            else -> Cartao.NORMAL
+        }
+    }
+
+    /** Os valores em R$ do print, para saber se o cartão na tela ainda é o da oferta do aviso. */
+    fun valoresDoPrint(linhas: List<String>): List<Double> =
+        VALOR_DO_PRINT.findAll(linhas.joinToString("\n").replace(REAL_DO_OCR) { "R\$" })
+            .mapNotNull { runCatching { dinheiro(it.groupValues[1]) }.getOrNull() }.toList()
 
     private val CORTADO = Regex("""\s*\S*(\.{3}|…)$""")
     // O "•" entre o tempo e a distância ("6 min • 1.4 km") às vezes sai do OCR como ".", "-", "*" ou some.
@@ -145,12 +215,16 @@ object LeitorOferta {
     private val PONTO_DO_OCR = Regex("""(min(?:utos?)?)\s*[.\-·*°+]?\s*(?=\d+(?:[.,]\d+)?\s*k?m\b)""", RegexOption.IGNORE_CASE)
 
     private val REAL_DO_OCR = Regex("""\bR\s?[S5]\s?(?=\d)""")
+    /** "R$ 34,90" ou "R$ 24" (a faixa do Táxi vem sem centavos). */
+    private val VALOR_DO_PRINT = Regex("""R\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)""")
+    private val TAXI = Regex("""\bt[áa]xi\b""", RegexOption.IGNORE_CASE)
+    private val EM_TRANSICAO = Regex("""combina[çc][ãa]o em andamento""", RegexOption.IGNORE_CASE)
+    private val ENCERRADO = Regex("""n[ãa]o est[áa] mais dispon[íi]vel|encontramos outro motorista""", RegexOption.IGNORE_CASE)
     private val NOTA_99 = Regex("""\b([1-5][,.]\d{2})\D{0,4}\d+\s*corridas""", RegexOption.IGNORE_CASE)
 
     /** O trecho é a soma dos outros (a Uber arredonda cada um para 0,1 km e para o minuto). */
-    private fun ehTotal(total: MatchResult, resto: List<MatchResult>) =
-        abs(km(total) - resto.sumOf { km(it) }) <= 0.05 * resto.size + 0.01 &&
-            abs(minutos(total.groupValues[1]) - resto.sumOf { minutos(it.groupValues[1]) }) <= resto.size
+    private fun ehTotal(total: Trecho, resto: List<Trecho>) =
+        abs(total.km - resto.sumOf { it.km }) <= 0.05 * resto.size + 0.01 && abs(total.min - resto.sumOf { it.min }) <= resto.size
 
     private fun dinheiro(s: String) = s.replace(".", "").replace(',', '.').toDouble()
 

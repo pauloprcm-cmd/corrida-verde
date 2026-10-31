@@ -40,6 +40,18 @@ object Casa {
         val t = destino.replace('\n', ' ').replace(Regex("""\s+"""), " ").trim().trimEnd(',')
         return if (t.contains("Brasil", ignoreCase = true)) t else "$t, Brasil"
     }
+
+    /**
+     * A consulta sem o nome do lugar na frente ("Cobertura do Mac Usp, 1301, Moema, São Paulo, Brasil" fica
+     * "1301, Moema, São Paulo, Brasil"), para quando o mapa não conhece o lugar. Null se começa pela rua.
+     */
+    fun semNomeDoLugar(consulta: String): String? {
+        val partes = consulta.split(",").map { it.trim() }
+        if (partes.size < 4 || RUA.containsMatchIn(partes[0]) || partes[0].any(Char::isDigit)) return null
+        return partes.drop(1).joinToString(", ")
+    }
+
+    private val RUA = Regex("""^(?:(?:rua|avenida|av|alameda|pra[çc]a|travessa|estrada|rodovia|largo|viaduto)\b|(?:r|av|al|p[çc]|tv|estr|rod)\.)""", RegexOption.IGNORE_CASE)
 }
 
 /**
@@ -52,6 +64,8 @@ object Enderecos {
     private const val MAXIMO_GUARDADOS = 2000
     /** Meio grau é uns 55 km: pega a cidade e a região metropolitana. */
     private const val RAIO_GRAUS = 0.5
+    /** Destino mais longe que isso da casa é o mapa que achou outro lugar com o mesmo nome (30/10/2026: 1167 km). */
+    private const val LONGE_KM = 100.0
     private val guardados = LinkedHashMap<String, Ponto?>()
     private var carregado = false
 
@@ -63,8 +77,11 @@ object Enderecos {
     fun destino(ctx: Context, destino: String, perto: Ponto? = null): Ponto? {
         val chave = Casa.consulta(destino)
         carregar(ctx)
-        guardados[chave]?.let { return it }
-        val p = buscar(ctx, chave, perto)?.first ?: return null
+        fun serve(p: Ponto) = perto == null || Casa.distanciaKm(p, perto) <= LONGE_KM
+        guardados[chave]?.takeIf(::serve)?.let { return it }
+        val p = buscar(ctx, chave, perto)?.first?.takeIf(::serve)
+            ?: Casa.semNomeDoLugar(chave)?.let { buscar(ctx, it, perto)?.first }?.takeIf(::serve)
+            ?: return null
         guardados[chave] = p
         while (guardados.size > MAXIMO_GUARDADOS) guardados.remove(guardados.keys.first())
         runCatching { File(ctx.filesDir, ARQUIVO).appendText("$chave\t${p.lat}\t${p.lon}\n") }

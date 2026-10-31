@@ -151,6 +151,10 @@ class LeitorService : AccessibilityService() {
     private var pedidoUber = 0L
     /** Chave do aviso que veio do print da Uber, para esconder só ele quando o cartão some. */
     private var chaveUber: String? = null
+    /** A oferta desse aviso, para conferir se o valor dela ainda está no print quando a leitura não serve. */
+    private var ofertaUber: Oferta? = null
+    /** Prints seguidos com o cartão na tela e sem leitura que sirva, antes de o aviso aparecer. */
+    private var semLeituraUber = 0
     /** Prints seguidos sem o cartão enquanto o aviso está na tela: um só pode ser o cartão ainda subindo. */
     private var semCartaoUber = 0
     private var diagUber = false
@@ -158,6 +162,15 @@ class LeitorService : AccessibilityService() {
     @Volatile private var printsComCartaoUber = 0
     private var ultimaGravacaoUber = 0L
     private val leiturasUber = ConcurrentLinkedDeque<String>()
+    /** A primeira leitura de cada cartão: as 10 últimas leituras somem quando chega outra oferta logo depois. */
+    private val primeirasLeiturasUber = ConcurrentLinkedDeque<String>()
+    private var ultimaPrimeiraUber = 0L
+    /**
+     * Corrida da Uber em andamento com mais de [MINUTOS_PARA_ENCADEADA] até o fim: até esta hora os prints ficam
+     * a cada [INTERVALO_EM_CORRIDA]. A barra da Uber ("12 min · 2,4 km · A caminho da última parada") chega sem print.
+     */
+    @Volatile private var corridaLongeDoFimAte = 0L
+    @Volatile private var minutosAteOFim: Int? = null
     private val lerCartaoUber = Runnable { if (Build.VERSION.SDK_INT >= 30) runCatching { tirarPrintUber() } }
     /** Cada texto com R$ que a Uber e a 99 mostram, com o texto de antes e o de depois. */
     private val textosComValor = LinkedHashMap<String, String>()
@@ -314,6 +327,15 @@ class LeitorService : AccessibilityService() {
         return windows.any { w ->
             w.type != AccessibilityWindowInfo.TYPE_APPLICATION && w.root?.packageName?.toString() == UBER &&
                 r.also { w.getBoundsInScreen(it) }.height() >= altura / 5
+        }
+    }
+
+    /** A miniatura do print do Samsung (a barra do gravador de tela é baixinha e não conta). */
+    private fun capturaDoCelularNaTela(): Boolean {
+        val altura = resources.displayMetrics.heightPixels
+        val r = Rect()
+        return windows.any { w ->
+            w.root?.packageName?.toString() == CAPTURA_SAMSUNG && r.also { w.getBoundsInScreen(it) }.height() >= altura / 5
         }
     }
 
@@ -606,8 +628,14 @@ class LeitorService : AccessibilityService() {
             fundo.removeCallbacks(conferir)
             fundo.postDelayed(conferir, 400)
         } else if (BuildConfig.UBER_POR_PRINT) {
+            LeitorViagem.minutosAteOFim(textos)?.let { min ->
+                minutosAteOFim = min
+                corridaLongeDoFimAte = if (min > MINUTOS_PARA_ENCADEADA) System.currentTimeMillis() + 30_000 else 0
+            }
             val comTexto = textosDoEvento.isNotEmpty()
-            filaUber.post { agendarPrintUber(comTexto) }
+            // Janela nova da Uber ("Ver todas as solicitações"): pode ser oferta encadeada, o print sai na hora.
+            val janelaNova = tipo == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || textos.any { SOLICITACOES.containsMatchIn(it) }
+            filaUber.post { agendarPrintUber(comTexto, janelaNova) }
         }
         val cfg = Config.carregar(this)
         if (cfg.diagnostico) salvarDiagnostico("Uber", textos, oferta, tipo, classe)
@@ -617,19 +645,28 @@ class LeitorService : AccessibilityService() {
      * Só na fila da Uber. Com o aviso na tela, quem tira os prints é o próprio [lerCartaoUber]; mas evento com
      * texto ("Procurando viagens", "Página inicial") é a tela de baixo voltando: o cartão sumiu, confere já.
      */
-    private fun agendarPrintUber(comTexto: Boolean) {
+    private fun agendarPrintUber(comTexto: Boolean, janelaNova: Boolean) {
         if (Build.VERSION.SDK_INT < 30) return
-        val livre = ultimoPrintUber + intervaloUber - System.currentTimeMillis()
+        val agora = System.currentTimeMillis()
+        val livre = ultimoPrintUber + intervaloUber - agora
         if (chaveUber != null) {
             if (!comTexto) return
             filaUber.removeCallbacks(lerCartaoUber)
             filaUber.postDelayed(lerCartaoUber, livre.coerceAtLeast(0))
             return
         }
-        if (filaUber.hasCallbacks(lerCartaoUber)) return
-        pedidoUber = System.currentTimeMillis()
+        // Corrida longe do fim: o mapa da navegação manda evento o tempo todo e eram 3 prints por segundo (o celular
+        // esquentou em 30/10/2026). Um a cada 3 s, menos quando abre janela nova da Uber.
+        val devagar = agora < corridaLongeDoFimAte && !janelaNova
+        if (filaUber.hasCallbacks(lerCartaoUber)) {
+            // Fora da corrida fica como antes: o print marcado já sai em até 0,4 s.
+            if (!janelaNova || agora >= corridaLongeDoFimAte) return
+            filaUber.removeCallbacks(lerCartaoUber)
+        }
+        pedidoUber = agora
         // Um respiro: o cartão ainda está subindo quando chega o primeiro evento.
-        filaUber.postDelayed(lerCartaoUber, livre.coerceAtLeast(80))
+        val espera = if (devagar) ultimoPrintUber + INTERVALO_EM_CORRIDA - agora else livre
+        filaUber.postDelayed(lerCartaoUber, espera.coerceAtLeast(80))
     }
 
     @TargetApi(30)
@@ -641,6 +678,12 @@ class LeitorService : AccessibilityService() {
         val frente = appNaFrente()
         if (ofertaNa99 || (frente != null && frente !in APPS_DA_BOLINHA && !cartaoFlutuanteDaUber()))
             return tratarPrintUber(null, cartaoNaTela = false)
+        // Print do próprio celular: a miniatura e a barra cobrem o cartão, e o OCR lia o aviso de dentro da miniatura
+        // (30/10/2026: o aviso pulou entre 3%, 95% e 21%). Fica o aviso que está na tela até ela sair.
+        if (capturaDoCelularNaTela()) {
+            if (chaveUber != null) filaUber.postDelayed(lerCartaoUber, intervaloUber)
+            return
+        }
         ultimoPrintUber = System.currentTimeMillis()
         diagUber = Config.carregar(this).diagnostico
         takeScreenshot(Display.DEFAULT_DISPLAY, naFilaUber, object : TakeScreenshotCallback {
@@ -703,14 +746,35 @@ class LeitorService : AccessibilityService() {
                 val linhas = t.textBlocks.flatMap { it.lines }
                     .filter { abs(it.angle) <= 15 && !(it.text.length <= 3 && (it.boundingBox?.left ?: 0) > largura * 3 / 4) }
                     .sortedBy { it.boundingBox?.top ?: 0 }.map { it.text }
-                val oferta = LeitorOferta.lerUberDoPrint(linhas)
+                val cartao = LeitorOferta.cartaoDoPrint(linhas)
+                val lida = if (cartao == LeitorOferta.Cartao.NORMAL) LeitorOferta.lerUberDoPrint(linhas) else null
+                // Nenhuma oferta paga 3 vezes o taxímetro: é leitura errada que passou (30/10/2026: 624%).
+                val oferta = lida?.takeIf { Avaliador.avaliar(it, Config.carregar(this)).pct <= PCT_IMPOSSIVEL }
                 // Valor e tempo/distância no texto: o cartão ainda está lá, só não deu para ler desta vez.
                 val restoDoCartao = linhas.any { "R$" in it || "RS" in it } && linhas.any { PARECE_OFERTA.containsMatchIn(it) }
                 val agora = System.currentTimeMillis()
-                anotarUber("$hora fundo ${(fundoLiso * 100).toInt()}% · OCR ${agora - inicio} ms" +
+                val motivo = when {
+                    cartao == LeitorOferta.Cartao.EM_TRANSICAO -> "cartão esmaecido, leitura ignorada"
+                    cartao == LeitorOferta.Cartao.ENCERRADO -> "a oferta acabou"
+                    lida != null && oferta == null -> "% impossível, leitura ignorada"
+                    oferta == null -> "oferta NÃO reconhecida"
+                    else -> oferta.toString()
+                }
+                val linha = "$hora fundo ${(fundoLiso * 100).toInt()}% · OCR ${agora - inicio} ms" +
                     (if (oferta != null && chaveUber == null && pedido > 0) " · do evento ao aviso ${agora - pedido} ms" else "") + ": " +
-                    "${oferta ?: "oferta NÃO reconhecida"} | " + linhas.joinToString(" | ").replace('\n', ' ').take(400))
-                tratarPrintUber(oferta, cartaoNaTela = restoDoCartao)
+                    "$motivo | " + linhas.joinToString(" | ").replace('\n', ' ').take(400)
+                anotarUber(linha)
+                if (diagUber && chaveUber == null && (oferta != null || restoDoCartao) && agora - ultimaPrimeiraUber > 8_000) {
+                    ultimaPrimeiraUber = agora
+                    primeirasLeiturasUber.addLast(linha)
+                    while (primeirasLeiturasUber.size > 15) primeirasLeiturasUber.pollFirst()
+                }
+                when {
+                    oferta != null -> tratarPrintUber(oferta, cartaoNaTela = true)
+                    cartao == LeitorOferta.Cartao.ENCERRADO -> tratarPrintUber(null, cartaoNaTela = false)
+                    cartao == LeitorOferta.Cartao.EM_TRANSICAO || restoDoCartao -> segurarPrintUber(LeitorOferta.valoresDoPrint(linhas))
+                    else -> tratarPrintUber(null, cartaoNaTela = false)
+                }
             }
             .addOnFailureListener(naFilaUber) { erro ->
                 cartao.recycle()
@@ -727,18 +791,42 @@ class LeitorService : AccessibilityService() {
     private fun tratarPrintUber(oferta: Oferta?, cartaoNaTela: Boolean) {
         if (oferta != null) {
             semCartaoUber = 0
+            semLeituraUber = 0
             chaveUber = oferta.chave
+            ofertaUber = oferta
             mostrar(oferta)
         } else {
+            if (!cartaoNaTela) semLeituraUber = 0
             val chave = chaveUber ?: return
             if (cartaoNaTela && ++semCartaoUber < 2 && telaLigada()) {
                 filaUber.postDelayed(lerCartaoUber, intervaloUber)
                 return
             }
             chaveUber = null
+            ofertaUber = null
             handler.post { if (chaveAtual == chave) esconder.run() }
             return
         }
+        filaUber.removeCallbacks(lerCartaoUber)
+        filaUber.postDelayed(lerCartaoUber, intervaloUber)
+    }
+
+    /**
+     * Só na fila da Uber. O cartão está na tela mas a leitura não serve (soma que não fecha, cartão esmaecido depois
+     * do "Tenho interesse"): fica o aviso que já está na tela enquanto o valor dele aparecer no print. Sem aviso
+     * ainda, tenta mais alguns prints, porque o seguinte pode sair bom.
+     */
+    private fun segurarPrintUber(valores: List<Double>) {
+        val atual = ofertaUber
+        if (chaveUber == null || atual == null) {
+            if (++semLeituraUber < 6 && telaLigada()) {
+                filaUber.removeCallbacks(lerCartaoUber)
+                filaUber.postDelayed(lerCartaoUber, intervaloUber)
+            }
+            return
+        }
+        if (valores.none { abs(it - atual.valor) < 0.01 }) return tratarPrintUber(null, cartaoNaTela = true)
+        semCartaoUber = 0
         filaUber.removeCallbacks(lerCartaoUber)
         filaUber.postDelayed(lerCartaoUber, intervaloUber)
     }
@@ -903,7 +991,15 @@ class LeitorService : AccessibilityService() {
             if (BuildConfig.UBER_POR_PRINT) {
                 appendLine("--- oferta da Uber pelo print (versão da Play) ---")
                 appendLine("Prints: $printsDaUber · com cara de cartão (foram ao OCR): $printsComCartaoUber")
+                val faltam = minutosAteOFim?.let { if (it == Int.MAX_VALUE) "uma parada e o destino" else "$it min" }
+                appendLine("Corrida da Uber: " + when {
+                    System.currentTimeMillis() < corridaLongeDoFimAte -> "faltam $faltam, um print a cada 3 s"
+                    faltam != null -> "a última barra vista dizia $faltam até o fim: prints normais"
+                    else -> "barra da corrida não vista"
+                })
                 leiturasUber.forEach { appendLine(it) }
+                appendLine("--- primeira leitura de cada cartão da Uber ---")
+                primeirasLeiturasUber.forEach { appendLine(it) }
             }
         }
         File(filesDir, ARQUIVO_STATUS).writeText(texto)
@@ -927,6 +1023,7 @@ class LeitorService : AccessibilityService() {
             ultimaEstrutura99 = 0
             prints99.clear()
             leiturasUber.clear()
+            primeirasLeiturasUber.clear()
             printsDaUber = 0
             printsComCartaoUber = 0
             ofertaNa99 = false
@@ -973,6 +1070,13 @@ class LeitorService : AccessibilityService() {
         private const val INTERVALO_LONGO = 1_100L
         /** O Android 11+ aceita um print a cada 333 ms (a conferir no diagnóstico: se recusar, volta ao longo). */
         private const val INTERVALO_CURTO = 400L
+        /** Na corrida da Uber, longe do fim: a oferta encadeada costuma chegar nos últimos minutos. */
+        private const val INTERVALO_EM_CORRIDA = 3_000L
+        private const val MINUTOS_PARA_ENCADEADA = 5
+        /** Acima disso a oferta pagaria mais de 3 vezes o taxímetro: é leitura errada. */
+        private const val PCT_IMPOSSIVEL = 300
+        private const val CAPTURA_SAMSUNG = "com.samsung.android.app.smartcapture"
+        private val SOLICITACOES = Regex("""solicita[çc][õo]es""", RegexOption.IGNORE_CASE)
         /** Parte do meio do print com o fundo liso do cartão da Uber, a partir da qual vale ler com o OCR. */
         private const val FUNDO_DO_CARTAO = 0.55
         private const val ID_OFERTA_99 = "$NOVENTA_E_NOVE:id/broad_order_container"

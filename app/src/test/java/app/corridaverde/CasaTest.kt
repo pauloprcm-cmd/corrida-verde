@@ -1,6 +1,7 @@
 package app.corridaverde
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,5 +25,13 @@ class CasaTest {
     @Test
     fun consultaDoDestino() {
         assertEquals("Ambience Vila Mariana, Vila Mariana, São Paulo, Brasil", Casa.consulta("Ambience Vila Mariana,  Vila Mariana,\nSão Paulo"))
+    }
+
+    @Test
+    fun consultaSemONomeDoLugar() {
+        // 30/10/2026: o mapa não conhecia a "Cobertura do Mac Usp" e achou outra a 1167 km.
+        assertEquals("1301, Moema, São Paulo, Brasil", Casa.semNomeDoLugar("Cobertura do Mac Usp, 1301, Moema, São Paulo, Brasil"))
+        assertNull(Casa.semNomeDoLugar("R. Bela Cintra, 1958, Consolação, São, Brasil"))
+        assertNull(Casa.semNomeDoLugar("Rua Aimbere, 279, Pompéia, São, Brasil"))
     }
 }

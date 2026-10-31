@@ -11,7 +11,8 @@ com quanto ela paga em relação ao taxímetro da Prefeitura de SP:
 O taxímetro usa a tabela vigente desde 11/08/2025 (comum: R$ 6,55 + R$ 4,80/km + R$ 55,50/hora parada;
 luxo: R$ 9,83 + R$ 7,20/km + R$ 83,25/hora parada), com bandeira 2 (+30% no km) das 20h às 6h de segunda a
 sábado e o dia todo em domingos e feriados. O trânsito entra pelo tempo que a Uber prevê: o que passar de
-km ÷ 25 km/h é cobrado como hora parada, como faz o taxímetro abaixo de 15 km/h.
+km ÷ 18,5 km/h é cobrado como hora parada, como faz o taxímetro abaixo de 15 km/h (calibrado com corridas reais
+de 30/10/2026). No uberTAXI a Uber fica com 15% do valor; no Táxi Promo o valor da oferta já é o que o motorista recebe.
 Todos os limites podem ser ajustados no app.
 
 O app **só lê** a tela: não toca, não aceita e não recusa corridas.

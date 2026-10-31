@@ -11,7 +11,7 @@ data class Resultado(
     val oferta: Oferta,
     val taximetro: Double,
     val minParado: Int,
-    /** % do taxímetro que a oferta paga; no uberTAXI, o taxímetro limitado ao máximo da faixa. */
+    /** % do taxímetro que a oferta paga; no uberTAXI, o taxímetro limitado ao máximo da faixa, menos a taxa da Uber. */
     val pct: Int,
     val cor: Cor,
     val rsKm: Double,
@@ -34,10 +34,14 @@ object Tarifa {
 
     /**
      * Velocidade média com o carro andando. O tempo que a Uber prevê além de km / essa velocidade é trânsito,
-     * que o taxímetro cobra pela hora parada (parado ou abaixo de 15 km/h). Calibrada nos prints de 25/09/2026:
-     * 6,7 km em 20 min deu R$ 40,85 no taxímetro; 7,24 km em 32 min deu R$ 57,65.
+     * que o taxímetro cobra pela hora parada (parado ou abaixo de 15 km/h). Era 25 (2 corridas de 25/09/2026);
+     * as 4 corridas de 30/10/2026 deram o taxímetro 10% a 22% acima do real com 25, e de -1% a +9% com 18,5.
+     * Provisório: recalibrar com mais corridas (km do hodômetro parcial e hora de início e fim).
      */
-    const val KMH_ANDANDO = 25.0
+    const val KMH_ANDANDO = 18.5
+
+    /** Taxa de serviço da Uber no uberTAXI (detalhe da corrida de 30/10/2026: preço R$ 32,08, taxa R$ 4,81). */
+    const val TAXA_UBER_TAXI = 0.15
 
     /** Bandeira 2: das 20h às 6h de segunda a sábado, e o dia todo em domingos e feriados. */
     fun bandeira2(agora: LocalDateTime): Boolean {
@@ -61,9 +65,10 @@ object Avaliador {
     fun avaliar(o: Oferta, cfg: Config, agora: LocalDateTime = LocalDateTime.now()): Resultado {
         val b2 = Tarifa.bandeira2(agora)
         val taximetro = Tarifa.taximetro(o.viagemKm, o.viagemMin, cfg.luxo, b2)
-        // uberTAXI (faixa "R$ 31 - R$ 46"): a Uber paga o taxímetro, mas nunca mais que o máximo.
-        // Se o taxímetro estimado passa do máximo, a diferença o motorista perde.
-        val recebe = o.valorMax?.let { minOf(it, taximetro) } ?: o.valor
+        // uberTAXI (faixa "R$ 31 - R$ 46"): o passageiro paga o taxímetro, mas nunca mais que o máximo, e a Uber
+        // fica com 15%. Se o taxímetro estimado passa do máximo, a diferença o motorista perde. No Táxi Promo o valor
+        // da oferta já é o que cai para o motorista.
+        val recebe = o.valorMax?.let { minOf(it, taximetro) * (1 - Tarifa.TAXA_UBER_TAXI) } ?: o.valor
         val pct = (recebe / taximetro * 100).roundToInt()
         val kmTotal = o.buscaKm + o.viagemKm
         val minTotal = o.buscaMin + o.viagemMin

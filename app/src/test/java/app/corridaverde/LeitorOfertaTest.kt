@@ -34,10 +34,10 @@ class LeitorOfertaTest {
     fun avaliaOfertaDoPrint() {
         val quintaDeManha = LocalDateTime.of(2026, 9, 24, 8, 46)
         val r = Avaliador.avaliar(LeitorOferta.ler(print)!!, limitesConferidos, quintaDeManha)
-        // 4,9 km em 35 min: ~23 min de trânsito cobrados pela hora parada.
-        assertEquals(51.57, r.taximetro, 0.005)
-        assertEquals(23, r.minParado)
-        assertEquals(120, r.pct)
+        // 4,9 km em 35 min: ~19 min de trânsito cobrados pela hora parada.
+        assertEquals(47.745, r.taximetro, 0.005)
+        assertEquals(19, r.minParado)
+        assertEquals(130, r.pct)
         assertEquals(Cor.VERDE, r.cor)
         assertEquals(9.86, r.rsKm, 0.005)
         assertEquals(86.65, r.rsHora!!, 0.005)
@@ -70,14 +70,14 @@ class LeitorOfertaTest {
         assertEquals(6.1, o.viagemKm, 0.001)
         assertEquals("Rua B, Vila Mariana, São Paulo", o.destino)
         val r = Avaliador.avaliar(o, limitesConferidos, LocalDateTime.of(2026, 10, 1, 17, 28))
-        // uberTAXI paga o taxímetro (~R$ 50,04) até o máximo (R$ 46): recebe 92% dele.
-        assertEquals(92, r.pct)
+        // uberTAXI: o passageiro paga o taxímetro (~R$ 45,28, abaixo do máximo de R$ 46) e a Uber fica com 15%.
+        assertEquals(85, r.pct)
         assertEquals(Cor.AMARELO, r.cor)
-        assertEquals(46.0 / 6.2, r.rsKm, 0.01)
-        // Máximo acima do taxímetro: recebe o taxímetro inteiro, 100%.
-        val folgado = Avaliador.avaliar(o.copy(valorMax = 70.0), limitesConferidos, LocalDateTime.of(2026, 10, 1, 17, 28))
-        assertEquals(100, folgado.pct)
-        assertEquals(Cor.VERDE, folgado.cor)
+        assertEquals(45.28 * 0.85 / 6.2, r.rsKm, 0.01)
+        // Máximo abaixo do taxímetro: a diferença o motorista perde, além dos 15%.
+        val apertado = Avaliador.avaliar(o.copy(valorMax = 40.0), limitesConferidos, LocalDateTime.of(2026, 10, 1, 17, 28))
+        assertEquals(75, apertado.pct)
+        assertEquals(Cor.VERMELHO, apertado.cor)
     }
 
     @Test
@@ -160,16 +160,27 @@ class LeitorOfertaTest {
     }
 
     @Test
-    fun corridasReaisDe25DeSetembro() {
+    fun corridasReaisDe30DeOutubro() {
+        // O taxímetro estimado pela previsão da Uber contra o que o taxímetro marcou no fim (sexta, bandeira 1).
+        fun taximetro(km: Double, min: Int, hora: Int) =
+            Avaliador.avaliar(Oferta(30.0, 0.5, 3, km, min, null), Config(), LocalDateTime.of(2026, 10, 30, hora, 0)).taximetro
+        assertEquals(83.55, taximetro(11.8, 67, 16), 83.55 * 0.10) // corrida 1: a Uber previu 17 min a mais
+        assertEquals(30.35, taximetro(5.0, 19, 17), 30.35 * 0.10)  // corrida 2: a Uber previu ~1,5 km a mais
+        assertEquals(35.95, taximetro(5.8, 20, 17), 35.95 * 0.02)  // corrida 3
+        assertEquals(33.85, taximetro(4.4, 21, 18), 33.85 * 0.02)  // corrida 4
+        // As de 25/09/2026, que deram os 25 km/h de antes, ficam abaixo do real.
         val sextaDeManha = LocalDateTime.of(2026, 9, 25, 8, 37)
-        // Táxi Promo R$ 32,24, 20 minutos (6.7 km): o taxímetro deu R$ 40,85.
-        val semTransito = Avaliador.avaliar(Oferta(32.24, 0.4, 3, 6.7, 20, null), limitesConferidos, sextaDeManha)
-        assertEquals(40.85, semTransito.taximetro, 40.85 * 0.05)
-        assertEquals(Cor.VERMELHO, semTransito.cor)
-        // R$ 36,71, 7,24 km que levaram 32 min: o taxímetro deu R$ 57,65.
-        val comTransito = Avaliador.avaliar(Oferta(36.71, 1.0, 4, 7.24, 32, null), limitesConferidos, sextaDeManha)
-        assertEquals(57.65, comTransito.taximetro, 57.65 * 0.05)
-        assertEquals(Cor.VERMELHO, comTransito.cor)
+        assertEquals(40.85, Avaliador.avaliar(Oferta(32.24, 0.4, 3, 6.7, 20, null), limitesConferidos, sextaDeManha).taximetro, 40.85 * 0.06)
+        assertEquals(57.65, Avaliador.avaliar(Oferta(36.71, 1.0, 4, 7.24, 32, null), limitesConferidos, sextaDeManha).taximetro, 57.65 * 0.15)
+    }
+
+    @Test
+    fun uberTaxiDaCorrida4DescontaATaxaDaUber() {
+        // R$ 24 a R$ 34, 4,4 km em 21 min: o taxímetro deu R$ 33,85 e caíram R$ 27,27 (81%, verde).
+        val o = Oferta(24.0, 0.3, 2, 4.4, 21, 4.84, valorMax = 34.0)
+        val r = Avaliador.avaliar(o, Config(), LocalDateTime.of(2026, 10, 30, 18, 25))
+        assertEquals(85, r.pct)
+        assertEquals(Cor.VERDE, r.cor)
     }
 
     @Test
