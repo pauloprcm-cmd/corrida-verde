@@ -87,6 +87,8 @@ class CidadeActivity : Activity() {
      * Tocou numa cidade da lista: já fica gravada, com a tabela da prefeitura. Antes só gravava no "Está certo,
      * salvar", no fim da tela da tabela, e quem voltava sem descer até ele recebia a pergunta a cada abertura.
      * A mesma cidade de novo não apaga a tabela que o taxista corrigiu.
+     * Depois de escolher, fecha direto, sem passar pela tela da tabela (pedido do Paulo em 07/11/2026): a tabela
+     * da prefeitura já vale, e quem precisar corrigir vai em Ajustes > "Ver ou corrigir a tabela".
      */
     private fun escolher(c: Cidade) {
         val cfg = Config.carregar(this)
@@ -95,7 +97,8 @@ class CidadeActivity : Activity() {
             Config.acompanharCidade(this, antiga = cfg.nomeCidade.ifBlank { "São Paulo" }, nova = c.nome)
             setResult(RESULT_OK)
         }
-        mostrarTabela(c, c.chave, c.tabela)
+        Toast.makeText(this, "Pronto: taxímetro de ${c.nome}", Toast.LENGTH_SHORT).show()
+        finish()
     }
 
     /** O que foi digitado na busca vira o nome da cidade nova ("osasco" fica "Osasco"). */
