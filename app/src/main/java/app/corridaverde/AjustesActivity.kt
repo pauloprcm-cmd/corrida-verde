@@ -131,6 +131,8 @@ class AjustesActivity : Activity() {
         super.onResume()
         campo(R.id.textoDiagnostico, TextView::class.java).text = diagnostico()
         mostrarCasa()
+        // Voltou da tela da cidade: mostra a cidade e a categoria novas.
+        mostrarCidade(Config.carregar(this))
     }
 
     /** Ao sair da tela, guarda o que foi mudado, para ninguém perder um ajuste por esquecer o Salvar. */
@@ -244,12 +246,6 @@ class AjustesActivity : Activity() {
         val f = File(filesDir, LeitorService.ARQUIVO_DIAGNOSTICO)
         val leitura = if (f.exists()) f.readText() else "Nenhuma leitura com R$ ainda. Ligue o modo diagnóstico e abra uma oferta na Uber."
         return status + "\n" + leitura
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // Voltou da tela da cidade: mostra a cidade e a categoria novas.
-        mostrarCidade(Config.carregar(this))
     }
 
     /** "Taxímetro de Campinas (fev/2025): bandeirada R$ 5,49 · km R$ 3,94"; a segunda categoria só onde a cidade tem. */
