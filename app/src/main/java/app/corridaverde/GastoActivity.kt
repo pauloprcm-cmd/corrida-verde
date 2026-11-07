@@ -174,14 +174,16 @@ class GastoActivity : Activity() {
         caixa.addView(nomeNovo)
         val pessoal = CheckBox(this).apply { text = "É gasto pessoal (casa, família): fica fora do Sobrou do trabalho" }
         caixa.addView(pessoal)
-        // Escreveu o nome de um tipo que já existe: marca como ele é.
+        // Escreveu o nome de um tipo que já existe: marca como ele é. Nome novo de casa (mercado, dentista): já vem pessoal.
+        fun marcarPessoal(nome: String) {
+            pessoal.isChecked = TiposGasto.achar(proprios, nome)?.pessoal ?: TiposGasto.parecePessoal(nome)
+        }
         nomeNovo.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            override fun afterTextChanged(s: android.text.Editable?) {
-                TiposGasto.achar(proprios, s?.toString() ?: "")?.let { pessoal.isChecked = it.pessoal }
-            }
+            override fun afterTextChanged(s: android.text.Editable?) = marcarPessoal(s?.toString() ?: "")
         })
+        marcarPessoal(nomeNovo.text.toString())
         val rotuloValor = rotulo("Valor (R$)")
         val valor = campo(l.valor?.let { Popup.br(it) } ?: "", decimal)
 

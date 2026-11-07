@@ -38,6 +38,14 @@ class TiposGastoTest {
     }
 
     @Test
+    fun nomeDeCasaJaVemPessoal() {
+        listOf("Mercado", "Supermercado", "Dentista", "Escola dos filhos", "Farmácia", "Conta de luz").forEach {
+            assertTrue(it, TiposGasto.parecePessoal(it))
+        }
+        listOf("Lanche", "Lava rápido", "Pedágio", "Estacionamento", "Lu").forEach { assertFalse(it, TiposGasto.parecePessoal(it)) }
+    }
+
+    @Test
     fun reconheceNaFala() {
         val tipos = listOf(TipoProprio("Café"), TipoProprio("Café da manhã"), TipoProprio("Dentista"))
         assertEquals("Dentista", TiposGasto.naFala(tipos, "gastei 45 reais no dentista")?.nome)

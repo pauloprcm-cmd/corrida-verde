@@ -216,7 +216,7 @@ object TiposGasto {
         val vistos = doArquivo.map { chave(it.nome) }.toMutableSet()
         val soNosGastos = gastos.filter { it.tipo == Tipo.OUTRO && it.descricao.isNotBlank() }
             .filter { vistos.add(chave(it.descricao)) }
-            .map { TipoProprio(limpo(it.descricao)) }
+            .map { TipoProprio(limpo(it.descricao), pessoal = parecePessoal(it.descricao)) }
         return doArquivo + soNosGastos
     }
 
@@ -230,6 +230,24 @@ object TiposGasto {
 
     /** As chaves dos tipos pessoais, para o [Dinheiro.balanco] separar do trabalho. */
     fun pessoais(ctx: Context): Set<String> = todos(ctx).filter { it.pessoal }.map { chave(it.nome) }.toSet()
+
+    private val PALAVRAS_PESSOAIS = listOf(
+        "mercado", "supermercado", "hortifruti", "sacolao", "feira", "acougue", "dentista", "medico", "medica",
+        "consulta", "exame", "hospital", "farmacia", "remedio", "plano de saude", "convenio", "escola", "faculdade",
+        "curso", "material escolar", "creche", "aluguel", "condominio", "luz", "energia", "agua", "gas de cozinha",
+        "botijao", "internet", "tv", "netflix", "academia", "cabeleireiro", "barbeiro", "roupa", "presente", "pet",
+        "veterinario", "racao", "casa", "familia", "filho", "filhos", "filha", "esposa", "marido", "mae", "pai",
+        "cartao de credito", "fatura", "emprestimo", "igreja", "dizimo", "lazer", "cinema",
+    ).map { " $it " }
+
+    /**
+     * Nome de gasto que é de casa ("Mercado", "Dentista", "Escola dos filhos"): já vem marcado como pessoal.
+     * Antes a caixinha vinha sempre desmarcada e o Paulo viu o mercado e o dentista no Sobrou do trabalho (07/11/2026).
+     */
+    fun parecePessoal(nome: String): Boolean {
+        val t = " " + chave(nome).replace(Regex("""[^a-z0-9 ]"""), " ").replace(Regex("""\s+"""), " ").trim() + " "
+        return PALAVRAS_PESSOAIS.any { it in t }
+    }
 
     fun ehPessoal(g: Gasto, pessoais: Set<String>) = g.tipo == Tipo.OUTRO && g.descricao.isNotBlank() && chave(g.descricao) in pessoais
 
@@ -277,11 +295,16 @@ object TiposGasto {
         if (!f.exists()) return emptyList()
         return f.readLines().mapNotNull { l ->
             val c = l.split('\t')
-            c.getOrNull(0)?.takeIf { it.isNotBlank() }?.let { TipoProprio(it, c.getOrNull(1) == "1", c.getOrNull(2) == "1") }
+            c.getOrNull(0)?.takeIf { it.isNotBlank() }?.let { nome ->
+                // Sem a 4ª coluna: gravado até a 1.89, quando a caixinha "pessoal" vinha sempre desmarcada. Os nomes de
+                // casa passam a pessoal uma vez; daí em diante vale o que o motorista escolher.
+                val antigo = c.size < 4
+                TipoProprio(nome, c.getOrNull(1) == "1" || (antigo && parecePessoal(nome)), c.getOrNull(2) == "1")
+            }
         }
     }
 
     private fun salvar(ctx: Context, tipos: List<TipoProprio>) {
-        File(ctx.filesDir, ARQUIVO).writeText(tipos.joinToString("") { "${limpo(it.nome)}\t${if (it.pessoal) 1 else 0}\t${if (it.escondido) 1 else 0}\n" })
+        File(ctx.filesDir, ARQUIVO).writeText(tipos.joinToString("") { "${limpo(it.nome)}\t${if (it.pessoal) 1 else 0}\t${if (it.escondido) 1 else 0}\t1\n" })
     }
 }
