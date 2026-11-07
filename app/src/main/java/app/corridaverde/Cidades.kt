@@ -71,6 +71,12 @@ object Cidades {
         // Emdec, decretos 23.766 e 23.770/2025.
         Cidade("Campinas", "SP", TabelaTaxi(v(5.49, 3.94, 5.12, 48.68), v(7.14, 5.12, 6.66, 63.28), "Executivo", b2Sabado = 14),
             "fev/2025", feriados = setOf(7 to 9, 12 to 8)),
+        // Decreto 15.048 de 16/03/2026 (bandeira 2 das 20h às 6h, domingo e feriado). Pesquisado em 07/11/2026.
+        Cidade("Osasco", "SP", TabelaTaxi(v(6.55, 4.80, 6.72, 55.00)), "mar/2026",
+            feriados = setOf(2 to 19, 7 to 9)),
+        // Decreto 9.608 de 08/07/2022, o mais novo achado (bandeira 2 das 20h às 6h, domingo e feriado).
+        Cidade("Barueri", "SP", TabelaTaxi(v(5.40, 4.60, 4.70, 45.00)), "jul/2022", conferir = true,
+            feriados = setOf(3 to 26, 7 to 9)),
         Cidade("Santos", "SP", TabelaTaxi(v(6.50, 4.60, 5.52, 36.00)), "2025", conferir = true,
             feriados = setOf(1 to 26, 7 to 9, 9 to 8)),
         // Resolução SMTR 3.893 de 29/12/2025. Executivo: km na bandeira 2 estimado (+20%).
