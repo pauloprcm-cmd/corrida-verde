@@ -125,14 +125,14 @@ class PainelOferta(
         caixa.addView(topo)
 
         val colunas = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        colunas.addView(coluna(UltimaOferta.UBER, "Uber"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        colunas.addView(coluna(UltimaOferta.UBER, "UBER", Color.WHITE), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         // Divisória: linha neon fina com tracinhos no meio.
         colunas.addView(FrameLayout(ctx).apply {
             addView(View(ctx).apply { setBackgroundColor(Color.argb(110, 0x3D, 0xF5, 0xA8)) },
                 FrameLayout.LayoutParams(dp(1), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER_HORIZONTAL))
             addView(View(ctx).apply { background = Tracinhos() }, FrameLayout.LayoutParams(dp(3), dp(30), Gravity.CENTER))
         }, LinearLayout.LayoutParams(dp(5), ViewGroup.LayoutParams.MATCH_PARENT).apply { setMargins(dp(10), dp(6), dp(10), dp(6)) })
-        colunas.addView(coluna(UltimaOferta.NOVENTA_E_NOVE, "99"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        colunas.addView(coluna(UltimaOferta.NOVENTA_E_NOVE, "99", AMARELO_99), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         caixa.addView(colunas, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) })
 
         caixa.addView(texto("Esconder até a próxima oferta", 13f, CINZA).apply {
@@ -177,11 +177,15 @@ class PainelOferta(
             .withEndAction { if (view === v) mostrarAba() }.start()
     }
 
-    /** A oferta de um app: nome, quando chegou e o valor; embarque e destino, cada um com o seu botão. */
-    private fun coluna(app: String, nome: String): View {
+    /**
+     * A oferta de um app: nome, quando chegou e o valor; embarque e destino, cada um com o seu botão. O nome vai
+     * escrito em negrito com a cor do app ("UBER" branco, "99" amarelo), sem o logo: logo de outra empresa no app
+     * arrisca a revisão da Play (Paulo, 07/11/2026).
+     */
+    private fun coluna(app: String, nome: String, cor: Int): View {
         val c = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
         val cabeca = LinearLayout(ctx).apply { gravity = Gravity.CENTER_VERTICAL or Gravity.START }
-        cabeca.addView(texto(nome, 19f, Color.WHITE, negrito = true))
+        cabeca.addView(texto(nome, 20f, cor, negrito = true))
         cabeca.addView(texto("  Última oferta", 13f, CINZA))
         c.addView(cabeca)
         val o = UltimaOferta.carregar(ctx, app)
@@ -249,6 +253,7 @@ class PainelOferta(
 
     private companion object {
         val CINZA = Color.rgb(0x9A, 0xA0, 0xA6)
+        val AMARELO_99 = Color.rgb(0xFF, 0xD4, 0x00)
         val HORA: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         const val ABRIR_MS = 170L
         const val FECHAR_MS = 130L
