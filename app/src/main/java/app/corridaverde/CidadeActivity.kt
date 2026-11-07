@@ -10,12 +10,8 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
-import android.view.View
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.RadioButton
-import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.Toast
 
@@ -167,51 +163,20 @@ class CidadeActivity : Activity() {
         val especial = t.especial?.let { campos("Táxi ${t.nomeEspecial.lowercase()}", it) }
 
         tela.addView(v.secao("Bandeira 2"))
-        tela.addView(v.texto("Domingo e feriado: o dia todo.", 16f, cor = v.texto2))
-        val linhaNoite = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val de = campoHora("À noite, a partir das (h)", t.b2De, linhaNoite)
-        val ate = campoHora("Até as (h da manhã)", t.b2Ate, linhaNoite)
-        v.por(tela, linhaNoite, espaco = 4)
-        tela.addView(v.texto("Sábado", 15f, cor = v.texto2).apply { setPadding(v.dp(4), v.dp(16), 0, v.dp(2)) })
-        val sabado = RadioGroup(this)
-        fun opcao(texto: String) = RadioButton(this, null, 0, R.style.Opcao).apply { id = View.generateViewId(); text = texto }
-            .also { sabado.addView(it) }
-        val soNoite = opcao("Só à noite, como nos outros dias")
-        val diaTodo = opcao("O dia todo")
-        val aPartir = opcao("A partir de uma hora da tarde")
-        tela.addView(sabado)
-        val horaSabado = campo(null, if (t.b2Sabado > 0) t.b2Sabado.toString() else "14", InputType.TYPE_CLASS_NUMBER).apply {
-            hint = "Hora (ex.: 14)"
-        }
-        sabado.setOnCheckedChangeListener { _, id -> horaSabado.visibility = if (id == aPartir.id) View.VISIBLE else View.GONE }
-        sabado.check(when (t.b2Sabado) { TabelaTaxi.SABADO_NORMAL -> soNoite.id; 0 -> diaTodo.id; else -> aPartir.id })
-        val dezembro = CheckBox(this, null, 0, R.style.Caixa).apply {
-            text = "Dezembro inteiro em bandeira 2"
-            isChecked = t.b2Dezembro
-        }
-        v.por(tela, dezembro, espaco = 8)
+        tela.addView(v.texto(cidade?.let { regraBandeira2(it.tabela) } ?: "Cidade fora da lista: o aviso compara sempre com a bandeira 1.",
+            16f, cor = v.texto2))
 
         v.por(tela, v.botaoPrincipal("Está certo, salvar") {
             val vc = ler(comum) ?: return@botaoPrincipal avisar("Preencha os quatro valores do táxi comum")
             val ve = especial?.let { ler(it) ?: return@botaoPrincipal avisar("Preencha os quatro valores do táxi ${t.nomeEspecial.lowercase()}") }
             if (vc.km2 < vc.km1) return@botaoPrincipal avisar("O km da bandeira 2 não pode ser menor que o da bandeira 1")
-            val h1 = de.text.toString().toIntOrNull()?.takeIf { it in 12..23 }
-                ?: return@botaoPrincipal avisar("A bandeira 2 da noite começa entre 12 e 23 h")
-            val h2 = ate.text.toString().toIntOrNull()?.takeIf { it in 0..11 }
-                ?: return@botaoPrincipal avisar("A bandeira 2 da noite acaba entre 0 e 11 h")
-            val sab = when (sabado.checkedRadioButtonId) {
-                diaTodo.id -> 0
-                aPartir.id -> horaSabado.text.toString().toIntOrNull()?.takeIf { it in 1..23 }
-                    ?: return@botaoPrincipal avisar("Diga a hora em que a bandeira 2 começa no sábado")
-                else -> TabelaTaxi.SABADO_NORMAL
-            }
             val novaChave = if (cidade != null) chave else {
                 val n = nome!!.text.toString().trim()
                 if (n.length < 2) return@botaoPrincipal avisar("Digite o nome da cidade")
                 val u = uf!!.text.toString().trim().uppercase()
                 if (u.isEmpty()) n else "$n/$u"
             }
-            val nova = t.copy(comum = vc, especial = ve, b2De = h1, b2Ate = h2, b2Sabado = sab, b2Dezembro = dezembro.isChecked)
+            val nova = t.copy(comum = vc, especial = ve)
             val cfg = Config.carregar(this)
             cfg.copy(cidade = novaChave, tabela = nova, luxo = cfg.luxo && ve != null).salvar(this)
             Config.acompanharCidade(this, antiga = cfg.nomeCidade.ifBlank { "São Paulo" }, nova = novaChave.substringBefore('/'))
@@ -255,14 +220,17 @@ class CidadeActivity : Activity() {
         }.also { dentro.addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)) }
     }
 
-    /** Meia linha com o rótulo e o campo da hora, para "das 20 às 6" ficarem lado a lado. */
-    private fun campoHora(rotulo: String, hora: Int, linha: LinearLayout): EditText {
-        val coluna = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        linha.addView(coluna, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-            if (linha.childCount > 0) marginStart = v.dp(12)
-        })
-        return campo(rotulo, hora.toString(), InputType.TYPE_CLASS_NUMBER, coluna)
-    }
+    /** A regra da prefeitura em uma frase ("Das 20 h às 6 h, sábado a partir das 14 h, domingo e feriado o dia todo"). */
+    private fun regraBandeira2(t: TabelaTaxi) = buildList {
+        add("Das ${t.b2De} h às ${t.b2Ate} h")
+        when (t.b2Sabado) {
+            TabelaTaxi.SABADO_NORMAL -> {}
+            0 -> add("sábado o dia todo")
+            else -> add("sábado a partir das ${t.b2Sabado} h")
+        }
+        add("domingo e feriado o dia todo")
+        if (t.b2Dezembro) add("dezembro inteiro")
+    }.joinToString(", ") + ". É a regra da prefeitura."
 
     private fun avisar(texto: String) = Toast.makeText(this, texto, Toast.LENGTH_LONG).show()
 

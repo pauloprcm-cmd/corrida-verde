@@ -36,10 +36,14 @@ object Tarifa {
     const val TAXA_UBER_TAXI = 0.15
 
     /**
-     * Bandeira 2 pela regra da cidade: à noite ([TabelaTaxi.b2De] às [TabelaTaxi.b2Ate]), no sábado a partir da hora
-     * da cidade, o dia todo em domingos e feriados e, onde a prefeitura libera, em dezembro e na terça de Carnaval.
+     * Bandeira 2 pela regra da prefeitura, que vem da base ([Cidades]) e o taxista não muda (pedido do Paulo em
+     * 07/11/2026: os horários na tela confundiam): à noite ([TabelaTaxi.b2De] às [TabelaTaxi.b2Ate]), no sábado a
+     * partir da hora da cidade, o dia todo em domingos e feriados e, onde a prefeitura libera, em dezembro e na terça
+     * de Carnaval. Cidade fora da base (null, digitada pelo taxista): sempre bandeira 1.
      */
-    fun bandeira2(agora: LocalDateTime, t: TabelaTaxi = Cidades.SAO_PAULO.tabela, cidade: Cidade? = Cidades.SAO_PAULO): Boolean {
+    fun bandeira2(agora: LocalDateTime, cidade: Cidade? = Cidades.SAO_PAULO): Boolean {
+        cidade ?: return false
+        val t = cidade.tabela
         val dia = agora.toLocalDate()
         if (dia.dayOfWeek == DayOfWeek.SUNDAY || Feriados.eh(dia, cidade)) return true
         if (t.b2Dezembro && dia.monthValue == 12) return true
@@ -59,7 +63,7 @@ object Tarifa {
 
 object Avaliador {
     fun avaliar(o: Oferta, cfg: Config, agora: LocalDateTime = LocalDateTime.now()): Resultado {
-        val b2 = Tarifa.bandeira2(agora, cfg.tabela, cfg.cidadeDaBase)
+        val b2 = Tarifa.bandeira2(agora, cfg.cidadeDaBase)
         val taximetro = Tarifa.taximetro(o.viagemKm, o.viagemMin, cfg.tabela, cfg.luxo, b2)
         // uberTAXI (faixa "R$ 31 - R$ 46"): o passageiro paga o taxímetro, mas nunca mais que o máximo, e a Uber
         // fica com 15%. Se o taxímetro estimado passa do máximo, a diferença o motorista perde. No Táxi Promo o valor

@@ -48,17 +48,20 @@ class CidadesTest {
     fun bandeira2DeCadaCidade() {
         val sabadoTarde = LocalDateTime.of(2026, 11, 7, 15, 0)
         val bh = cidade("Belo Horizonte")
-        assertTrue(Tarifa.bandeira2(sabadoTarde, bh.tabela, bh))                              // BH: sábado a partir das 14h
-        assertFalse(Tarifa.bandeira2(sabadoTarde, Cidades.SAO_PAULO.tabela, Cidades.SAO_PAULO)) // SP: sábado de dia é bandeira 1
-        assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 5, 21, 0), bh.tabela, bh))      // BH: quinta 21h ainda bandeira 1
-        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 5, 21, 0), Cidades.SAO_PAULO.tabela, Cidades.SAO_PAULO))
-        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 12, 2, 10, 0), bh.tabela, bh))       // dezembro inteiro
+        assertTrue(Tarifa.bandeira2(sabadoTarde, bh)) // BH: sábado a partir das 14h
+        assertFalse(Tarifa.bandeira2(sabadoTarde, Cidades.SAO_PAULO)) // SP: sábado de dia é bandeira 1
+        assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 5, 21, 0), bh))      // BH: quinta 21h ainda bandeira 1
+        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 5, 21, 0), Cidades.SAO_PAULO))
+        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 12, 2, 10, 0), bh))       // dezembro inteiro
         val rio = cidade("Rio de Janeiro")
-        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 1, 20, 10, 0), rio.tabela, rio))     // São Sebastião
-        assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 1, 26, 10, 0), rio.tabela, rio))
-        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 2, 17, 10, 0), rio.tabela, rio))     // terça de Carnaval
+        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 1, 20, 10, 0), rio))     // São Sebastião
+        assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 1, 26, 10, 0), rio))
+        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 2, 17, 10, 0), rio))     // terça de Carnaval
         val df = cidade("Brasília")
-        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 7, 9, 0), df.tabela, df))       // DF: sábado o dia todo
+        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 7, 9, 0), df))       // DF: sábado o dia todo
+        // Cidade digitada pelo taxista (fora da base): sempre bandeira 1, nem à noite nem no domingo.
+        assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 5, 23, 0), null))
+        assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 8, 12, 0), null))
     }
 
     @Test
