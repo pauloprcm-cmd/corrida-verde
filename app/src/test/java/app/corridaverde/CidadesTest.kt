@@ -29,7 +29,8 @@ class CidadesTest {
         assertEquals(listOf("São Luís", "São Paulo"), Cidades.procurar("sao").map { it.nome })
         assertEquals("Niterói", Cidades.procurar("niteroi").single().nome)
         assertEquals("Belo Horizonte", Cidades.pelaLocalidade("belo horizonte")?.nome)
-        assertNull(Cidades.pelaLocalidade("Osasco"))
+        assertEquals("Osasco", Cidades.pelaLocalidade("osasco")?.nome)
+        assertNull(Cidades.pelaLocalidade("Diadema"))
     }
 
     @Test
