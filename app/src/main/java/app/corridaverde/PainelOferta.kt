@@ -185,7 +185,15 @@ class PainelOferta(
     private fun coluna(app: String, nome: String, cor: Int): View {
         val c = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
         val cabeca = LinearLayout(ctx).apply { gravity = Gravity.CENTER_VERTICAL or Gravity.START }
-        cabeca.addView(texto(nome, 20f, cor, negrito = true))
+        cabeca.addView(texto(nome, 20f, cor, negrito = true).apply {
+            // O "99" mais encorpado (Paulo, 07/11/2026): a letra mais grossa do Roboto, com um contorno da mesma cor.
+            if (app == UltimaOferta.NOVENTA_E_NOVE) {
+                typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                textSize = 22f
+                paint.style = android.graphics.Paint.Style.FILL_AND_STROKE
+                paint.strokeWidth = densidade * 0.8f
+            }
+        })
         cabeca.addView(texto("  Última oferta", 13f, CINZA))
         c.addView(cabeca)
         val o = UltimaOferta.carregar(ctx, app)
