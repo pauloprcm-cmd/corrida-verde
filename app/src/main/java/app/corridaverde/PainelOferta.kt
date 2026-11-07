@@ -157,25 +157,42 @@ class PainelOferta(
         }
         // Cresce da lateral esquerda, onde estava a aba, em menos de dois décimos de segundo.
         caixa.pivotX = 0f
+        caixa.pivotY = (centroDaAba() - p.y).toFloat()
         caixa.scaleX = 0.08f
+        caixa.scaleY = 0.3f
         caixa.alpha = 0.3f
         runCatching { wm.addView(caixa, p) }.onSuccess {
             view = caixa
             animando = true
-            caixa.animate().scaleX(1f).alpha(1f).setDuration(ABRIR_MS).setInterpolator(DecelerateInterpolator(1.6f))
+            caixa.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(ABRIR_MS).setInterpolator(DecelerateInterpolator(1.6f))
                 .withEndAction { animando = false }.start()
         }
     }
 
-    /** Volta para a lateral, encolhendo, e a aba reaparece. */
+    /**
+     * Volta para a lateral, encolhendo em direção à aba, e a aba reaparece. Antes encolhia só na largura, na altura
+     * do painel e não da aba, e ao tirar a janela o celular ainda mostrava o painel inteiro por um instante: parecia
+     * falha (Paulo, 07/11/2026). Agora o painel fica invisível um quadro antes de sair da tela.
+     */
     private fun fechar() {
         val v = view ?: return
         if (animando) return
         animando = true
+        val p = v.layoutParams as? WindowManager.LayoutParams
         v.pivotX = 0f
-        v.animate().scaleX(0.08f).alpha(0f).setDuration(FECHAR_MS).setInterpolator(AccelerateInterpolator())
-            .withEndAction { if (view === v) mostrarAba() }.start()
+        v.pivotY = (centroDaAba() - (p?.y ?: 0)).toFloat()
+        val altura = v.height.coerceAtLeast(1)
+        v.animate().scaleX(0.08f).scaleY((dp(118).toFloat() / altura).coerceAtMost(1f)).alpha(0f)
+            .setDuration(FECHAR_MS).setInterpolator(AccelerateInterpolator())
+            .withEndAction {
+                if (view !== v) return@withEndAction
+                v.visibility = View.INVISIBLE
+                v.postDelayed({ if (view === v) mostrarAba() }, 40)
+            }.start()
     }
+
+    /** Altura do meio da aba na tela: o painel cresce dali e volta para lá. */
+    private fun centroDaAba() = (ctx.resources.displayMetrics.heightPixels * 0.40).toInt() + dp(118) / 2
 
     /**
      * A oferta de um app: nome, quando chegou e o valor; embarque e destino, cada um com o seu botão. O nome vai

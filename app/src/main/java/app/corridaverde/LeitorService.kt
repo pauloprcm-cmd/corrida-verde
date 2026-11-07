@@ -67,6 +67,8 @@ class LeitorService : AccessibilityService() {
     private var painelDispensadoEm = 0L
     /** Só na tela (onde chegam os eventos). */
     private var ultimaOlhadaBolinha = 0L
+    /** Quantas vezes ainda olhar de novo o app da frente depois de um evento da Uber ou da 99 ([tentarBolinhaDeNovo]). */
+    @Volatile private var tentativasBolinha = 0
     private val olharBolinha = Runnable { runCatching { atualizarBolinha() } }
     /** Trocar da Uber para outro app não manda evento para cá: enquanto a bolinha está na tela, confere a cada segundo. */
     private val vigiarBolinha = object : Runnable {
@@ -291,10 +293,24 @@ class LeitorService : AccessibilityService() {
     /** Chega evento da Uber ou da 99: vê se é hora de mostrar a bolinha (no máximo a cada meio segundo). */
     private fun conferirBolinha() {
         if (bolinhaNaTela) return
+        tentativasBolinha = TENTATIVAS_BOLINHA
         val agora = SystemClock.uptimeMillis()
         if (agora - ultimaOlhadaBolinha < 500) return
         ultimaOlhadaBolinha = agora
+        fundoBolinha.removeCallbacks(olharBolinha)
         fundoBolinha.post(olharBolinha)
+    }
+
+    /**
+     * Abrindo a 99 (ou a Uber) pela tela inicial, os primeiros eventos chegam ainda na animação de abrir, com a tela
+     * inicial como janela da frente; e a 99 parada no mapa quase não manda evento depois. Sem tentar de novo, a aba
+     * e a bolinha só apareciam passando pela Uber e voltando (Paulo, 07/11/2026). Só na linha da bolinha.
+     */
+    private fun tentarBolinhaDeNovo() {
+        if (tentativasBolinha <= 0) return
+        tentativasBolinha--
+        fundoBolinha.removeCallbacks(olharBolinha)
+        fundoBolinha.postDelayed(olharBolinha, 400)
     }
 
     /**
@@ -303,7 +319,10 @@ class LeitorService : AccessibilityService() {
      */
     private fun atualizarBolinha() {
         val cfg = Config.carregar(this)
-        val naUberOu99 = telaLigada() && (appNaFrente() ?: return) in APPS_DA_BOLINHA // Não deu para saber agora: deixa como está.
+        val frente = appNaFrente()
+        if (frente == null) return tentarBolinhaDeNovo() // Não deu para saber agora: deixa como está.
+        val naUberOu99 = telaLigada() && frente in APPS_DA_BOLINHA
+        if (naUberOu99) tentativasBolinha = 0 else if (!bolinhaNaTela) tentarBolinhaDeNovo()
         val recente = UltimaOferta.maisRecente(this)
         handler.post {
             val mostrarBola = naUberOu99 && cfg.bolinha
@@ -1076,6 +1095,8 @@ class LeitorService : AccessibilityService() {
         const val UBER = "com.ubercab.driver"
         const val WAZE = "com.waze"
         const val MAPS = "com.google.android.apps.maps"
+        /** Cerca de dois segundos e meio olhando de novo, de 400 em 400 ms: cobre a animação de abrir o app. */
+        const val TENTATIVAS_BOLINHA = 6
         private val NAVEGADORES = listOf(WAZE, MAPS)
         private val NOMES = mapOf(UBER to "Uber", "com.app99.driver" to "99", WAZE to "Waze", MAPS to "Maps")
         private val PALAVRAS_DE_RADAR = listOf("radar", "câmera", "camera", "fiscaliza", "limite", "velocidade")
