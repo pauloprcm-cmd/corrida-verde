@@ -189,10 +189,11 @@ object LeitorOferta {
         // fecha e o total virava a busca.
         val tela = linhas.filterNot { EST_DO_TOTAL.containsMatchIn(it) }.joinToString("\n")
             .replace(REAL_DO_OCR) { "R\$" }
-            .replace(HORA_DO_OCR) { m -> m.groupValues[1].map { DIGITO_DO_OCR[it] ?: it }.joinToString("") + " h e " }
-            .replace(NUMERO_DO_OCR) { m -> m.value.map { DIGITO_DO_OCR[it] ?: it }.joinToString("") }
-            .replace(UM_DO_OCR, "1")
             .replace(KM_DO_OCR, " km")
+            .replace(HORA_DO_OCR) { m -> digitos(m.groupValues[1]) + " h e " }
+            // Onde só pode haver número (antes de min, km e parada; depois de R$), letra parecida vira algarismo.
+            .replace(NUMERO_DO_OCR) { m -> m.value.takeUnless { ehNumero(it) } ?: digitos(m.value) }
+            .replace(VALOR_COM_LETRA) { m -> m.value.takeUnless { v -> v.any(Char::isDigit) } ?: digitos(m.value) }
             .replace(VALOR_SEM_VIRGULA) { m -> m.groupValues[1].let { "R\$ ${it.dropLast(2)},${it.takeLast(2)}" } }
             .replace(PONTO_DO_OCR) { "${it.groupValues[1]} • " }
         return ler(listOf(tela), doPrint = true, totalJaSaiu = linhas.any { EST_DO_TOTAL.containsMatchIn(it) })
@@ -222,20 +223,42 @@ object LeitorOferta {
     private val CORTADO = Regex("""\s*\S*(\.{3}|…)$""")
     // O "•" entre o tempo e a distância ("6 min • 1.4 km") às vezes sai do OCR como ".", "-", "*" ou some.
     private val EST_DO_TOTAL = Regex("""\bEst\.?\s*de\b""", RegexOption.IGNORE_CASE)
-    // Número antes de "min" ou "km" com letra no lugar de algarismo ("1l min", "l.4 km"); precisa ter um algarismo.
-    private val NUMERO_DO_OCR = Regex("""(?<![\w.,])(?=[\dlI|O.,]*\d)[\dlI|O]+(?:[.,][\dlI|O]+)?(?=\s*(?:min|k?m\b))""")
+    /**
+     * Na letra da Uber o "1" é um tracinho, e o leitor de imagem não sabe que ali vai número: sai "l", "I" ou "|"; o
+     * "0" sai "O" e o "5" sai "S". Já foram "1l min", "l.4 km", "l min" (06/11/2026) e "l parada". Em vez de uma regra
+     * por caso, a troca vale em todo número antes de "min", "km", "m" e "parada".
+     */
+    private val NUMERO_DO_OCR = Regex("""(?<![\w.,])[\dlI|OoSs]{1,4}(?:[.,][\dlI|OoSs]{1,2})?(?=\s*(?:min|k?m\b|[Pp]arada))""")
+    /** O valor depois do "R$" ("R$ 2l,5O" é R$ 21,50). Precisa ter um algarismo de verdade. */
+    private val VALOR_COM_LETRA = Regex("""(?<=R\$ ?)[\dlI|OoSs]{1,5}(?:[.,][\dlI|OoSs]{2,3})*(?!\w)""")
+    private val DIGITO_DO_OCR = mapOf('l' to '1', 'I' to '1', '|' to '1', 'O' to '0', 'o' to '0', 'S' to '5', 's' to '5')
+
+    private fun digitos(s: String) = s.map { DIGITO_DO_OCR[it] ?: it }.joinToString("")
+
+    /**
+     * É número lido errado? Com um algarismo de verdade, sim ("1l", "l.4"). Com ponto ou vírgula no meio também
+     * ("l.O km", "S.S km"). Sem nenhum dos dois, só "l", "I", "|" e "O" de até dois caracteres ("l min", "lO min"):
+     * uma palavra como "dos" antes de "min" fica como está.
+     */
+    private fun ehNumero(s: String) = s.any(Char::isDigit) || s.any { it == '.' || it == ',' } ||
+        (s.length <= 2 && s.all { it in "lI|O" })
     // "1 h e 3 min" sai do OCR como "lhe3min" ou "1he 3 min".
     private val HORA_DO_OCR = Regex("""(?<!\w)([\dlI|]{1,2})\s*h\s*(?:e\s*)?(?=\d+\s*min)""")
-    // "1 min" e "1 parada" saem "l min" e "l parada" (06/11/2026): o NUMERO_DO_OCR não troca, porque não há algarismo.
-    private val UM_DO_OCR = Regex("""(?<![\w.,])[lI|](?=\s*(?:min|[Pp]arada))""")
     // "1.2 km" sai "1.2 kmn" ou "15.6 kn".
     private val KM_DO_OCR = Regex("""(?<=\d)\s?(?:kmn|krn|kn)\b""", RegexOption.IGNORE_CASE)
     // "R$ 37,99" sai "R$ 3799": a Uber sempre escreve os centavos no valor da corrida (a faixa do Táxi é que vem sem).
     private val VALOR_SEM_VIRGULA = Regex("""(?<![-–—]\s{0,2})R\$\s*(\d{3,5})(?![\d.,])(?!\s*[-–—])""")
-    private val DIGITO_DO_OCR = mapOf('l' to '1', 'I' to '1', '|' to '1', 'O' to '0')
     private val PONTO_DO_OCR = Regex("""(min(?:utos?)?)\s*[.\-·*°+]?\s*(?=\d+(?:[.,]\d+)?\s*k?m\b)""", RegexOption.IGNORE_CASE)
 
-    private val REAL_DO_OCR = Regex("""\bR\s?[S5]\s?(?=\d)""")
+    /**
+     * "R$" sai "RS" ou "R5"; o valor pode começar com letra no lugar do algarismo ("RS l5,23"). Só quando o que vem
+     * depois tem cara de preço (com centavos, faixa "24 - R$ 34" ou o valor sozinho no fim da linha): "Rodovia RS 040"
+     * no destino não pode virar "R$ 0,40", senão o Indo pra casa procura o endereço errado.
+     */
+    private val REAL_DO_OCR = Regex(
+        """\bR ?[S5] ?(?=[\dlI|O]{1,3}(?:[.,][\dlI|O]{2}(?![\dlI|O])|\s*[-–—]\s*R)|[\dlI|O]{1,5}[ \t]*$)""",
+        RegexOption.MULTILINE,
+    )
     /** "R$ 34,90" ou "R$ 24" (a faixa do Táxi vem sem centavos). */
     private val VALOR_DO_PRINT = Regex("""R\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)""")
     private val TAXI = Regex("""\bt[áa]xi\b""", RegexOption.IGNORE_CASE)

@@ -192,4 +192,29 @@ class PrintDaUberTest {
         assertNull(ler("Táxi Promo | R$ 23,69 | 22 min 4.6 km | 89 min •1.2 km | Rua X, São Paulo | 16 minutos•3.4 km | " +
             "Rua Y, São Paulo | Tenho interesse"))
     }
+
+    @Test
+    fun letraNoLugarDeAlgarismoEmQualquerNumero() {
+        // Preço, minutos e km com l, I, O e S no lugar de 1, 0 e 5.
+        val o = ler("Táxi Promo | RS 2l,5O | 2I min • 6.S km | lO min • l.O km | Rua A, Itaim Bibi, São Paulo | " +
+            "* 4,9O (12) | ll minutos • S.S km | Rua B, 10, São Paulo | Tenho interesse")!!
+        assertEquals(21.50, o.valor, 0.001)
+        assertEquals(10, o.buscaMin)
+        assertEquals(1.0, o.buscaKm, 0.001)
+        assertEquals(11, o.viagemMin)
+        assertEquals(5.5, o.viagemKm, 0.001)
+        // Palavra antes de "min" não vira número.
+        assertNull(ler("Táxi Promo | R$ 20,00 | dos min • ok | Rua A | Tenho interesse"))
+    }
+
+    @Test
+    fun rodoviaDoRioGrandeDoSulNoDestinoFicaComoEsta() {
+        val o = ler("Táxi Promo | RS 45,30 | 30 min • 15.0 km | 5 min • 1.0 km | Av. Assis Brasil, Porto Alegre | " +
+            "25 minutos • 14.0 km | Rodovia RS 040, 1200, Viamão | Tenho interesse")!!
+        assertEquals(45.30, o.valor, 0.001)
+        assertEquals("Rodovia RS 040, 1200, Viamão", o.destino)
+        // Valor sem vírgula sozinho na linha continua sendo valor.
+        assertEquals(37.99, ler("Táxi Promo | RS 3799 | 38 min•9.0 km | 6 min •1.2 km | Rua A, São Paulo | " +
+            "32 minutos•7.8 km | Rua B, 10, São Paulo | Tenho interesse")!!.valor, 0.001)
+    }
 }
