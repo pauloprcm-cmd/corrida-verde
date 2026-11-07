@@ -60,7 +60,11 @@ class LeitorService : AccessibilityService() {
     /** Saber qual app está na frente é uma consulta à tela: linha própria, para não atrasar a oferta. */
     private val trabalhoBolinha = HandlerThread("bolinha").apply { start() }
     private val fundoBolinha = Handler(trabalhoBolinha.looper)
+    /** A bolinha ou a aba da Última oferta na tela: enquanto houver uma, a linha da bolinha confere o app da frente. */
     @Volatile private var bolinhaNaTela = false
+    private lateinit var painel: PainelOferta
+    /** Só na tela. A aba some até chegar uma oferta mais nova que esta (o "Esconder até a próxima oferta"). */
+    private var painelDispensadoEm = 0L
     /** Só na tela (onde chegam os eventos). */
     private var ultimaOlhadaBolinha = 0L
     private val olharBolinha = Runnable { runCatching { atualizarBolinha() } }
@@ -217,9 +221,13 @@ class LeitorService : AccessibilityService() {
             esconderBolinha()
             startActivity(Intent(this, GastoActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }, aoDescartar = {
-            bolinhaNaTela = false
+            // A aba da Última oferta pode continuar na tela, e a linha da bolinha segue conferindo por ela.
+            bolinhaNaTela = painel.visivel
             Config.carregar(this).copy(bolinha = false).salvar(this)
             Toast.makeText(this, "Bolinha Falar desligada. Para ligar de novo: Ajustes › Botão de falar.", Toast.LENGTH_LONG).show()
+        })
+        painel = PainelOferta(this, aoDispensar = {
+            painelDispensadoEm = System.currentTimeMillis()
         })
         instancia = this
         // Ligou pelo passo a passo: traz o app de volta com o "Pronto!", sem a pessoa ter que achar o caminho.
@@ -250,6 +258,7 @@ class LeitorService : AccessibilityService() {
         fundoBolinha.removeCallbacksAndMessages(null)
         trabalhoBolinha.quitSafely()
         if (::bolinha.isInitialized) bolinha.esconder()
+        if (::painel.isInitialized) painel.esconder()
         if (::popup.isInitialized) popup.esconder()
         if (::radarPopup.isInitialized) radarPopup.esconder()
         reconhecedor?.close()
@@ -288,26 +297,33 @@ class LeitorService : AccessibilityService() {
         fundoBolinha.post(olharBolinha)
     }
 
-    /** Só na linha da bolinha. Ela fica na tela enquanto a Uber ou a 99 estão na frente (não no Waze: atrapalharia a navegação). */
+    /**
+     * Só na linha da bolinha. Ela fica na tela enquanto a Uber ou a 99 estão na frente (não no Waze: atrapalharia a
+     * navegação). A aba da Última oferta também, quando há oferta das últimas 3 horas que não foi dispensada.
+     */
     private fun atualizarBolinha() {
-        val mostrar = if (!Config.carregar(this).bolinha || !telaLigada()) false
-        else (appNaFrente() ?: return) in APPS_DA_BOLINHA // Não deu para saber agora: deixa como está.
+        val cfg = Config.carregar(this)
+        val naUberOu99 = telaLigada() && (appNaFrente() ?: return) in APPS_DA_BOLINHA // Não deu para saber agora: deixa como está.
+        val recente = UltimaOferta.maisRecente(this)
         handler.post {
-            if (mostrar && !bolinha.visivel) {
-                bolinha.mostrar()
-                if (bolinha.visivel) {
-                    bolinhaNaTela = true
-                    fundoBolinha.removeCallbacks(vigiarBolinha)
-                    fundoBolinha.postDelayed(vigiarBolinha, 1_000)
-                }
-            } else if (!mostrar && bolinha.visivel) esconderBolinha()
+            val mostrarBola = naUberOu99 && cfg.bolinha
+            val mostrarAba = naUberOu99 && recente > painelDispensadoEm &&
+                System.currentTimeMillis() - recente < UltimaOferta.VALIDADE_MS
+            if (mostrarBola && !bolinha.visivel) bolinha.mostrar() else if (!mostrarBola && bolinha.visivel) bolinha.esconder()
+            if (mostrarAba && !painel.visivel) painel.mostrar() else if (!mostrarAba && painel.visivel) painel.esconder()
+            val antes = bolinhaNaTela
+            bolinhaNaTela = bolinha.visivel || painel.visivel
+            if (bolinhaNaTela && !antes) {
+                fundoBolinha.removeCallbacks(vigiarBolinha)
+                fundoBolinha.postDelayed(vigiarBolinha, 1_000)
+            } else if (!bolinhaNaTela) fundoBolinha.removeCallbacks(vigiarBolinha)
         }
     }
 
     private fun esconderBolinha() {
-        bolinhaNaTela = false
-        fundoBolinha.removeCallbacks(vigiarBolinha)
         bolinha.esconder()
+        bolinhaNaTela = painel.visivel
+        if (!bolinhaNaTela) fundoBolinha.removeCallbacks(vigiarBolinha)
     }
 
     /** O app da janela em uso. A bolinha da 99 por cima de outro app não conta: ela não é janela de app. */
@@ -507,7 +523,7 @@ class LeitorService : AccessibilityService() {
                 if (oferta == null) return@addOnSuccessListener tentarDeNovo99()
                 if (ofertaNa99 && avisar99) {
                     chave99 = oferta.chave
-                    mostrar(oferta)
+                    mostrar(oferta, UltimaOferta.NOVENTA_E_NOVE)
                 }
             }
             .addOnFailureListener(noFundo) { erro ->
@@ -862,11 +878,15 @@ class LeitorService : AccessibilityService() {
         }
     }
 
-    private fun mostrar(oferta: Oferta) {
+    private fun mostrar(oferta: Oferta, app: String = UltimaOferta.UBER) {
         val cfg = Config.carregar(this)
         handler.post {
             if (oferta.chave != chaveAtual) {
                 chaveAtual = oferta.chave
+                // Fica para o painel Última oferta, e a aba aparece já (a oferta de antes pode ter sido dispensada).
+                UltimaOferta.guardar(this, app, oferta)
+                ultimaOlhadaBolinha = 0L
+                conferirBolinha()
                 popup.mostrar(Avaliador.avaliar(oferta, cfg), cfg)
                 if (cfg.indoPraCasa) calcularCasa(oferta, cfg)
                 // Gravação ligada e chegou oferta: a corrida de rua já deve ter acabado.

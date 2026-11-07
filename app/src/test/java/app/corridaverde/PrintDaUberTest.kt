@@ -22,6 +22,7 @@ class PrintDaUberTest {
         assertEquals(28, o.viagemMin)
         assertEquals(0, o.paradas)
         assertEquals("Av. Doutora Ruth Cardoso, São Paulo", o.destino)
+        assertEquals("R. Ribeiro de Barros, Vila Anglo Brasileira, Säo Paulo", o.embarque)
     }
 
     @Test

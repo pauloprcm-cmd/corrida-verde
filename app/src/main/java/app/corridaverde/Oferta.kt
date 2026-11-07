@@ -15,6 +15,8 @@ data class Oferta(
     val valorMax: Double? = null,
     /** Endereço do destino final, como a Uber escreve ("Ambience Vila Mariana, Vila Mariana, São Paulo"). */
     val destino: String? = null,
+    /** Endereço de embarque do passageiro, entre a busca e a viagem no cartão (para o painel Última oferta). */
+    val embarque: String? = null,
     /** Grupo da categoria escrita no cartão (UberX, Comfort, Black, 99Pop...), para o perfil de motorista de app. */
     val grupo: Grupo = Grupo.ECONOMICO,
 ) {
@@ -119,10 +121,24 @@ object LeitorOferta {
             // O endereço vem logo depois do último trecho ("30 minutos (6.1 km)").
             destino = tela.substring(viagem.last().m.range.last + 1).lines().map { it.trim() }
                 .firstOrNull { it.length >= 5 && it.any(Char::isLetter) && !NAO_ENDERECO.containsMatchIn(it) },
+            embarque = endereco(tela.substring(busca.m.range.last + 1, viagem.first().m.range.first)),
             // A categoria vem antes da busca; o endereço do destino pode ter "Black" ou "Comfort" no nome.
             grupo = Grupo.da(tela.substring(0, busca.m.range.first)),
         )
     }
+
+    /**
+     * O endereço de embarque: as linhas entre a busca e a viagem até a nota ou o "Verificado" (até duas, porque no
+     * print e na 99 o endereço quebra: "R. Ribeiro de Barros, Vila Anglo" + "Brasileira, São Paulo").
+     */
+    private fun endereco(trecho: String): String? = trecho.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        // Sobras do mapa no print ("PA", "MI") antes do endereço.
+        .dropWhile { it.length <= 3 }
+        .takeWhile { l ->
+            l.any(Char::isLetter) && "R$" !in l && !NAO_ENDERECO.containsMatchIn(l) &&
+                !NOTA.containsMatchIn(l) && !NOTA_99.containsMatchIn(l)
+        }.take(2)
+        .joinToString(" ").replace(CORTADO, "").trim().trimEnd(',').takeIf { it.length >= 5 }
 
     /**
      * A leitura como veio e, depois, com o ponto de volta nos km sem casa decimal ("72 km" → 7.2): a Uber sempre

@@ -451,4 +451,25 @@ class LeitorOfertaTest {
         assertEquals(30, o.viagemMin)
         assertEquals(1, o.paradas)
     }
+
+    @Test
+    fun leEnderecoDeEmbarque() {
+        // Uber pelo texto: o endereço fica entre a busca e a viagem; a nota e o "Verificado" não entram.
+        assertEquals("Rua A, São Paulo", LeitorOferta.ler(print)!!.embarque)
+        assertEquals("Rua A, Cachoeirinha, São Paulo", LeitorOferta.ler(listOf(
+            "UberX", "Exclusivo", "R$ 56,36", "Est. de R\$2,26/km", "7 min • 2.6 km", "Rua A, Cachoeirinha, São Paulo",
+            "4,92 (1007)", "Verificado", "1 h e 3 min • 22.3 km", "Cidade de Deus, Osasco", "Aceitar",
+        ))!!.embarque)
+        // 99 (OCR): o endereço quebra em duas linhas; a nota "4,98 270 corridas" vem antes da busca.
+        assertEquals("Rua José Maria Peixoto, 158, Jardim Peri", LeitorOferta.ler99(listOf(
+            "Táxi", "3", "R$9,53 O1,0x", "t 4,98 270 corridas", "Perfil Premium",
+            "4 min (701 m)", "Rua José Maria Peixoto, 158, Jardim", "Peri",
+            "2 min (541 m)", "Rua Cariacica, 78, Jardim Santa Cruz",
+        ))!!.embarque)
+        // Táxi com o total embaixo da faixa: o embarque é o da busca, não o do total.
+        assertEquals("Rua João Cachoeira, Itaim Bibi, São Paulo", LeitorOferta.ler(listOf(
+            "Táxi", "R$ 12 - R$ 16", "8 min • 1.7 km", "1 min • 0.2 km", "Rua João Cachoeira, Itaim Bibi, São Paulo",
+            "4,84 (732)", "Verificado", "7 minutos • 1.5 km", "Avenida Brigadeiro Faria Lima, 4440, Itaim Bibi, São Paulo",
+        ))!!.embarque)
+    }
 }
