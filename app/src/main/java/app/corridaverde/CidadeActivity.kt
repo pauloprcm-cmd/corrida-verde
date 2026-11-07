@@ -79,12 +79,27 @@ class CidadeActivity : Activity() {
         Cidades.procurar(texto).forEach { c ->
             val t = c.tabela.comum
             v.por(l, v.item(R.drawable.ic_taxi, "${c.nome} · ${c.uf}", "Bandeirada R$ ${Popup.br(t.bandeirada)} · km R$ ${Popup.br(t.km1)}") {
-                mostrarTabela(c, c.chave, c.tabela)
+                escolher(c)
             }, espaco = 10)
         }
         v.por(l, v.item(R.drawable.ic_chave, "Minha cidade não está na lista", "Digite a tabela colada no seu táxi") {
             mostrarTabela(null, nomeDigitado(texto), null)
         }, espaco = 18)
+    }
+
+    /**
+     * Tocou numa cidade da lista: já fica gravada, com a tabela da prefeitura. Antes só gravava no "Está certo,
+     * salvar", no fim da tela da tabela, e quem voltava sem descer até ele recebia a pergunta a cada abertura.
+     * A mesma cidade de novo não apaga a tabela que o taxista corrigiu.
+     */
+    private fun escolher(c: Cidade) {
+        val cfg = Config.carregar(this)
+        if (cfg.cidade != c.chave) {
+            cfg.copy(cidade = c.chave, tabela = c.tabela, luxo = cfg.luxo && c.tabela.especial != null).salvar(this)
+            Config.acompanharCidade(this, antiga = cfg.nomeCidade.ifBlank { "São Paulo" }, nova = c.nome)
+            setResult(RESULT_OK)
+        }
+        mostrarTabela(c, c.chave, c.tabela)
     }
 
     /** O que foi digitado na busca vira o nome da cidade nova ("osasco" fica "Osasco"). */
@@ -109,7 +124,7 @@ class CidadeActivity : Activity() {
                 if (achou != null) {
                     v.por(s, v.texto("Você está em ${achou.nome}", 15f, negrito = true, cor = v.verde), espaco = 16)
                     v.por(s, v.item(R.drawable.ic_ok, "${achou.nome} · ${achou.uf}", "Toque para usar esta") {
-                        mostrarTabela(achou, achou.chave, achou.tabela)
+                        escolher(achou)
                     }, espaco = 8)
                 } else nomes.firstOrNull()?.let { nome ->
                     v.por(s, v.texto("Você está em $nome, que ainda não está na lista. Toque em \"Minha cidade não está na lista\", " +
