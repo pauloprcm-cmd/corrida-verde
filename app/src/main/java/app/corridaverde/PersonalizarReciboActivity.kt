@@ -59,6 +59,11 @@ class PersonalizarReciboActivity : Activity() {
         }
         tela.addView(previa, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(380)).apply { topMargin = dp(12) })
 
+        // Antes só dava para chegar aqui pelo Registrar por voz (Paulo, 07/11/2026).
+        tela.addView(rotulo("Seus dados no recibo"))
+        tela.addView(texto("Nome, placa, alvará, CPF, telefone e e-mail que vão embaixo da assinatura.", 15f, cor = CINZA))
+        tela.addView(botao("✏️ Meus dados do recibo") { startActivity(ReciboActivity.dados(this)) })
+
         tela.addView(rotulo("Modelo"))
         // Os modelos em linhas de três, para os nomes caberem.
         Modelo.values().toList().chunked(3).forEach { linha ->
@@ -147,6 +152,12 @@ class PersonalizarReciboActivity : Activity() {
                 if (cor == estilo.cor) setStroke(dp(4), Color.rgb(0xF5, 0xC2, 0x1B))
             }
         }
+    }
+
+    /** Voltou do Meus dados do recibo: a prévia mostra os dados novos. */
+    override fun onResume() {
+        super.onResume()
+        atualizar()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

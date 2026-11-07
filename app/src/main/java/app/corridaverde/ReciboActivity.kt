@@ -62,6 +62,8 @@ class ReciboActivity : Activity() {
         setContentView(rolagem)
         motorista = Motorista.carregar(this)
         if (savedInstanceState != null) return
+        // Vindo do Personalizar recibo: só os dados do motorista, e volta para lá ao salvar.
+        if (intent.getBooleanExtra(EXTRA_DADOS, false)) return telaDados { finish() }
         val inicio = {
             val pronto = intent.getStringExtra(EXTRA_PRONTO)?.let { Recibos.deLinha(it) }
             when {
@@ -429,6 +431,7 @@ class ReciboActivity : Activity() {
         private const val EXTRA_LISTA = "lista"
         private const val EXTRA_PRONTO = "pronto"
         private const val EXTRA_LANCAR = "lancar"
+        private const val EXTRA_DADOS = "dados"
         private val APPS_DE_RUA = setOf("Táxi", "Particular")
         private val DATA = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         private val HORA = DateTimeFormatter.ofPattern("HH:mm")
@@ -442,6 +445,9 @@ class ReciboActivity : Activity() {
         fun porVoz(ctx: Context) = Intent(ctx, ReciboActivity::class.java).putExtra(EXTRA_OUVIR, true)
 
         fun lista(ctx: Context) = Intent(ctx, ReciboActivity::class.java).putExtra(EXTRA_LISTA, true)
+
+        /** Só a tela Meus dados do recibo (nome, placa, alvará, CPF, telefone, e-mail), sem passar pela voz. */
+        fun dados(ctx: Context) = Intent(ctx, ReciboActivity::class.java).putExtra(EXTRA_DADOS, true)
 
         /** Prévia e envio de um recibo já montado (cliente fixo); [lancar] põe o total no Meu dinheiro ao enviar. */
         fun pronto(ctx: Context, r: Recibo, lancar: Boolean) = Intent(ctx, ReciboActivity::class.java)
