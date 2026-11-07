@@ -229,7 +229,6 @@ class CidadeActivity : Activity() {
             else -> add("sábado a partir das ${t.b2Sabado} h")
         }
         add("domingo e feriado o dia todo")
-        if (t.b2Dezembro) add("dezembro inteiro")
     }.joinToString(", ") + ". É a regra da prefeitura."
 
     private fun avisar(texto: String) = Toast.makeText(this, texto, Toast.LENGTH_LONG).show()

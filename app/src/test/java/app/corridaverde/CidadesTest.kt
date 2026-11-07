@@ -52,7 +52,7 @@ class CidadesTest {
         assertFalse(Tarifa.bandeira2(sabadoTarde, Cidades.SAO_PAULO)) // SP: sábado de dia é bandeira 1
         assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 5, 21, 0), bh))      // BH: quinta 21h ainda bandeira 1
         assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 5, 21, 0), Cidades.SAO_PAULO))
-        assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 12, 2, 10, 0), bh))       // dezembro inteiro
+        assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 12, 2, 10, 0), bh))      // dezembro: sem o "mês inteiro" (Uber e 99 não pagam)
         val rio = cidade("Rio de Janeiro")
         assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 1, 20, 10, 0), rio))     // São Sebastião
         assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 1, 26, 10, 0), rio))

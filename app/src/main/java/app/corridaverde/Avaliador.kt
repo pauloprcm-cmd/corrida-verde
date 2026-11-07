@@ -38,15 +38,16 @@ object Tarifa {
     /**
      * Bandeira 2 pela regra da prefeitura, que vem da base ([Cidades]) e o taxista não muda (pedido do Paulo em
      * 07/11/2026: os horários na tela confundiam): à noite ([TabelaTaxi.b2De] às [TabelaTaxi.b2Ate]), no sábado a
-     * partir da hora da cidade, o dia todo em domingos e feriados e, onde a prefeitura libera, em dezembro e na terça
-     * de Carnaval. Cidade fora da base (null, digitada pelo taxista): sempre bandeira 1.
+     * partir da hora da cidade, o dia todo em domingos e feriados e na terça de Carnaval onde é feriado. Sem o
+     * "dezembro inteiro" que algumas prefeituras liberam: só vale na corrida cobrada fora da plataforma, e a Uber e a 99
+     * não pagam bandeira 2, então toda oferta de dezembro ficaria vermelha (Paulo, 07/11/2026).
+     * Cidade fora da base (null, digitada pelo taxista): sempre bandeira 1.
      */
     fun bandeira2(agora: LocalDateTime, cidade: Cidade? = Cidades.SAO_PAULO): Boolean {
         cidade ?: return false
         val t = cidade.tabela
         val dia = agora.toLocalDate()
         if (dia.dayOfWeek == DayOfWeek.SUNDAY || Feriados.eh(dia, cidade)) return true
-        if (t.b2Dezembro && dia.monthValue == 12) return true
         if (dia.dayOfWeek == DayOfWeek.SATURDAY && t.b2Sabado != TabelaTaxi.SABADO_NORMAL && agora.hour >= t.b2Sabado) return true
         return agora.hour >= t.b2De || agora.hour < t.b2Ate
     }
