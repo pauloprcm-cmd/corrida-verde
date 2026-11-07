@@ -20,7 +20,7 @@ import java.util.zip.ZipOutputStream
 object Copia {
     /** Só estes arquivos entram e saem da cópia; nada de diagnóstico nem vídeo. */
     private val ARQUIVOS = listOf(
-        "corridas.tsv", "totais.tsv", "gastos.tsv", "recibos.tsv", "clientes.tsv", "destinos.tsv", "recibo_logo.png", "recibo_assinatura.png",
+        "corridas.tsv", "totais.tsv", "gastos.tsv", "tipos_gasto.tsv", "recibos.tsv", "clientes.tsv", "destinos.tsv", "recibo_logo.png", "recibo_assinatura.png",
     )
     private val PREFERENCIAS = listOf("config", "motorista", "recibo_estilo", "pix")
     private const val MARCA = "corrida-verde-copia.json"

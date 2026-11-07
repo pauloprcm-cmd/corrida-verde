@@ -126,4 +126,70 @@ class PrintDaUberTest {
         assertNull(LeitorViagem.minutosAteOFim(listOf("30", "LIMITE", "Recursos de segurança", "Reporte um problema no mapa")))
         assertNull(LeitorViagem.minutosAteOFim(listOf("8 min", "1,3 km", "Encontro com Daniele")))
     }
+
+    // ---------- Ofertas de 06/11/2026 em que o aviso não apareceu (diagnóstico da 1.82) ----------
+
+    @Test
+    fun iconeDaBuscaGrudadoNoMinuto() {
+        // 19:27:13: o ícone da busca virou "8" grudado no "6 min" e o "km" saiu "kmn".
+        val a = ler("B | Ver todas as solicitações 1 | Certa | Care- I | Táxi Promo | R$ 23,69 | 22 min 4.6 km | " +
+            "2 Inclui um valor extra de R$ 4 | 86 min •1.2 kmn | Rua Tabapuā, Itaim Bibi, São Paulo | * 4,84 (743) | " +
+            "16 minutos•3.4 km | Rua Fernão Dias, 690, São Paulo | Tenho interesse")!!
+        assertEquals(23.69, a.valor, 0.001)
+        assertEquals(6, a.buscaMin)
+        assertEquals(1.2, a.buscaKm, 0.001)
+        assertEquals(16, a.viagemMin)
+        assertEquals(3.4, a.viagemKm, 0.001)
+        // 19:28:38: "87 min •13 km" é 7 min e 1.3 km (o total 17 min e 3.0 km confirma).
+        val b = ler("Butantấ | 2 Táxi Promo | R$ 14,48 | 17 min •3.0 km | Inclui um valor extra de R$2 | 87 min •13 km | " +
+            "Av. Brig. Faria Lima, Itaim Bibi, São | Paulo | * 4,91 (935) | Verificado | 10 minutos •1,7 km | " +
+            "Rua Casa do Ator, 90, Itaim Bibi, São | Paulo | Tenho interesse")!!
+        assertEquals(14.48, b.valor, 0.001)
+        assertEquals(7, b.buscaMin)
+        assertEquals(1.3, b.buscaKm, 0.001)
+        assertEquals(1.7, b.viagemKm, 0.001)
+        // 19:29:13: a busca "87 min" e a viagem "74 km" (7.4) ao mesmo tempo.
+        val c = ler("2 Táxi Promo | R$ 39,18 | 49 min•9.2 km | 87 min •1.8 km | Rua Fidêncio Ramos, Itaim Bibi, São | " +
+            "Paulo | 4,93 (743) | Verificado | l parada | 42 minutos •74 km | R. José Maria Lisboa, 20, Jardim | " +
+            "Paulista, São Paulo | Tenho interesse | Gravação: nenhuma graVação ainda")!!
+        assertEquals(7, c.buscaMin)
+        assertEquals(7.4, c.viagemKm, 0.001)
+        assertEquals(42, c.viagemMin)
+        assertEquals(1, c.paradas) // "l parada" é "1 parada"
+    }
+
+    @Test
+    fun umMinutoEscritoComL() {
+        // 19:29:30: "1 min" saiu "l min".
+        val o = ler("Ragar ae vldgens | 2 Táxi Promo | R$ 15,23 | 13 min. 2.4 km | e l min • 0.1 km | " +
+            "São Paulo Corporate Towers, Torre | Sul, Itaim Bibi | 4,93 (1198) | Verificado | 12 minutos• 2.3 km | " +
+            "Rua Jesuíno Arruda, 666, Itaim Bibi, | São Paulo | Tenho interesse | RROKIIN")!!
+        assertEquals(1, o.buscaMin)
+        assertEquals(0.1, o.buscaKm, 0.001)
+        assertEquals(12, o.viagemMin)
+        assertEquals(2.3, o.viagemKm, 0.001)
+    }
+
+    @Test
+    fun valorSemAVirgula() {
+        // 19:29:35: "R$ 37,99" saiu "R$ 3799".
+        val o = ler("ver todas as SOiCitaçoes | AVANÇADO | Táxi Promo | R$ 3799 | 38 min•9.0 km | 6 min •1.2 km | " +
+            "Google |Ed. Pátio Victor Malzoni, | Torre A, Itaim Bibi | * 4,99 (3316) | 32 minutos•7.8 km | " +
+            "R. Paraguacu, 316, Perdizes, São | Paulo | Tenho interesse")!!
+        assertEquals(37.99, o.valor, 0.001)
+        assertEquals(6, o.buscaMin)
+        assertEquals(7.8, o.viagemKm, 0.001)
+        // A faixa do Táxi continua sem centavos.
+        val faixa = ler("Táxi | R$ 100 - R$ 146 | 50 min • 21.0 km | 5 min • 1.0 km | Rua A, São Paulo | " +
+            "45 minutos • 20.0 km | Rua B, 10, São Paulo | Tenho interesse")!!
+        assertEquals(100.0, faixa.valor, 0.001)
+        assertEquals(146.0, faixa.valorMax!!, 0.001)
+    }
+
+    @Test
+    fun buscaQueNaoFechaComOTotalContinuaSemAviso() {
+        // Se nem tirando o ícone a soma fecha, é melhor não avisar do que avisar errado.
+        assertNull(ler("Táxi Promo | R$ 23,69 | 22 min 4.6 km | 89 min •1.2 km | Rua X, São Paulo | 16 minutos•3.4 km | " +
+            "Rua Y, São Paulo | Tenho interesse"))
+    }
 }

@@ -74,6 +74,12 @@ class MeuDiaActivity : Activity() {
         v.por(tela, v.item(R.drawable.ic_grafico, "Dia, semana e mês", "Quanto entrou, saiu e sobrou; corrigir lançamentos") {
             startActivity(Intent(this, DinheiroActivity::class.java))
         }, espaco = 18)
+        // Só aparece depois que o motorista cria o primeiro tipo de gasto dele.
+        if (TiposGasto.todos(this).isNotEmpty()) {
+            v.por(tela, v.item(R.drawable.ic_carteira, "Meus tipos de gasto", "Supermercado, escola... pessoal ou do trabalho") {
+                startActivity(Intent(this, MeusGastosActivity::class.java))
+            })
+        }
 
         val cfg = Config.carregar(this)
         val casa = when {

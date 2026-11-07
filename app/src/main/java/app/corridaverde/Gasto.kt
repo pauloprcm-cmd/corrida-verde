@@ -22,7 +22,10 @@ enum class Tipo(val nome: String, val combustivel: Boolean = false) {
     val unidade get() = if (this == GNV) "m³" else "L"
 }
 
-/** Um gasto registrado. [km] é a quilometragem do painel na hora do abastecimento. */
+/**
+ * Um gasto registrado. [km] é a quilometragem do painel na hora do abastecimento. [descricao] é o nome que o
+ * motorista deu a um gasto "Outro" ("Supermercado", "Dentista"), que vira um tipo dele ([TiposGasto]).
+ */
 data class Gasto(
     val quando: LocalDateTime,
     val tipo: Tipo,
@@ -30,7 +33,11 @@ data class Gasto(
     val litros: Double? = null,
     val km: Int? = null,
     val tanqueCheio: Boolean = false,
-)
+    val descricao: String = "",
+) {
+    /** Como o gasto aparece nas telas: o nome que o motorista deu, ou o do tipo. */
+    val nome get() = descricao.takeIf { tipo == Tipo.OUTRO && it.isNotBlank() } ?: tipo.nome
+}
 
 /** Consumo entre dois abastecimentos de tanque cheio. */
 data class Consumo(val kmRodados: Int, val litros: Double, val valor: Double, val unidade: String) {
@@ -134,8 +141,20 @@ object Gastos {
         File(ctx.filesDir, ARQUIVO).writeText(linhas.mapIndexed { j, l -> if (j == i) paraLinha(novo) else l }.joinToString("") { it + "\n" })
     }
 
+    /** Troca o nome de um tipo próprio em todos os gastos dele. */
+    fun renomear(ctx: Context, antigo: String, novo: String) {
+        val f = File(ctx.filesDir, ARQUIVO).takeIf { it.exists() } ?: return
+        val c = TiposGasto.chave(antigo)
+        f.writeText(f.readLines().joinToString("") { l ->
+            val g = deLinha(l)
+            (if (g != null && g.tipo == Tipo.OUTRO && TiposGasto.chave(g.descricao) == c) paraLinha(g.copy(descricao = novo)) else l) + "\n"
+        })
+    }
+
     fun paraLinha(g: Gasto) =
-        listOf(g.quando, g.tipo.name, g.valor, g.litros ?: "", g.km ?: "", if (g.tanqueCheio) 1 else 0).joinToString("\t")
+        listOf(g.quando, g.tipo.name, g.valor, g.litros ?: "", g.km ?: "", if (g.tanqueCheio) 1 else 0,
+            g.descricao.replace(Regex("""[\t\r\n]+"""), " "))
+            .joinToString("\t")
 
     fun deLinha(s: String): Gasto? = runCatching {
         val c = s.split('\t')
@@ -146,6 +165,8 @@ object Gastos {
             litros = c[3].toDoubleOrNull(),
             km = c[4].toIntOrNull(),
             tanqueCheio = c[5] == "1",
+            // Os gastos de antes dos tipos próprios têm 6 colunas.
+            descricao = c.getOrNull(6).orEmpty(),
         )
     }.getOrNull()
 
@@ -168,5 +189,99 @@ object Gastos {
         val rodados = ultimo.km - abast[i].km!!
         if (rodados <= 0) return null
         return Consumo(rodados, depois.sumOf { it.litros!! }, depois.sumOf { it.valor }, ultimo.tipo.unidade)
+    }
+}
+
+/** Um tipo de gasto criado pelo motorista. [pessoal] fica fora do "Sobrou do trabalho"; [escondido] some da lista. */
+data class TipoProprio(val nome: String, val pessoal: Boolean = false, val escondido: Boolean = false)
+
+/**
+ * Os tipos de gasto de cada motorista ("Supermercado", "Escola dos filhos"...): nascem quando ele escreve o nome de
+ * um gasto "Outro" e, dali em diante, aparecem na lista e são reconhecidos na fala. Ficam só no celular dele.
+ */
+object TiposGasto {
+    private const val ARQUIVO = "tipos_gasto.tsv"
+
+    /** Para comparar nomes: sem acento, minúsculo, sem espaço sobrando ("Supermercado " = "supermercado"). */
+    fun chave(nome: String) = LeitorGasto.semAcento(nome).lowercase().replace(Regex("""\s+"""), " ").trim()
+
+    /** O nome como vai no arquivo: sem tabulação nem quebra de linha, com a primeira letra maiúscula. */
+    fun limpo(nome: String) = nome.replace(Regex("""[\t\r\n]+"""), " ").replace(Regex("""\s+"""), " ").trim()
+        .replaceFirstChar { it.uppercase() }.take(40)
+
+    fun todos(ctx: Context): List<TipoProprio> = juntar(lerArquivo(ctx), Gastos.todos(ctx))
+
+    /** Os do arquivo e os nomes que só aparecem nos gastos (o arquivo pode ter ficado para trás numa cópia antiga). */
+    fun juntar(doArquivo: List<TipoProprio>, gastos: List<Gasto>): List<TipoProprio> {
+        val vistos = doArquivo.map { chave(it.nome) }.toMutableSet()
+        val soNosGastos = gastos.filter { it.tipo == Tipo.OUTRO && it.descricao.isNotBlank() }
+            .filter { vistos.add(chave(it.descricao)) }
+            .map { TipoProprio(limpo(it.descricao)) }
+        return doArquivo + soNosGastos
+    }
+
+    /** Os que aparecem na lista do formulário: os mais usados primeiro. */
+    fun naLista(tipos: List<TipoProprio>, gastos: List<Gasto>): List<TipoProprio> {
+        val usos = gastos.filter { it.tipo == Tipo.OUTRO }.groupingBy { chave(it.descricao) }.eachCount()
+        return tipos.filter { !it.escondido }.sortedWith(compareByDescending<TipoProprio> { usos[chave(it.nome)] ?: 0 }.thenBy { chave(it.nome) })
+    }
+
+    fun achar(tipos: List<TipoProprio>, nome: String): TipoProprio? = chave(nome).let { c -> tipos.firstOrNull { chave(it.nome) == c } }
+
+    /** As chaves dos tipos pessoais, para o [Dinheiro.balanco] separar do trabalho. */
+    fun pessoais(ctx: Context): Set<String> = todos(ctx).filter { it.pessoal }.map { chave(it.nome) }.toSet()
+
+    fun ehPessoal(g: Gasto, pessoais: Set<String>) = g.tipo == Tipo.OUTRO && g.descricao.isNotBlank() && chave(g.descricao) in pessoais
+
+    /** Cria o tipo, ou atualiza se pessoal ou não (e mostra de novo, se estava escondido). */
+    fun registrar(ctx: Context, nome: String, pessoal: Boolean) {
+        val n = limpo(nome)
+        if (n.isEmpty()) return
+        val tipos = todos(ctx)
+        val existe = achar(tipos, n)
+        salvar(ctx, if (existe == null) tipos + TipoProprio(n, pessoal)
+            else tipos.map { if (it === existe) it.copy(pessoal = pessoal, escondido = false) else it })
+    }
+
+    fun atualizar(ctx: Context, antigo: TipoProprio, novo: TipoProprio) {
+        val tipos = todos(ctx)
+        val nome = limpo(novo.nome)
+        if (nome.isEmpty()) return
+        val outro = achar(tipos, nome)?.takeIf { chave(it.nome) != chave(antigo.nome) }
+        // Renomeou para um nome que já existe: junta os dois.
+        val lista = tipos.filter { chave(it.nome) != chave(antigo.nome) && it !== outro } + novo.copy(nome = outro?.nome ?: nome)
+        salvar(ctx, lista)
+        if (nome != antigo.nome) Gastos.renomear(ctx, antigo.nome, outro?.nome ?: nome)
+    }
+
+    /**
+     * O tipo próprio dito na fala ("gastei 45 no dentista" acha "Dentista"). O nome mais comprido ganha
+     * ("café da manhã" antes de "café"). Só palavras inteiras.
+     */
+    fun naFala(tipos: List<TipoProprio>, fala: String): TipoProprio? {
+        val t = " " + chave(fala).replace(Regex("""[^a-z0-9 ]"""), " ").replace(Regex("""\s+"""), " ") + " "
+        return tipos.filter { chave(it.nome).isNotEmpty() && " ${chave(it.nome)} " in t }.maxByOrNull { it.nome.length }
+    }
+
+    private val DEPOIS_DE = Regex("""\b(?:no|na|nos|nas|com|em|de|do|da|pro|pra|para)\s+([a-zà-ÿ]{3,}(?:\s+(?:d[oae]s?|e)\s+[a-zà-ÿ]{3,})?)""")
+    private val NAO_E_NOME = Regex("""^(reais|real|conto|contos|pila|hoje|ontem|dinheiro|cartao|credito|debito|pix|uber|gasto|valor|novo|nova)\b""")
+
+    /** Um nome para sugerir num gasto novo: "gastei 45 reais no dentista" sugere "Dentista". */
+    fun sugerirNome(fala: String): String? = DEPOIS_DE.findAll(fala.lowercase())
+        .map { it.groupValues[1] }
+        .firstOrNull { !NAO_E_NOME.containsMatchIn(LeitorGasto.semAcento(it)) }
+        ?.let { limpo(it) }
+
+    private fun lerArquivo(ctx: Context): List<TipoProprio> {
+        val f = File(ctx.filesDir, ARQUIVO)
+        if (!f.exists()) return emptyList()
+        return f.readLines().mapNotNull { l ->
+            val c = l.split('\t')
+            c.getOrNull(0)?.takeIf { it.isNotBlank() }?.let { TipoProprio(it, c.getOrNull(1) == "1", c.getOrNull(2) == "1") }
+        }
+    }
+
+    private fun salvar(ctx: Context, tipos: List<TipoProprio>) {
+        File(ctx.filesDir, ARQUIVO).writeText(tipos.joinToString("") { "${limpo(it.nome)}\t${if (it.pessoal) 1 else 0}\t${if (it.escondido) 1 else 0}\n" })
     }
 }

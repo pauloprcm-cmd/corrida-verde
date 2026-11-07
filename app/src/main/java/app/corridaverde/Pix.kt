@@ -42,7 +42,7 @@ data class ContaPix(val tipo: TipoChave = TipoChave.CELULAR, val chave: String =
         fun carregar(ctx: Context): ContaPix {
             val p = ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
             val tipo = runCatching { TipoChave.valueOf(p.getString("tipo", null)!!) }.getOrDefault(TipoChave.CELULAR)
-            return ContaPix(tipo, p.getString("chave", "") ?: "", p.getString("nome", "") ?: "", p.getString("cidade", "São Paulo") ?: "São Paulo")
+            return ContaPix(tipo, p.getString("chave", "") ?: "", p.getString("nome", "") ?: "", p.getString("cidade", null).orEmpty().ifBlank { Config.cidadePadrao(ctx) })
         }
     }
 }

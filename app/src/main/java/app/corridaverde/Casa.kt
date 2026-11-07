@@ -120,9 +120,19 @@ object Enderecos {
 
     /** Rua, número e bairro de um ponto (o "📍 Aqui" do recibo). */
     fun endereco(ctx: Context, p: Ponto): String? {
+        val a = reverso(ctx, p) ?: return null
+        val rua = listOfNotNull(a.thoroughfare, a.subThoroughfare).joinToString(", ").ifBlank { null }
+        return listOfNotNull(rua, a.subLocality).joinToString(" - ").ifBlank { a.getAddressLine(0) }
+    }
+
+    /** Os nomes que o mapa dá para a cidade do ponto (no Brasil vem ora em locality, ora em subAdminArea). */
+    fun cidade(ctx: Context, p: Ponto): List<String> =
+        reverso(ctx, p)?.let { listOfNotNull(it.locality, it.subAdminArea).distinct() } ?: emptyList()
+
+    private fun reverso(ctx: Context, p: Ponto): Address? {
         if (!Geocoder.isPresent()) return null
         val g = Geocoder(ctx, Locale("pt", "BR"))
-        val a: Address = runCatching {
+        return runCatching {
             if (Build.VERSION.SDK_INT >= 33) {
                 var r: Address? = null
                 val pronto = CountDownLatch(1)
@@ -136,9 +146,7 @@ object Enderecos {
                 @Suppress("DEPRECATION")
                 g.getFromLocation(p.lat, p.lon, 1)?.firstOrNull()
             }
-        }.getOrNull() ?: return null
-        val rua = listOfNotNull(a.thoroughfare, a.subThoroughfare).joinToString(", ").ifBlank { null }
-        return listOfNotNull(rua, a.subLocality).joinToString(" - ").ifBlank { a.getAddressLine(0) }
+        }.getOrNull()
     }
 
     private fun carregar(ctx: Context) {

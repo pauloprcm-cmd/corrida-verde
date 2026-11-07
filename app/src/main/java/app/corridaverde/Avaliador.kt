@@ -22,16 +22,8 @@ data class Resultado(
     val avisos: List<String>,
 )
 
-/** Tabela do táxi de SP (Prefeitura, vigente desde 11/08/2025). */
+/** O cálculo do taxímetro, com a tabela da cidade do taxista ([Config.tabela], escolhida em [Cidades]). */
 object Tarifa {
-    const val BANDEIRADA_COMUM = 6.55
-    const val KM_COMUM = 4.80
-    const val BANDEIRADA_LUXO = 9.83
-    const val KM_LUXO = 7.20
-    const val ACRESCIMO_BANDEIRA2 = 1.30
-    const val HORA_COMUM = 55.50
-    const val HORA_LUXO = 83.25
-
     /**
      * Velocidade média com o carro andando. O tempo que a Uber prevê além de km / essa velocidade é trânsito,
      * que o taxímetro cobra pela hora parada (parado ou abaixo de 15 km/h). Era 25 (2 corridas de 25/09/2026);
@@ -43,28 +35,32 @@ object Tarifa {
     /** Taxa de serviço da Uber no uberTAXI (detalhe da corrida de 30/10/2026: preço R$ 32,08, taxa R$ 4,81). */
     const val TAXA_UBER_TAXI = 0.15
 
-    /** Bandeira 2: das 20h às 6h de segunda a sábado, e o dia todo em domingos e feriados. */
-    fun bandeira2(agora: LocalDateTime): Boolean {
+    /**
+     * Bandeira 2 pela regra da cidade: à noite ([TabelaTaxi.b2De] às [TabelaTaxi.b2Ate]), no sábado a partir da hora
+     * da cidade, o dia todo em domingos e feriados e, onde a prefeitura libera, em dezembro e na terça de Carnaval.
+     */
+    fun bandeira2(agora: LocalDateTime, t: TabelaTaxi = Cidades.SAO_PAULO.tabela, cidade: Cidade? = Cidades.SAO_PAULO): Boolean {
         val dia = agora.toLocalDate()
-        if (dia.dayOfWeek == DayOfWeek.SUNDAY || Feriados.eh(dia)) return true
-        return agora.hour >= 20 || agora.hour < 6
+        if (dia.dayOfWeek == DayOfWeek.SUNDAY || Feriados.eh(dia, cidade)) return true
+        if (t.b2Dezembro && dia.monthValue == 12) return true
+        if (dia.dayOfWeek == DayOfWeek.SATURDAY && t.b2Sabado != TabelaTaxi.SABADO_NORMAL && agora.hour >= t.b2Sabado) return true
+        return agora.hour >= t.b2De || agora.hour < t.b2Ate
     }
 
     /** Minutos da viagem que o taxímetro deve cobrar como hora parada. */
     fun minutosParado(km: Double, min: Int): Double = maxOf(0.0, min - km / KMH_ANDANDO * 60)
 
-    /** O taxímetro usa só a viagem, sem a busca. A bandeira 2 aumenta o km, não a hora parada. */
-    fun taximetro(km: Double, min: Int, luxo: Boolean, bandeira2: Boolean): Double {
-        val porKm = (if (luxo) KM_LUXO else KM_COMUM) * (if (bandeira2) ACRESCIMO_BANDEIRA2 else 1.0)
-        val porHora = if (luxo) HORA_LUXO else HORA_COMUM
-        return (if (luxo) BANDEIRADA_LUXO else BANDEIRADA_COMUM) + km * porKm + minutosParado(km, min) * porHora / 60
+    /** O taxímetro usa só a viagem, sem a busca. A bandeira 2 muda o km, não a hora parada. */
+    fun taximetro(km: Double, min: Int, t: TabelaTaxi, luxo: Boolean, bandeira2: Boolean): Double {
+        val v = t.especial?.takeIf { luxo } ?: t.comum
+        return v.bandeirada + km * (if (bandeira2) v.km2 else v.km1) + minutosParado(km, min) * v.hora / 60
     }
 }
 
 object Avaliador {
     fun avaliar(o: Oferta, cfg: Config, agora: LocalDateTime = LocalDateTime.now()): Resultado {
-        val b2 = Tarifa.bandeira2(agora)
-        val taximetro = Tarifa.taximetro(o.viagemKm, o.viagemMin, cfg.luxo, b2)
+        val b2 = Tarifa.bandeira2(agora, cfg.tabela, cfg.cidadeDaBase)
+        val taximetro = Tarifa.taximetro(o.viagemKm, o.viagemMin, cfg.tabela, cfg.luxo, b2)
         // uberTAXI (faixa "R$ 31 - R$ 46"): o passageiro paga o taxímetro, mas nunca mais que o máximo, e a Uber
         // fica com 15%. Se o taxímetro estimado passa do máximo, a diferença o motorista perde. No Táxi Promo o valor
         // da oferta já é o que cai para o motorista.
@@ -107,16 +103,19 @@ object Avaliador {
     }
 }
 
-/** Feriados nacionais, do estado e da cidade de São Paulo. */
+/** Feriados nacionais e os da cidade e do estado do taxista ([Cidade.feriados]). */
 object Feriados {
-    private val FIXOS = setOf(
-        1 to 1, 1 to 25, 4 to 21, 5 to 1, 7 to 9, 9 to 7,
+    /** Nacionais fixos (20/11 é nacional desde a Lei 14.759/2023). */
+    private val NACIONAIS = setOf(
+        1 to 1, 4 to 21, 5 to 1, 9 to 7,
         10 to 12, 11 to 2, 11 to 15, 11 to 20, 12 to 25,
     )
 
-    fun eh(d: LocalDate): Boolean {
-        if ((d.monthValue to d.dayOfMonth) in FIXOS) return true
+    fun eh(d: LocalDate, cidade: Cidade? = Cidades.SAO_PAULO): Boolean {
+        val md = d.monthValue to d.dayOfMonth
+        if (md in NACIONAIS || cidade?.feriados?.contains(md) == true) return true
         val pascoa = pascoa(d.year)
+        if (cidade?.carnaval == true && d == pascoa.minusDays(47)) return true // terça de Carnaval
         return d == pascoa.minusDays(2) || d == pascoa.plusDays(60) // Sexta-feira Santa e Corpus Christi
     }
 

@@ -10,6 +10,7 @@ import android.text.InputType
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -89,7 +90,22 @@ class GastoActivity : Activity() {
             is TotalDoDia -> editando.hora
             else -> null
         }
-        val tipos = Tipo.entries
+        // A lista de tipos: os fixos, depois os que o motorista criou (mais usados primeiro) e, no fim, "Outro".
+        val todosGastos = Gastos.todos(this)
+        val proprios = TiposGasto.todos(this)
+        val editado = (editando as? Gasto)?.takeIf { it.tipo == Tipo.OUTRO && it.descricao.isNotBlank() }
+            ?.let { TiposGasto.achar(proprios, it.descricao) ?: TipoProprio(TiposGasto.limpo(it.descricao)) }
+        val daFala = if (editando == null && fala != null) TiposGasto.naFala(proprios, fala) else null
+        val naLista = TiposGasto.naLista(proprios, todosGastos).let { lista ->
+            listOfNotNull(editado).filter { e -> lista.none { TiposGasto.chave(it.nome) == TiposGasto.chave(e.nome) } } + lista
+        }
+        val fixos = Tipo.entries.filter { it != Tipo.OUTRO }
+        val opcoes: List<Any> = fixos + naLista + Tipo.OUTRO
+        fun tipoDe(o: Any) = o as? Tipo ?: Tipo.OUTRO
+        val inicial: Any = editado?.let { e -> naLista.first { TiposGasto.chave(it.nome) == TiposGasto.chave(e.nome) } }
+            ?: daFala?.let { d -> naLista.firstOrNull { it === d } }
+            ?: l.tipo?.takeIf { it != Tipo.OUTRO }
+            ?: Tipo.OUTRO
         val caixa = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
@@ -137,10 +153,35 @@ class GastoActivity : Activity() {
 
         val rotuloTipo = rotulo("Tipo")
         val tipo = Spinner(this).apply {
-            adapter = ArrayAdapter(this@GastoActivity, android.R.layout.simple_spinner_dropdown_item, tipos.map { it.nome })
-            setSelection(tipos.indexOf(l.tipo ?: Tipo.OUTRO))
+            adapter = ArrayAdapter(this@GastoActivity, android.R.layout.simple_spinner_dropdown_item, opcoes.map {
+                when (it) {
+                    is TipoProprio -> if (it.pessoal) "${it.nome} (pessoal)" else it.nome
+                    Tipo.OUTRO -> "Outro (escrever qual)"
+                    else -> (it as Tipo).nome
+                }
+            })
+            setSelection(opcoes.indexOf(inicial))
         }
         caixa.addView(tipo)
+        // "Outro": o nome do gasto, que vira um tipo dele para as próximas vezes.
+        val rotuloNome = rotulo("Qual gasto? (ex.: Supermercado, Dentista)")
+        val nomeNovo = AutoCompleteTextView(this).apply {
+            setAdapter(ArrayAdapter(this@GastoActivity, android.R.layout.simple_dropdown_item_1line, proprios.map { it.nome }))
+            threshold = 1
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setText(if (editando == null && daFala == null && l.tipo == null) fala?.let { TiposGasto.sugerirNome(it) } ?: "" else "")
+        }
+        caixa.addView(nomeNovo)
+        val pessoal = CheckBox(this).apply { text = "É gasto pessoal (casa, família): fica fora do Sobrou do trabalho" }
+        caixa.addView(pessoal)
+        // Escreveu o nome de um tipo que já existe: marca como ele é.
+        nomeNovo.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                TiposGasto.achar(proprios, s?.toString() ?: "")?.let { pessoal.isChecked = it.pessoal }
+            }
+        })
         val rotuloValor = rotulo("Valor (R$)")
         val valor = campo(l.valor?.let { Popup.br(it) } ?: "", decimal)
 
@@ -157,7 +198,9 @@ class GastoActivity : Activity() {
             val gasto = ehGasto.isChecked
             soGanho.forEach { it.visibility = if (gasto) View.GONE else View.VISIBLE }
             soGasto.forEach { it.visibility = if (gasto) View.VISIBLE else View.GONE }
-            val t = tipos[tipo.selectedItemPosition]
+            val t = tipoDe(opcoes[tipo.selectedItemPosition])
+            val outro = gasto && opcoes[tipo.selectedItemPosition] == Tipo.OUTRO
+            listOf(rotuloNome, nomeNovo, pessoal).forEach { it.visibility = if (outro) View.VISIBLE else View.GONE }
             soCombustivel.forEach { it.visibility = if (gasto && t.combustivel) View.VISIBLE else View.GONE }
             rotuloLitros.text = if (t == Tipo.GNV) "Metros cúbicos (m³)" else "Litros"
         }
@@ -197,7 +240,13 @@ class GastoActivity : Activity() {
                 salvarGanho(apps[app.selectedItemPosition], v, total.isChecked, hora, editando)
                 return@setOnClickListener
             }
-            val t = tipos[tipo.selectedItemPosition]
+            val escolhido = opcoes[tipo.selectedItemPosition]
+            val t = tipoDe(escolhido)
+            val descricao = when (escolhido) {
+                is TipoProprio -> escolhido.nome
+                Tipo.OUTRO -> TiposGasto.limpo(nomeNovo.text.toString())
+                else -> ""
+            }
             val v = num(valor)
             if (v == null || v <= 0) {
                 valor.error = "Informe o valor"
@@ -210,7 +259,10 @@ class GastoActivity : Activity() {
                 litros = if (t.combustivel) num(litros)?.takeIf { it > 0 } else null,
                 km = if (t.combustivel) km.text.toString().filter { it.isDigit() }.toIntOrNull() else null,
                 tanqueCheio = t.combustivel && cheio.isChecked,
+                descricao = descricao,
             )
+            // Nome novo (ou o de um tipo que estava escondido): entra na lista dele.
+            if (escolhido == Tipo.OUTRO && descricao.isNotEmpty()) TiposGasto.registrar(this, descricao, pessoal.isChecked)
             dialogo.setOnCancelListener(null)
             dialogo.dismiss()
             salvar(gasto, editando as? Gasto)
@@ -266,21 +318,36 @@ class GastoActivity : Activity() {
         }
         Gastos.adicionar(this, g)
         Notificacao.atualizar(this)
-        val c = if (g.tipo.combustivel) Gastos.consumo(Gastos.todos(this)) else null
-        if (c == null) {
+        val todos = if (g.tipo.combustivel) Gastos.todos(this) else emptyList()
+        val c = if (g.tipo.combustivel) Gastos.consumo(todos) else null
+        // Tanque que rendeu bem menos que a média do mesmo combustível, e a conta do etanol contra a gasolina.
+        val queda = c?.let { Abastecimentos.trechos(todos) }?.let { t -> Abastecimentos.queda(t)?.let { it to t.last() } }
+        val preco = if (g.tipo.combustivel) Abastecimentos.compararPreco(todos, g) else null
+        if (c == null && preco == null) {
             val dica = if (g.tanqueCheio && g.km != null) " No próximo tanque cheio com a quilometragem, o app mostra o consumo." else ""
-            Toast.makeText(this, "Gasto salvo: ${g.tipo.nome} R$ ${Popup.br(g.valor)}.$dica", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Gasto salvo: ${g.nome} R$ ${Popup.br(g.valor)}.$dica", Toast.LENGTH_LONG).show()
             finish()
             return
         }
+        val texto = buildString {
+            if (c != null) {
+                append("Rodou ${c.kmRodados} km\n")
+                append("Colocou ${String.format(PT, "%.1f", c.litros)} ${c.unidade}\n\n")
+                append("${Abastecimentos.kmL(c.kmPorLitro)} km/${c.unidade.lowercase()}\n")
+                append("R$ ${Popup.br(c.custoKm)} por km")
+            }
+            queda?.let { (q, t) ->
+                append("\n\nAtenção: este tanque rendeu ${Math.round(q * 100)}% menos que a sua média com ${t.combustivel!!.nome.lowercase()}. ")
+                append("Confira a calibragem dos pneus, o filtro de ar e o óleo.")
+            }
+            preco?.let {
+                if (isNotEmpty()) append("\n\n")
+                append(it)
+            }
+        }
         AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
-            .setTitle("Consumo desde o último tanque cheio")
-            .setMessage(
-                "Rodou ${c.kmRodados} km\n" +
-                    "Colocou ${String.format(PT, "%.1f", c.litros)} ${c.unidade}\n\n" +
-                    "${String.format(PT, "%.1f", c.kmPorLitro)} km/${c.unidade.lowercase()}\n" +
-                    "R$ ${Popup.br(c.custoKm)} por km",
-            )
+            .setTitle(if (c != null) "Consumo desde o último tanque cheio" else "Gasto salvo: ${g.nome} R$ ${Popup.br(g.valor)}")
+            .setMessage(texto)
             .setPositiveButton("OK") { _, _ -> finish() }
             .setOnCancelListener { finish() }
             .show()

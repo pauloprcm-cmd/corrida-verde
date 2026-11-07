@@ -7,6 +7,13 @@ data class Config(
     /** [TAXI] ou [APP]; vazio enquanto a pessoa não escolheu (primeira abertura). */
     val perfil: String = "",
     val luxo: Boolean = false,
+    /**
+     * Cidade do taxista ("São Paulo/SP"), vazia enquanto ele não escolheu. Fora da base ([Cidades]) é o nome que
+     * ele digitou, com a tabela do táxi dele. Quem já usava o app antes das cidades fica com a de SP até escolher.
+     */
+    val cidade: String = "",
+    /** A tabela que vale: a da cidade, ou a que o taxista corrigiu em Ajustes (a prefeitura mudou e o app não). */
+    val tabela: TabelaTaxi = Cidades.SAO_PAULO.tabela,
     /** Padrões do taxista escolhidos pelo Paulo em 30/10/2026 (antes 100, 85 e 3,0 km). */
     val limiteVerde: Int = 80,
     val limiteAmarelo: Int = 70,
@@ -45,6 +52,11 @@ data class Config(
 ) {
     val indoPraCasa get() = casa != null && indoPraCasaDia == LocalDate.now().toString()
     val motoristaDeApp get() = perfil == APP
+    /** A cidade da base, para os feriados; sem cidade escolhida, São Paulo (como era antes das cidades). */
+    val cidadeDaBase get() = if (cidade.isEmpty()) Cidades.SAO_PAULO else Cidades.achar(cidade)
+    val nomeCidade get() = cidade.substringBefore('/')
+    /** Falta o taxista dizer a cidade (a escolha aparece ao abrir o app). */
+    val faltaCidade get() = !motoristaDeApp && cidade.isEmpty()
 
     fun verde(g: Grupo) = when (g) {
         Grupo.ECONOMICO -> verdeEconomico
@@ -62,6 +74,8 @@ data class Config(
         ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE).edit()
             .putString("perfil", perfil)
             .putBoolean("luxo", luxo)
+            .putString("cidade", cidade)
+            .apply { salvarTabela(this, tabela) }
             .putInt("limiteVerde", limiteVerde)
             .putInt("limiteAmarelo", limiteAmarelo)
             .putFloat("buscaMaxKm", buscaMaxKm.toFloat())
@@ -127,6 +141,55 @@ data class Config(
         fun maisAntiga(a: String?, b: String?): String? =
             listOfNotNull(a, b).filter { runCatching { LocalDate.parse(it) }.isSuccess }.minOrNull()
 
+        private val VALORES = listOf("bandeirada", "km1", "km2", "hora")
+
+        private fun salvarTabela(e: android.content.SharedPreferences.Editor, t: TabelaTaxi) {
+            fun valores(prefixo: String, v: Valores?) = listOf(v?.bandeirada, v?.km1, v?.km2, v?.hora).zip(VALORES)
+                .forEach { (n, nome) -> e.putString("$prefixo$nome", n?.toString() ?: "") }
+            valores("tx_", t.comum)
+            valores("txe_", t.especial)
+            e.putString("tx_nomeEspecial", t.nomeEspecial)
+                .putInt("tx_b2De", t.b2De).putInt("tx_b2Ate", t.b2Ate).putInt("tx_b2Sabado", t.b2Sabado)
+                .putBoolean("tx_b2Dezembro", t.b2Dezembro)
+        }
+
+        /** Guardada como texto ("4.47"): em Float, 4,47 voltava 4,4699997. Sem tabela guardada, a de SP. */
+        private fun carregarTabela(p: android.content.SharedPreferences): TabelaTaxi {
+            val sp = Cidades.SAO_PAULO.tabela
+            fun valores(prefixo: String): Valores? {
+                val n = VALORES.map { p.getString("$prefixo$it", null)?.toDoubleOrNull() }
+                return if (n.all { it != null }) Valores(n[0]!!, n[1]!!, n[2]!!, n[3]!!) else null
+            }
+            val comum = valores("tx_") ?: return sp
+            return TabelaTaxi(
+                comum = comum,
+                especial = valores("txe_"),
+                nomeEspecial = p.getString("tx_nomeEspecial", sp.nomeEspecial) ?: sp.nomeEspecial,
+                b2De = p.getInt("tx_b2De", sp.b2De),
+                b2Ate = p.getInt("tx_b2Ate", sp.b2Ate),
+                b2Sabado = p.getInt("tx_b2Sabado", sp.b2Sabado),
+                b2Dezembro = p.getBoolean("tx_b2Dezembro", sp.b2Dezembro),
+            )
+        }
+
+        /** A cidade que o recibo e o Pix usam quando o motorista não digitou outra: a do taxímetro, ou São Paulo. */
+        fun cidadePadrao(ctx: Context): String = carregar(ctx).nomeCidade.ifBlank { "São Paulo" }
+
+        /**
+         * Trocou a cidade do taxímetro: o recibo e o Pix acompanham, menos quando o motorista escreveu outra cidade
+         * neles (a "região" do recibo, ou a cidade da conta no banco). Só troca o que estava vazio ou na cidade antiga.
+         */
+        fun acompanharCidade(ctx: Context, antiga: String, nova: String) {
+            if (nova.isBlank()) return
+            listOf("motorista", "pix").forEach { arquivo ->
+                val p = ctx.getSharedPreferences(arquivo, Context.MODE_PRIVATE)
+                val atual = p.getString("cidade", null)
+                if (atual.isNullOrBlank() || Cidades.semAcento(atual.trim()) == Cidades.semAcento(antiga.trim())) {
+                    p.edit().putString("cidade", nova).apply()
+                }
+            }
+        }
+
         fun carregar(ctx: Context): Config {
             val p = ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
             val d = Config()
@@ -135,6 +198,8 @@ data class Config(
             return Config(
                 perfil = p.getString("perfil", d.perfil) ?: "",
                 luxo = p.getBoolean("luxo", d.luxo),
+                cidade = p.getString("cidade", "") ?: "",
+                tabela = carregarTabela(p),
                 limiteVerde = p.getInt("limiteVerde", d.limiteVerde),
                 limiteAmarelo = p.getInt("limiteAmarelo", d.limiteAmarelo),
                 buscaMaxKm = real("buscaMaxKm", d.buscaMaxKm),

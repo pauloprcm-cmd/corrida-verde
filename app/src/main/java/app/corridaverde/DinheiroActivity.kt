@@ -84,7 +84,8 @@ class DinheiroActivity : Activity() {
 
         val b = Dinheiro.balanco(this, visao, dia)
         conteudo.removeAllViews()
-        conteudo.addView(texto("Sobrou", 16f).apply { setPadding(0, dp(12), 0, 0) })
+        // Com gasto pessoal no período, deixa claro que o número grande é só do trabalho.
+        conteudo.addView(texto(if (b.porPessoal.isNotEmpty()) "Sobrou do trabalho" else "Sobrou", 16f).apply { setPadding(0, dp(12), 0, 0) })
         conteudo.addView(texto(Dinheiro.rs(b.sobrou), 40f, negrito = true, cor = if (b.sobrou < 0) VERMELHO else VERDE))
         conteudo.addView(texto("Entrou ${Dinheiro.rs(b.entrou)}\nGastou ${Dinheiro.rs(b.gastou)}", 18f))
 
@@ -105,18 +106,82 @@ class DinheiroActivity : Activity() {
 
         if (b.porTipo.isNotEmpty()) {
             secao("Para onde foi")
-            b.porTipo.entries.sortedByDescending { it.value }.forEach { (tipo, v) -> linha(tipo.nome, Dinheiro.rs(v), null) }
+            b.porTipo.entries.sortedByDescending { it.value }.forEach { (nome, v) -> linha(nome, Dinheiro.rs(v), null) }
             Dinheiro.pct(b.combustivel, b.entrou)?.takeIf { b.combustivel > 0 }?.let {
                 conteudo.addView(texto("O combustível levou $it% do que entrou.", 15f, cor = CINZA).apply { setPadding(0, dp(6), 0, 0) })
             }
         }
 
-        if (visao == Visao.DIA) lancamentos() else barrasPorDia(b, hoje)
-        if (b.entrou == 0.0 && b.gastou == 0.0) {
+        if (visao != Visao.DIA) consumo(b, hoje)
+        if (visao == Visao.DIA) {
+            pessoais(b)
+            lancamentos()
+        } else {
+            barrasPorDia(b, hoje)
+            pessoais(b)
+        }
+        if (b.entrou == 0.0 && b.gastou == 0.0 && b.pessoal == 0.0) {
             conteudo.addView(texto("Nada lançado neste período. Ganhos e gastos entram pelo botão Falar ganho ou gasto.", 15f, cor = CINZA).apply {
                 setPadding(0, dp(16), 0, 0)
             })
         }
+    }
+
+    /**
+     * Semana e mês: a média de consumo do período (sem precisar de tanque cheio) e, no mês, qual combustível
+     * saiu mais barato por km nos últimos 90 dias.
+     */
+    private fun consumo(b: Balanco, hoje: LocalDate) {
+        val gastos = Gastos.todos(this)
+        val media = Abastecimentos.mediaDoPeriodo(gastos, b.de, b.ate)
+        val porCombustivel = if (visao == Visao.MES) Abastecimentos.porCombustivel(gastos, hoje.minusDays(90)) else emptyList()
+        val semKm = Abastecimentos.semKm(gastos, b.de, b.ate)
+        if (media == null && porCombustivel.isEmpty() && semKm == 0) return
+        secao("Consumo")
+        media?.let {
+            linha("Média ${if (visao == Visao.MES) "do mês" else "da semana"}", "${Abastecimentos.kmL(it.kmPorLitro)} km/${it.unidade.lowercase()}",
+                "R$ ${Popup.br(it.custoKm)}/km")
+            conteudo.addView(texto("${it.kmRodados} km pelo painel. Não precisa encher o tanque: quanto mais km, mais exata.", 14f, cor = CINZA))
+        }
+        if (media == null && semKm > 0) {
+            conteudo.addView(texto("Para ver a média, fale a quilometragem do painel em todo abastecimento " +
+                "(ex.: “abasteci 100 de gasolina, painel 45.320”).", 14f, cor = CINZA))
+        }
+        if (porCombustivel.isNotEmpty()) {
+            conteudo.addView(texto("Por combustível (últimos 90 dias, de tanque cheio a tanque cheio)", 15f, negrito = true).apply {
+                setPadding(0, dp(12), 0, dp(2))
+            })
+            porCombustivel.forEach {
+                linha("${it.tipo.nome} (${it.tanques} ${if (it.tanques == 1) "tanque" else "tanques"})",
+                    "R$ ${Popup.br(it.custoKm)}/km", "${Abastecimentos.kmL(it.kmPorLitro)} km/${it.tipo.unidade.lowercase()}")
+            }
+            if (porCombustivel.size >= 2) {
+                val melhor = porCombustivel[0]
+                val dif = porCombustivel[1].custoKm - melhor.custoKm
+                conteudo.addView(texto("${melhor.tipo.nome} compensou: R$ ${Popup.br(dif)} a menos por km, " +
+                    "uns ${Dinheiro.rs(dif * 1000)} a cada 1.000 km.", 15f, negrito = true, cor = VERDE).apply { setPadding(0, dp(6), 0, 0) })
+            }
+            Abastecimentos.limiteEtanol(porCombustivel)?.let {
+                conteudo.addView(texto("No seu carro, o etanol compensa até ${Math.round(it * 100)}% do preço da gasolina.", 14f, cor = CINZA))
+            }
+        }
+    }
+
+    /** Os gastos pessoais do período e o que fica no bolso depois deles. Some se não houver nenhum. */
+    private fun pessoais(b: Balanco) {
+        if (b.porPessoal.isEmpty()) return
+        secao("Gastos pessoais")
+        b.porPessoal.entries.sortedByDescending { it.value }.forEach { (nome, v) -> linha(nome, Dinheiro.rs(v), null) }
+        conteudo.addView(View(this).apply { setBackgroundColor(CINZA) }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
+            topMargin = dp(6)
+            bottomMargin = dp(6)
+        })
+        linha("Total pessoal", Dinheiro.rs(b.pessoal), null)
+        val l = LinearLayout(this).apply { setPadding(0, dp(3), 0, dp(3)) }
+        l.addView(texto("No bolso", 17f, negrito = true), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        l.addView(texto(Dinheiro.rs(b.noBolso), 17f, negrito = true, cor = if (b.noBolso < 0) VERMELHO else VERDE))
+        conteudo.addView(l)
+        conteudo.addView(texto("O que sobrou do trabalho menos os gastos pessoais.", 14f, cor = CINZA))
     }
 
     /** Uma barrinha por dia com o que sobrou: verde para cima, vermelha quando gastou mais do que ganhou. */
@@ -153,8 +218,9 @@ class DinheiroActivity : Activity() {
         Corridas.todas(this).filter { it.hora.toLocalDate() == dia }.forEach {
             itens += Triple(it.hora, "${it.app} · corrida", it)
         }
+        val pessoais = TiposGasto.pessoais(this)
         Gastos.todos(this).filter { it.quando.toLocalDate() == dia }.forEach {
-            itens += Triple(it.quando, "Gasto · ${it.tipo.nome}", it)
+            itens += Triple(it.quando, "${if (TiposGasto.ehPessoal(it, pessoais)) "Pessoal" else "Gasto"} · ${it.nome}", it)
         }
         if (itens.isEmpty()) return
         secao("Lançamentos")

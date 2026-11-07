@@ -26,6 +26,8 @@ class MainActivity : Activity() {
     private var versao: TextView? = null
     /** Acabou um passo a passo ([LEITURA] ou [BATERIA]): mostra o "Pronto!" dele. */
     private var pronto: String? = null
+    /** Já abriu a escolha da cidade nesta abertura do app. */
+    private var pulouCidade = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,6 +87,11 @@ class MainActivity : Activity() {
     private fun mostrarTela() {
         if (!Termos.aceitou(this)) return montarTermos()
         if (faltaEscolherPerfil()) return montarEscolha()
+        // Taxista sem cidade: abre a escolha uma vez; se ele voltar sem escolher, segue com a tabela de SP e pergunta na próxima abertura.
+        if (Config.carregar(this).faltaCidade && !pulouCidade) {
+            pulouCidade = true
+            CidadeActivity.abrir(this)
+        }
         montar()
         Notificacao.atualizar(this)
         tirarIconeFalar()
@@ -135,7 +142,8 @@ class MainActivity : Activity() {
         // Celular antigo: diz por que a 99 não aparece, em vez de deixar o motorista esperando o aviso.
         if (cfg.aviso99 && !le99) c.addView(v.texto(Celular.semAviso99, 16f, cor = v.texto2).apply { setPadding(0, v.dp(6), 0, 0) })
         val linha = listOfNotNull(
-            if (cfg.motoristaDeApp) "Motorista de app" else "Taxímetro: ${if (cfg.luxo) "Luxo" else "Comum"}",
+            if (cfg.motoristaDeApp) "Motorista de app"
+            else "Taxímetro ${if (cfg.luxo) cfg.tabela.nomeEspecial else "Comum"}" + (cfg.nomeCidade.ifEmpty { "São Paulo" }.let { " de $it" }),
             "Indo pra casa".takeIf { cfg.indoPraCasa },
         )
         c.addView(v.texto(linha.joinToString(" · "), 16f, cor = v.texto2).apply { setPadding(0, v.dp(6), 0, 0) })

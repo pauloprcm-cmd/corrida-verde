@@ -40,7 +40,7 @@ data class Motorista(
             val p = ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
             fun s(k: String, d: String = "") = p.getString(k, d) ?: d
             return Motorista(
-                s("nome"), s("placa"), s("alvara"), s("documento"), s("telefone"), s("cidade", "São Paulo"),
+                s("nome"), s("placa"), s("alvara"), s("documento"), s("telefone"), s("cidade").ifBlank { Config.cidadePadrao(ctx) },
                 s("fantasia"), s("email"), s("instagram"),
             )
         }

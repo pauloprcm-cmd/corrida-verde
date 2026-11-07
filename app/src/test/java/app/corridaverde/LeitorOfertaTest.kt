@@ -190,7 +190,7 @@ class LeitorOfertaTest {
         assertTrue(Tarifa.bandeira2(LocalDateTime.of(2026, 11, 20, 12, 0))) // Consciência Negra
         assertFalse(Tarifa.bandeira2(LocalDateTime.of(2026, 9, 26, 12, 0))) // sábado de dia
         assertEquals(LocalDate.of(2026, 4, 5), Feriados.pascoa(2026))
-        assertEquals(9.83 + 10 * 7.20 * 1.3, Tarifa.taximetro(10.0, 24, luxo = true, bandeira2 = true), 0.001)
+        assertEquals(9.83 + 10 * 7.20 * 1.3, Tarifa.taximetro(10.0, 24, Cidades.SAO_PAULO.tabela, luxo = true, bandeira2 = true), 0.001)
     }
 
     @Test

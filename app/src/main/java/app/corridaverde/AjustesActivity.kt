@@ -36,6 +36,8 @@ class AjustesActivity : Activity() {
             .zip(CAMPOS_APP.toList()).forEach { (valor, id) -> campo(id, EditText::class.java).setText(Popup.br(valor)) }
         campo(R.id.luxo, RadioButton::class.java).isChecked = cfg.luxo
         campo(R.id.comum, RadioButton::class.java).isChecked = !cfg.luxo
+        mostrarCidade(cfg)
+        campo(R.id.trocarTabela, Button::class.java).setOnClickListener { CidadeActivity.abrir(this, editar = true) }
         campo(R.id.limiteVerde, EditText::class.java).setText(cfg.limiteVerde.toString())
         campo(R.id.limiteAmarelo, EditText::class.java).setText(cfg.limiteAmarelo.toString())
         campo(R.id.buscaMax, EditText::class.java).setText(cfg.buscaMaxKm.toString().replace('.', ','))
@@ -244,6 +246,24 @@ class AjustesActivity : Activity() {
         return status + "\n" + leitura
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Voltou da tela da cidade: mostra a cidade e a categoria novas.
+        mostrarCidade(Config.carregar(this))
+    }
+
+    /** "Taxímetro de Campinas (fev/2025): bandeirada R$ 5,49 · km R$ 3,94"; a segunda categoria só onde a cidade tem. */
+    private fun mostrarCidade(cfg: Config) {
+        val t = cfg.tabela
+        val nome = cfg.nomeCidade.ifEmpty { "São Paulo (escolha a sua cidade)" }
+        val corrigida = cfg.cidadeDaBase?.let { it.tabela != t } ?: false
+        campo(R.id.cidadeAtual, TextView::class.java).text = "Taxímetro de $nome${if (corrigida) ", com a tabela que você corrigiu" else ""}: " +
+            "bandeirada R$ ${Popup.br(t.comum.bandeirada)} · km R$ ${Popup.br(t.comum.km1)} (bandeira 2: R$ ${Popup.br(t.comum.km2)})"
+        campo(R.id.categoria, RadioGroup::class.java).visibility = if (t.especial != null) View.VISIBLE else View.GONE
+        campo(R.id.luxo, RadioButton::class.java).text = t.nomeEspecial
+        if (t.especial == null) campo(R.id.comum, RadioButton::class.java).isChecked = true
+    }
+
     /** Taxista vê o taxímetro e a % ; motorista de app vê os mínimos de R$/km. */
     private fun mostrarPerfil(app: Boolean) {
         campo(R.id.soTaxi, LinearLayout::class.java).visibility = if (app) View.GONE else View.VISIBLE
@@ -271,7 +291,7 @@ class AjustesActivity : Activity() {
         val atual = Config.carregar(this)
         val diagnostico = campo(R.id.diagnostico, CheckBox::class.java).isChecked
         return atual.copy(
-            luxo = campo(R.id.luxo, RadioButton::class.java).isChecked,
+            luxo = campo(R.id.luxo, RadioButton::class.java).isChecked && atual.tabela.especial != null,
             limiteVerde = verde,
             limiteAmarelo = amarelo,
             buscaMaxKm = busca,

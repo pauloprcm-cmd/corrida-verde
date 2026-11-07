@@ -37,9 +37,12 @@
 
             <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Taxímetro" />
 
-            <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="O aviso compara a oferta com a tabela do táxi de São Paulo." />
+            <TextView android:id="@+id/cidadeAtual" style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+
+            <Button android:id="@+id/trocarTabela" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Ver ou corrigir a tabela, trocar de cidade" />
 
             <RadioGroup
+                android:id="@+id/categoria"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">

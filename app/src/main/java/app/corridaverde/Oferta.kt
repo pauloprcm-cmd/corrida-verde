@@ -78,7 +78,10 @@ object LeitorOferta {
         val opcoes = if (doPrint) comPontoDeVolta(lidos) else listOf(lidos)
         // Desde 28/10/2026 o Táxi mostra o total ("8 min • 1.7 km") embaixo do valor, antes da busca: é a soma dos
         // outros trechos e não pode virar busca nem parada.
-        val comTotal = opcoes.firstOrNull { it.size >= 3 && ehTotal(it[0], it.drop(1)) }
+        // No print, o ícone da busca às vezes vira um algarismo grudado no minuto ("6 min" sai "86 min": 4 ofertas sem
+        // aviso em 06/11/2026). Tirar o primeiro algarismo só vale se a soma passar a fechar com o total.
+        val comTotal = opcoes.flatMap { o -> listOf(o) + if (doPrint) semIconeNaBusca(o) else emptyList() }
+            .firstOrNull { it.size >= 3 && ehTotal(it[0], it.drop(1)) }
         val trechos = when {
             comTotal != null -> comTotal.drop(1)
             // No print, o trecho logo embaixo do valor (sem a linha "Est. de") é o total. Se a soma não fecha, o OCR
@@ -138,6 +141,15 @@ object LeitorOferta {
         }
     }
 
+    /** A leitura com o minuto da busca (o trecho logo depois do total) sem o primeiro algarismo: "86" → 6, "816" → 16. */
+    private fun semIconeNaBusca(o: List<Trecho>): List<List<Trecho>> {
+        if (o.size < 3) return emptyList()
+        val b = o[1]
+        return listOf(10, 100).filter { b.min >= it }.map { d ->
+            o.toMutableList().also { it[1] = Trecho(b.m, b.km, b.min % d) }
+        }
+    }
+
     /** Nenhum trecho mais rápido que 90 km/h (72 km em 28 min é o ponto que sumiu, não a viagem). */
     private fun plausivel(trechos: List<Trecho>) = trechos.all { it.km <= 2 || (it.min > 0 && it.km / it.min * 60 <= 90) }
 
@@ -179,6 +191,9 @@ object LeitorOferta {
             .replace(REAL_DO_OCR) { "R\$" }
             .replace(HORA_DO_OCR) { m -> m.groupValues[1].map { DIGITO_DO_OCR[it] ?: it }.joinToString("") + " h e " }
             .replace(NUMERO_DO_OCR) { m -> m.value.map { DIGITO_DO_OCR[it] ?: it }.joinToString("") }
+            .replace(UM_DO_OCR, "1")
+            .replace(KM_DO_OCR, " km")
+            .replace(VALOR_SEM_VIRGULA) { m -> m.groupValues[1].let { "R\$ ${it.dropLast(2)},${it.takeLast(2)}" } }
             .replace(PONTO_DO_OCR) { "${it.groupValues[1]} • " }
         return ler(listOf(tela), doPrint = true, totalJaSaiu = linhas.any { EST_DO_TOTAL.containsMatchIn(it) })
     }
@@ -211,6 +226,12 @@ object LeitorOferta {
     private val NUMERO_DO_OCR = Regex("""(?<![\w.,])(?=[\dlI|O.,]*\d)[\dlI|O]+(?:[.,][\dlI|O]+)?(?=\s*(?:min|k?m\b))""")
     // "1 h e 3 min" sai do OCR como "lhe3min" ou "1he 3 min".
     private val HORA_DO_OCR = Regex("""(?<!\w)([\dlI|]{1,2})\s*h\s*(?:e\s*)?(?=\d+\s*min)""")
+    // "1 min" e "1 parada" saem "l min" e "l parada" (06/11/2026): o NUMERO_DO_OCR não troca, porque não há algarismo.
+    private val UM_DO_OCR = Regex("""(?<![\w.,])[lI|](?=\s*(?:min|[Pp]arada))""")
+    // "1.2 km" sai "1.2 kmn" ou "15.6 kn".
+    private val KM_DO_OCR = Regex("""(?<=\d)\s?(?:kmn|krn|kn)\b""", RegexOption.IGNORE_CASE)
+    // "R$ 37,99" sai "R$ 3799": a Uber sempre escreve os centavos no valor da corrida (a faixa do Táxi é que vem sem).
+    private val VALOR_SEM_VIRGULA = Regex("""(?<![-–—]\s{0,2})R\$\s*(\d{3,5})(?![\d.,])(?!\s*[-–—])""")
     private val DIGITO_DO_OCR = mapOf('l' to '1', 'I' to '1', '|' to '1', 'O' to '0')
     private val PONTO_DO_OCR = Regex("""(min(?:utos?)?)\s*[.\-·*°+]?\s*(?=\d+(?:[.,]\d+)?\s*k?m\b)""", RegexOption.IGNORE_CASE)
 

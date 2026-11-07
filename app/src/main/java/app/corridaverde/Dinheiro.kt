@@ -12,14 +12,22 @@ data class Balanco(
     val de: LocalDate,
     val ate: LocalDate,
     val porApp: Map<String, Double>,
-    val porTipo: Map<Tipo, Double>,
-    /** O que sobrou em cada dia do período, para as barrinhas da semana e do mês. */
+    /** Gastos do trabalho por nome ("Gasolina", "Pedágio" e os tipos próprios do trabalho). */
+    val porTipo: Map<String, Double>,
+    /** O que sobrou do trabalho em cada dia do período, para as barrinhas da semana e do mês. */
     val sobrouPorDia: Map<LocalDate, Double>,
+    val combustivel: Double = 0.0,
+    /** Gastos pessoais por nome ("Supermercado", "Dentista"): ficam fora do [sobrou]. */
+    val porPessoal: Map<String, Double> = emptyMap(),
 ) {
     val entrou get() = porApp.values.sum()
+    /** Só os gastos do trabalho. */
     val gastou get() = porTipo.values.sum()
+    /** Sobrou do trabalho: ganhos menos gastos do trabalho. */
     val sobrou get() = entrou - gastou
-    val combustivel get() = porTipo.filterKeys { it.combustivel }.values.sum()
+    val pessoal get() = porPessoal.values.sum()
+    /** O que sobrou depois dos gastos pessoais também. */
+    val noBolso get() = sobrou - pessoal
 }
 
 enum class Visao(val nome: String) {
@@ -62,7 +70,12 @@ enum class Visao(val nome: String) {
 }
 
 object Dinheiro {
-    fun balanco(corridas: List<Corrida>, totais: List<TotalDoDia>, gastos: List<Gasto>, de: LocalDate, ate: LocalDate): Balanco {
+    /** [pessoais]: as chaves dos tipos próprios marcados como pessoais ([TiposGasto.pessoais]). */
+    fun balanco(
+        corridas: List<Corrida>, totais: List<TotalDoDia>, todosOsGastos: List<Gasto>, de: LocalDate, ate: LocalDate,
+        pessoais: Set<String> = emptySet(),
+    ): Balanco {
+        val (pessoalTodos, gastos) = todosOsGastos.partition { TiposGasto.ehPessoal(it, pessoais) }
         val porApp = mutableMapOf<String, Double>()
         val sobrouPorDia = linkedMapOf<LocalDate, Double>()
         var d = de
@@ -72,14 +85,15 @@ object Dinheiro {
             sobrouPorDia[d] = ganhos.values.sum() - Gastos.totalDoDia(gastos, d)
             d = d.plusDays(1)
         }
-        val porTipo = gastos.filter { it.quando.toLocalDate() in de..ate }
-            .groupBy { it.tipo }.mapValues { (_, l) -> l.sumOf { it.valor } }
-        return Balanco(de, ate, porApp.filterValues { it != 0.0 }, porTipo, sobrouPorDia)
+        fun porNome(l: List<Gasto>) = l.filter { it.quando.toLocalDate() in de..ate }
+            .groupBy { it.nome }.mapValues { (_, g) -> g.sumOf { it.valor } }
+        val combustivel = gastos.filter { it.tipo.combustivel && it.quando.toLocalDate() in de..ate }.sumOf { it.valor }
+        return Balanco(de, ate, porApp.filterValues { it != 0.0 }, porNome(gastos), sobrouPorDia, combustivel, porNome(pessoalTodos))
     }
 
     fun balanco(ctx: Context, visao: Visao, dia: LocalDate): Balanco {
         val (de, ate) = visao.periodo(dia)
-        return balanco(Corridas.todas(ctx), Totais.todos(ctx), Gastos.todos(ctx), de, ate)
+        return balanco(Corridas.todas(ctx), Totais.todos(ctx), Gastos.todos(ctx), de, ate, TiposGasto.pessoais(ctx))
     }
 
     fun hoje(ctx: Context) = balanco(ctx, Visao.DIA, LocalDate.now())
