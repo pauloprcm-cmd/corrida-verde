@@ -388,7 +388,8 @@ class LeitorService : AccessibilityService() {
     private fun agendarRadar(app: String) {
         fundoRadar.post {
             eventosDosNavegadores.merge(app, 1) { a, b -> a + b }
-            marcarLeituraDoRadar(app, 500)
+            // Uber e Maps não dão alerta: a leitura é só para o diagnóstico e lia a tela inteira da Uber 2 vezes por segundo.
+            marcarLeituraDoRadar(app, if (app == UBER || app == MAPS) 5_000 else 500)
             // Só com o Waze ou o Maps aberto não chega evento da Uber nem da 99: o diagnóstico é salvo daqui.
             val agora = System.currentTimeMillis()
             if (app in NAVEGADORES && agora - ultimoPedidoStatus >= 5_000 && Config.carregar(this).diagnostico) {
@@ -516,7 +517,7 @@ class LeitorService : AccessibilityService() {
                         }
                         anotar99("$hora print ${tela.width}x${tela.height}${if (quasePreto(tela)) " · SAIU PRETO" else ""}")
                     }
-                    val cartao = recorteDoCartao(tela, area)
+                    val cartao = recorteDoCartao(tela, area, alturaToda = true)
                     tela.recycle()
                     lerTexto99(cartao, hora)
                 }.onFailure { anotar99("$hora print falhou: ${it.message}") }
@@ -973,12 +974,13 @@ class LeitorService : AccessibilityService() {
 
     /**
      * O cartão fica na metade de baixo, preso ao rodapé: o OCR lê só daí para baixo. Com a tela dividida ([area]),
-     * só no pedaço do app, para não misturar o cartão da Uber com o da 99.
+     * só no pedaço do app, para não misturar o cartão da Uber com o da 99. Nesse pedaço baixinho o cartão da 99 ocupa
+     * a altura toda e o preço fica bem no alto ([alturaToda]): sem isso o OCR lia tudo menos o valor (08/11/2026).
      */
-    private fun recorteDoCartao(tela: Bitmap, area: Rect?): Bitmap {
+    private fun recorteDoCartao(tela: Bitmap, area: Rect?, alturaToda: Boolean = false): Bitmap {
         val r = area?.let { Rect(it) }?.takeIf { it.intersect(0, 0, tela.width, tela.height) && it.height() > 10 }
             ?: Rect(0, 0, tela.width, tela.height)
-        val topo = r.top + r.height() * 35 / 100
+        val topo = if (area != null && alturaToda) r.top else r.top + r.height() * 35 / 100
         return Bitmap.createBitmap(tela, r.left, topo, r.width(), r.bottom - topo)
     }
 

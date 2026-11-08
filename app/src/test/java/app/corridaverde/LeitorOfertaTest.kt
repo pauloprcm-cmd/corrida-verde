@@ -356,6 +356,21 @@ class LeitorOfertaTest {
     }
 
     @Test
+    fun le99NaTelaDivididaComAHoraDaBarraEmCima() {
+        // Oferta de 08/11/2026, 11:31, com a 99 no pedaço esquerdo: o recorte agora pega também o alto da tela.
+        val o = LeitorOferta.ler99(listOf(
+            "11:31", "99", "Táxi", "R$11,27 1,0x", "5,00 28 corridas", "Perfil Essencial",
+            "3 min (272 m)", "Maria Bonita, Avenida General Penha", "Brasil, 1323 - Vila Nova Cachoeirinha",
+            "3 min (988 m)", "Rua Santa Rita do Itueto, 345, Jardim", "Peri",
+        ))!!
+        assertEquals(11.27, o.valor, 0.001)
+        assertEquals(0.272, o.buscaKm, 0.001)
+        assertEquals(0.988, o.viagemKm, 0.001)
+        assertEquals(5.0, o.nota!!, 0.001)
+        assertEquals("Rua Santa Rita do Itueto, 345, Jardim Peri", o.destino)
+    }
+
+    @Test
     fun leTrechoComPontoNoLugarDosParenteses() {
         // Diagnóstico de 26/10/2026: a Uber passou a escrever "7 min • 2.6 km".
         val o = LeitorOferta.ler(listOf(
