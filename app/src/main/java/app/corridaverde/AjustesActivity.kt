@@ -69,11 +69,22 @@ class AjustesActivity : Activity() {
         }
         campo(R.id.bolinha, CheckBox::class.java).isChecked = cfg.bolinha
         campo(R.id.telaDividida, CheckBox::class.java).isChecked = cfg.telaDividida
-        campo(R.id.abaTamanho, RadioGroup::class.java).check(when (cfg.abaLargura) {
-            Config.ABA_LARGA -> R.id.abaLarga
-            Config.ABA_FINA -> R.id.abaFina
-            else -> R.id.abaMedia
-        })
+        // A aba grava na hora, sem o Salvar. Só estes campos: um número pela metade em outro campo não atrapalha.
+        campo(R.id.abaTamanho, RadioGroup::class.java).apply {
+            check(when (cfg.abaLargura) {
+                Config.ABA_LARGA -> R.id.abaLarga
+                Config.ABA_FINA -> R.id.abaFina
+                else -> R.id.abaMedia
+            })
+            setOnCheckedChangeListener { _, id ->
+                val largura = when (id) {
+                    R.id.abaLarga -> Config.ABA_LARGA
+                    R.id.abaFina -> Config.ABA_FINA
+                    else -> Config.ABA_MEDIA
+                }
+                Config.carregar(this@AjustesActivity).copy(abaLargura = largura).salvar(this@AjustesActivity)
+            }
+        }
         val textoTransparencia = campo(R.id.abaTransparenciaTexto, TextView::class.java)
         fun mostrarTransparencia(pct: Int) { textoTransparencia.text = "Transparência: " + if (pct == 0) "nenhuma" else "$pct%" }
         mostrarTransparencia(cfg.abaTransparencia)
@@ -82,7 +93,9 @@ class AjustesActivity : Activity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(s: SeekBar, valor: Int, doUsuario: Boolean) = mostrarTransparencia(valor * Config.ABA_PASSO_TRANSPARENCIA)
                 override fun onStartTrackingTouch(s: SeekBar) {}
-                override fun onStopTrackingTouch(s: SeekBar) {}
+                override fun onStopTrackingTouch(s: SeekBar) {
+                    Config.carregar(this@AjustesActivity).copy(abaTransparencia = s.progress * Config.ABA_PASSO_TRANSPARENCIA).salvar(this@AjustesActivity)
+                }
             })
         }
         campo(R.id.alertaMercado, CheckBox::class.java).isChecked = cfg.alertaMercado
