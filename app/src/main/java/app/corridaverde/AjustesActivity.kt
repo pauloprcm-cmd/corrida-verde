@@ -13,6 +13,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
@@ -68,6 +69,22 @@ class AjustesActivity : Activity() {
         }
         campo(R.id.bolinha, CheckBox::class.java).isChecked = cfg.bolinha
         campo(R.id.telaDividida, CheckBox::class.java).isChecked = cfg.telaDividida
+        campo(R.id.abaTamanho, RadioGroup::class.java).check(when (cfg.abaLargura) {
+            Config.ABA_LARGA -> R.id.abaLarga
+            Config.ABA_FINA -> R.id.abaFina
+            else -> R.id.abaMedia
+        })
+        val textoTransparencia = campo(R.id.abaTransparenciaTexto, TextView::class.java)
+        fun mostrarTransparencia(pct: Int) { textoTransparencia.text = "Transparência: " + if (pct == 0) "nenhuma" else "$pct%" }
+        mostrarTransparencia(cfg.abaTransparencia)
+        campo(R.id.abaTransparencia, SeekBar::class.java).apply {
+            progress = cfg.abaTransparencia / Config.ABA_PASSO_TRANSPARENCIA
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar, valor: Int, doUsuario: Boolean) = mostrarTransparencia(valor * Config.ABA_PASSO_TRANSPARENCIA)
+                override fun onStartTrackingTouch(s: SeekBar) {}
+                override fun onStopTrackingTouch(s: SeekBar) {}
+            })
+        }
         campo(R.id.alertaMercado, CheckBox::class.java).isChecked = cfg.alertaMercado
         campo(R.id.mercadosProprios, EditText::class.java).setText(cfg.mercadosProprios)
         campo(R.id.casaEndereco, EditText::class.java).setText(cfg.casaEndereco)
@@ -311,6 +328,12 @@ class AjustesActivity : Activity() {
             aviso99 = campo(R.id.aviso99, CheckBox::class.java).isChecked,
             bolinha = campo(R.id.bolinha, CheckBox::class.java).isChecked,
             telaDividida = campo(R.id.telaDividida, CheckBox::class.java).isChecked,
+            abaLargura = when (campo(R.id.abaTamanho, RadioGroup::class.java).checkedRadioButtonId) {
+                R.id.abaLarga -> Config.ABA_LARGA
+                R.id.abaFina -> Config.ABA_FINA
+                else -> Config.ABA_MEDIA
+            },
+            abaTransparencia = campo(R.id.abaTransparencia, SeekBar::class.java).progress * Config.ABA_PASSO_TRANSPARENCIA,
             alertaMercado = campo(R.id.alertaMercado, CheckBox::class.java).isChecked,
             mercadosProprios = campo(R.id.mercadosProprios, EditText::class.java).text.toString().trim(),
             perfil = if (campo(R.id.perfilApp, RadioButton::class.java).isChecked) Config.APP else Config.TAXI,

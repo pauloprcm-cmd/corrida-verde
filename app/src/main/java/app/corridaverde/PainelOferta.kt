@@ -12,6 +12,7 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.animation.AccelerateInterpolator
@@ -59,24 +60,65 @@ class PainelOferta(
 
     private fun mostrarAba() {
         esconder()
-        val aba = LinearLayout(ctx).apply {
+        val cfg = Config.carregar(ctx)
+        val larga = cfg.abaLargura == Config.ABA_LARGA
+        val desenho = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             background = MolduraNeon(densidade, corteDp = 8f, listras = true, detalhes = false)
+            alpha = 1f - cfg.abaTransparencia / 100f
+            // Tracinhos na vertical, como no desenho, e a seta (na aba estreita a dupla não cabe).
+            addView(View(ctx).apply { background = Tracinhos() }, LinearLayout.LayoutParams(dp(3), dp(26)))
+            addView(texto(if (larga) "»" else "›", if (larga) 22f else 13f, MolduraNeon.NEON, negrito = true).apply { setPadding(0, dp(6), 0, dp(6)) })
+            addView(View(ctx).apply { background = Tracinhos() }, LinearLayout.LayoutParams(dp(3), dp(26)))
+        }
+        // A janela tem sempre a largura da aba larga: fina no desenho, mas continua fácil de acertar com o dedo.
+        val aba = FrameLayout(ctx).apply {
             contentDescription = "Última oferta"
-            // Tracinhos na vertical, como no desenho, e as setas.
-            addView(View(ctx).apply { background = Tracinhos() }, LinearLayout.LayoutParams(dp(3), dp(26)))
-            addView(texto("»", 22f, MolduraNeon.NEON, negrito = true).apply { setPadding(0, dp(6), 0, dp(6)) })
-            addView(View(ctx).apply { background = Tracinhos() }, LinearLayout.LayoutParams(dp(3), dp(26)))
+            addView(desenho, FrameLayout.LayoutParams(dp(cfg.abaLargura + FOLGA_BRILHO), ViewGroup.LayoutParams.MATCH_PARENT))
             setOnClickListener { if (!animando) abrir() }
         }
-        val p = parametros(dp(30), dp(118), tocavelFora = false).apply {
+        val p = parametros(dp(Config.ABA_LARGA + FOLGA_BRILHO), dp(ALTURA_ABA), tocavelFora = false).apply {
             gravity = Gravity.TOP or Gravity.START
             x = -dp(4) // A folga do brilho do lado esquerdo fica fora da tela: a aba encosta na borda.
-            y = (ctx.resources.displayMetrics.heightPixels * 0.40).toInt()
+            y = yDaAba()
         }
+        arrastavel(aba, p)
         runCatching { wm.addView(aba, p) }.onSuccess { view = aba }
     }
+
+    /** Tocar abre; mover o dedo além da folga do toque leva a aba para cima ou para baixo, e ela fica ali. */
+    private fun arrastavel(aba: View, p: WindowManager.LayoutParams) {
+        val folgaToque = ViewConfiguration.get(ctx).scaledTouchSlop
+        var dedoInicio = 0f
+        var abaInicio = 0
+        var arrastando = false
+        aba.setOnTouchListener { v, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    dedoInicio = ev.rawY
+                    abaInicio = p.y
+                    arrastando = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val andou = ev.rawY - dedoInicio
+                    if (!arrastando && kotlin.math.abs(andou) > folgaToque) arrastando = true
+                    if (arrastando) {
+                        p.y = limitarAba(abaInicio + andou.toInt())
+                        runCatching { wm.updateViewLayout(v, p) }
+                    }
+                }
+                MotionEvent.ACTION_UP ->
+                    if (arrastando) Config.guardarAlturaAba(ctx, p.y.toFloat() / ctx.resources.displayMetrics.heightPixels)
+                    else v.performClick()
+            }
+            true
+        }
+    }
+
+    private fun limitarAba(y: Int) = y.coerceIn(0, (ctx.resources.displayMetrics.heightPixels - dp(ALTURA_ABA)).coerceAtLeast(0))
+
+    private fun yDaAba() = limitarAba((ctx.resources.displayMetrics.heightPixels * Config.alturaAba(ctx)).toInt())
 
     /** Uma coluna de traços curtos, a decoração da aba e da divisória. */
     private inner class Tracinhos : Drawable() {
@@ -182,7 +224,7 @@ class PainelOferta(
         v.pivotX = 0f
         v.pivotY = (centroDaAba() - (p?.y ?: 0)).toFloat()
         val altura = v.height.coerceAtLeast(1)
-        v.animate().scaleX(0.08f).scaleY((dp(118).toFloat() / altura).coerceAtMost(1f)).alpha(0f)
+        v.animate().scaleX(0.08f).scaleY((dp(ALTURA_ABA).toFloat() / altura).coerceAtMost(1f)).alpha(0f)
             .setDuration(FECHAR_MS).setInterpolator(AccelerateInterpolator())
             .withEndAction {
                 if (view !== v) return@withEndAction
@@ -192,7 +234,7 @@ class PainelOferta(
     }
 
     /** Altura do meio da aba na tela: o painel cresce dali e volta para lá. */
-    private fun centroDaAba() = (ctx.resources.displayMetrics.heightPixels * 0.40).toInt() + dp(118) / 2
+    private fun centroDaAba() = yDaAba() + dp(ALTURA_ABA) / 2
 
     /**
      * A oferta de um app: nome, quando chegou e o valor; embarque e destino, cada um com o seu botão. O nome vai
@@ -280,6 +322,9 @@ class PainelOferta(
         val CINZA = Color.rgb(0x9A, 0xA0, 0xA6)
         val AMARELO_99 = Color.rgb(0xFF, 0xD4, 0x00)
         val HORA: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+        const val ALTURA_ABA = 118
+        /** A folga da [MolduraNeon] nos dois lados, onde cabe o brilho. */
+        const val FOLGA_BRILHO = 8
         const val ABRIR_MS = 170L
         const val FECHAR_MS = 130L
     }

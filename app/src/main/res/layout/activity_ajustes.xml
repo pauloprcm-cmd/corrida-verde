@@ -151,6 +151,27 @@
 
         <Button android:id="@+id/testar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Testar o aviso" />
 
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Aba da Última oferta" />
+
+        <RadioGroup
+            android:id="@+id/abaTamanho"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton android:id="@+id/abaLarga" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Larga" />
+
+            <RadioButton android:id="@+id/abaMedia" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Média" />
+
+            <RadioButton android:id="@+id/abaFina" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Fina" />
+        </RadioGroup>
+
+        <TextView android:id="@+id/abaTransparenciaTexto" style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+
+        <SeekBar android:id="@+id/abaTransparencia" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="12" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Quanto mais fina ou transparente, mais dá para ler o que está atrás, e mais difícil fica enxergar a aba. Para mudar a altura, segure a aba em cima da Uber ou da 99 e arraste." />
+
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tablet / tela dividida" />
 
         <CheckBox android:id="@+id/telaDividida" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Uso a Uber e a 99 com a tela dividida" />

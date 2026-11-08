@@ -40,6 +40,10 @@ data class Config(
     val telaDividida: Boolean = false,
     /** Linha de aviso quando o embarque é em mercado ([Mercados]); não muda a cor da oferta. */
     val alertaMercado: Boolean = true,
+    /** Largura em dp da aba da Última oferta: [ABA_LARGA], [ABA_MEDIA] (padrão) ou [ABA_FINA]. */
+    val abaLargura: Int = ABA_MEDIA,
+    /** Transparência da aba em %, de 0 a 60: passando disso o motorista não acharia mais onde tocar. */
+    val abaTransparencia: Int = 0,
     /** Mercados do bairro que o motorista acrescentou, separados por vírgula. */
     val mercadosProprios: String = "",
     /**
@@ -100,6 +104,8 @@ data class Config(
             .putBoolean("aviso99", aviso99)
             .putBoolean("bolinha", bolinha)
             .putBoolean("telaDividida", telaDividida)
+            .putInt("abaLargura", abaLargura)
+            .putInt("abaTransparencia", abaTransparencia)
             .putBoolean("alertaMercado", alertaMercado)
             .putString("mercadosProprios", mercadosProprios)
             .putFloat("verdeEconomico", verdeEconomico.toFloat())
@@ -123,6 +129,20 @@ data class Config(
         const val CENTRO = "centro"
         const val DIREITA = "direita"
         const val DURACAO_DIAGNOSTICO = 24 * 60 * 60_000L
+        const val ABA_LARGA = 22
+        const val ABA_MEDIA = 14
+        const val ABA_FINA = 9
+        const val ABA_PASSO_TRANSPARENCIA = 5
+
+        /**
+         * Altura da aba arrastada, em fração da tela. Fora do [Config] de propósito: a tela de Ajustes grava o
+         * [Config] inteiro e apagaria a posição; em fração, ela continua valendo se a tela mudar de tamanho.
+         */
+        private const val ABA_ALTURA = "abaAltura"
+        fun alturaAba(ctx: Context) = ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE).getFloat(ABA_ALTURA, 0.40f)
+        fun guardarAlturaAba(ctx: Context, fracao: Float) {
+            ctx.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE).edit().putFloat(ABA_ALTURA, fracao).apply()
+        }
 
         /**
          * Dia da primeira abertura (AAAA-MM-DD), de onde vão contar os 30 dias grátis. Fica no "config", que
@@ -221,6 +241,8 @@ data class Config(
                 aviso99 = p.getBoolean("aviso99", d.aviso99),
                 bolinha = p.getBoolean("bolinha", d.bolinha),
                 telaDividida = p.getBoolean("telaDividida", d.telaDividida),
+                abaLargura = p.getInt("abaLargura", d.abaLargura),
+                abaTransparencia = p.getInt("abaTransparencia", d.abaTransparencia),
                 alertaMercado = p.getBoolean("alertaMercado", d.alertaMercado),
                 mercadosProprios = p.getString("mercadosProprios", d.mercadosProprios) ?: "",
                 verdeEconomico = real("verdeEconomico", d.verdeEconomico),
