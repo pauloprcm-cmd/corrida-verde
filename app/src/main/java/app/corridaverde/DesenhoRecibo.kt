@@ -37,7 +37,10 @@ object DesenhoRecibo {
     private val DATA_LONGA = DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale("pt", "BR"))
 
     /** Tudo o que o desenho precisa, junto. */
-    class Folha(val r: Recibo, val m: Motorista, val e: EstiloRecibo, val logo: Bitmap?, val assinatura: Bitmap?)
+    class Folha(val r: Recibo, val m: Motorista, val e: EstiloRecibo, val logo: Bitmap?, val assinatura: Bitmap?) {
+        /** A logo do topo: comprida, sem a margem em branco, para o espaço ir todo para o desenho. */
+        val logoTopo: Bitmap? by lazy { logo?.let { semMargem(it) } }
+    }
 
     fun folha(ctx: Context, r: Recibo, m: Motorista, e: EstiloRecibo = EstiloRecibo.carregar(ctx)) =
         Folha(r, m, e, EstiloRecibo.logo(ctx), EstiloRecibo.assinatura(ctx))
@@ -107,6 +110,15 @@ object DesenhoRecibo {
         desenharImagem(c, semBranco(logo), caixa, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG).apply { alpha = 30 })
     }
 
+    /** Só a logo comprida perde a margem: a quadrada continua exatamente do tamanho de sempre. */
+    private fun semMargem(b: Bitmap): Bitmap {
+        if (!LogoRecibo.comprida(b.width, b.height)) return b
+        val px = IntArray(b.width * b.height)
+        b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
+        val (esquerda, topo, direita, baixo) = LogoRecibo.recorte(px, b.width, b.height) ?: return b
+        return Bitmap.createBitmap(b, esquerda, topo, direita - esquerda, baixo - topo)
+    }
+
     /** Cópia da imagem em que quanto mais perto do branco, mais transparente (o amarelo continua forte). */
     private fun semBranco(b: Bitmap): Bitmap {
         val px = IntArray(b.width * b.height)
@@ -124,7 +136,13 @@ object DesenhoRecibo {
         val w = LARGURA.toFloat()
         val m = 30f
         var esquerda = m
-        f.logo?.let { desenharImagem(c, it, RectF(m, 24f, m + 48f, 72f)); esquerda += 58f }
+        f.logoTopo?.let {
+            val livre = w - 2 * m - pincel(23f, negrito = true).measureText(f.e.titulo) -
+                pincel(18f, negrito = true).measureText("Nº ${numero(f.r)}") - 20f
+            val l = LogoRecibo.largura(it.width, it.height, 48f, 48f, livre)
+            desenharImagem(c, it, RectF(m, 24f, m + l, 72f))
+            esquerda += l + 10f
+        }
         c.drawText(f.e.titulo, esquerda, 58f, pincel(23f, negrito = true))
         c.drawText("Nº ${numero(f.r)}", w - m, 58f, pincel(18f, negrito = true).apply { textAlign = Paint.Align.RIGHT })
         c.drawLine(m, 84f, w - m, 84f, Paint().apply { color = LINHA; strokeWidth = 1f })
@@ -218,7 +236,11 @@ object DesenhoRecibo {
         val m = 20f
         // Topo: nome do táxi, nome do motorista, documento, região e contatos; a logo à direita.
         var y = 32f
-        f.logo?.let { desenharImagem(c, it, RectF(w - m - 54f, 14f, w - m, 68f)) }
+        val larguraLogo = f.logoTopo?.let {
+            val l = LogoRecibo.largura(it.width, it.height, 54f, 54f, w - 2 * m - pincel(15f).measureText(f.m.marca.uppercase()) - 8f)
+            desenharImagem(c, it, RectF(w - m - l, 14f, w - m, 68f))
+            l
+        } ?: 54f
         c.drawText(f.m.marca.uppercase(), m, y, pincel(15f))
         y += 15f
         if (f.m.fantasia.isNotBlank() && f.m.nome.isNotBlank()) { c.drawText(f.m.nome.uppercase(), m, y, pincel(9.5f)); y += 13f }
@@ -230,12 +252,13 @@ object DesenhoRecibo {
             f.m.instagram.takeIf { it.isNotBlank() },
         )
         if (contatos.isNotEmpty()) {
-            y = paragrafo(c, contatos.joinToString("  ·  "), pincel(8.5f, cor = CINZA), y - 8f, w - 2 * m - 60f, m) + 8f
+            y = paragrafo(c, contatos.joinToString("  ·  "), pincel(8.5f, cor = CINZA), y - 8f, w - 2 * m - larguraLogo - 6f, m) + 8f
         }
         y = maxOf(y, 72f) + 4f
 
-        // Faixa com o título no meio e a data à direita.
+        // Faixa com o número à esquerda, o título no meio e a data à direita.
         c.drawRect(m, y, w - m, y + 24f, Paint().apply { color = Color.rgb(0xF6, 0xF6, 0xF6) })
+        c.drawText("Nº ${numero(f.r)}", m + 6f, y + 16f, pincel(9.5f, negrito = true))
         c.drawText(f.e.titulo, w / 2, y + 17f, pincel(14f, negrito = true).centro())
         c.drawText(Recibos.data(f.r), w - m - 6f, y + 16f, pincel(9.5f).apply { textAlign = Paint.Align.RIGHT })
         y += 36f
@@ -352,7 +375,13 @@ object DesenhoRecibo {
         moldura.strokeWidth = 0.7f
         c.drawRect(19f, 19f, LARGURA - 19f, ALTURA - 19f, moldura)
         var esquerda = MARGEM
-        f.logo?.let { desenharImagem(c, it, RectF(MARGEM, MARGEM - 4f, MARGEM + 52f, MARGEM + 48f)); esquerda += 62f }
+        f.logoTopo?.let {
+            val texto = maxOf(pincel(19f, negrito = true).measureText(f.e.titulo.uppercase()), pincel(11f).measureText(subtitulo(f)))
+            val livre = LARGURA - 2 * MARGEM - texto - pincel(14f, negrito = true).measureText("Nº ${numero(f.r)}") - 20f
+            val l = LogoRecibo.largura(it.width, it.height, 52f, 52f, livre)
+            desenharImagem(c, it, RectF(MARGEM, MARGEM - 4f, MARGEM + l, MARGEM + 48f))
+            esquerda += l + 10f
+        }
         c.drawText(f.e.titulo.uppercase(), esquerda, MARGEM + 20f, pincel(19f, negrito = true, cor = f.e.cor))
         c.drawText(subtitulo(f), esquerda, MARGEM + 38f, pincel(11f, cor = CINZA))
         c.drawText("Nº ${numero(f.r)}", LARGURA - MARGEM, MARGEM + 20f, pincel(14f, negrito = true).apply { textAlign = Paint.Align.RIGHT })
@@ -363,10 +392,13 @@ object DesenhoRecibo {
         // Faixa colorida no topo, com o título e o número em branco.
         c.drawRect(0f, 0f, LARGURA.toFloat(), 78f, Paint().apply { color = f.e.cor })
         var esquerda = MARGEM
-        f.logo?.let {
-            c.drawRoundRect(MARGEM - 4f, 13f, MARGEM + 52f, 65f, 8f, 8f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
-            desenharImagem(c, it, RectF(MARGEM, 17f, MARGEM + 48f, 61f))
-            esquerda += 64f
+        f.logoTopo?.let {
+            val texto = maxOf(pincel(20f, negrito = true).measureText(f.e.titulo), pincel(11f).measureText(subtitulo(f)))
+            val livre = LARGURA - 2 * MARGEM - texto - pincel(15f, negrito = true).measureText("Nº ${numero(f.r)}") - 26f
+            val l = LogoRecibo.largura(it.width, it.height, 44f, 48f, livre)
+            c.drawRoundRect(MARGEM - 4f, 13f, MARGEM + l + 4f, 65f, 8f, 8f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
+            desenharImagem(c, it, RectF(MARGEM, 17f, MARGEM + l, 61f))
+            esquerda += l + 16f
         }
         c.drawText(f.e.titulo, esquerda, 40f, pincel(20f, negrito = true, cor = Color.WHITE))
         c.drawText(subtitulo(f), esquerda, 58f, pincel(11f, cor = Color.argb(220, 255, 255, 255)))

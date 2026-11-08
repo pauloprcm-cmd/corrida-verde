@@ -105,6 +105,7 @@ object Avaliador {
         if (buscaLonga) add("busca longa")
         o.nota?.takeIf { it < cfg.notaMinima }?.let { add("nota ${String.format(java.util.Locale("pt", "BR"), "%.2f", it)}") }
         if (o.viagemKm > cfg.viagemLongaKm) add("viagem longa")
+        if (cfg.alertaMercado) Mercados.achar(o.embarque, Mercados.proprios(cfg.mercadosProprios))?.let { add("embarque em mercado: $it") }
     }
 }
 

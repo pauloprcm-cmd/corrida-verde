@@ -68,6 +68,8 @@ class AjustesActivity : Activity() {
         }
         campo(R.id.bolinha, CheckBox::class.java).isChecked = cfg.bolinha
         campo(R.id.telaDividida, CheckBox::class.java).isChecked = cfg.telaDividida
+        campo(R.id.alertaMercado, CheckBox::class.java).isChecked = cfg.alertaMercado
+        campo(R.id.mercadosProprios, EditText::class.java).setText(cfg.mercadosProprios)
         campo(R.id.casaEndereco, EditText::class.java).setText(cfg.casaEndereco)
         campo(R.id.raioCasa, EditText::class.java).setText(cfg.raioCasaKm.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString().replace('.', ',') })
         campo(R.id.salvarCasa, Button::class.java).setOnClickListener { salvarCasa() }
@@ -309,6 +311,8 @@ class AjustesActivity : Activity() {
             aviso99 = campo(R.id.aviso99, CheckBox::class.java).isChecked,
             bolinha = campo(R.id.bolinha, CheckBox::class.java).isChecked,
             telaDividida = campo(R.id.telaDividida, CheckBox::class.java).isChecked,
+            alertaMercado = campo(R.id.alertaMercado, CheckBox::class.java).isChecked,
+            mercadosProprios = campo(R.id.mercadosProprios, EditText::class.java).text.toString().trim(),
             perfil = if (campo(R.id.perfilApp, RadioButton::class.java).isChecked) Config.APP else Config.TAXI,
             verdeEconomico = porKm[0]!!,
             amareloEconomico = porKm[1]!!,

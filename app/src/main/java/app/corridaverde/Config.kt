@@ -38,6 +38,10 @@ data class Config(
      * tela e com o próprio aviso em cima dele. Desligado, o leitor faz exatamente o que fazia antes (07/11/2026).
      */
     val telaDividida: Boolean = false,
+    /** Linha de aviso quando o embarque é em mercado ([Mercados]); não muda a cor da oferta. */
+    val alertaMercado: Boolean = true,
+    /** Mercados do bairro que o motorista acrescentou, separados por vírgula. */
+    val mercadosProprios: String = "",
     /**
      * Perfil de motorista de app: R$/km (busca + viagem) a partir do qual a oferta fica verde e amarela, por grupo.
      * Padrões provisórios (pesquisa de 01/10/2026; média do GigU de R$ 1,72/km), a conferir no teste com motoristas.
@@ -96,6 +100,8 @@ data class Config(
             .putBoolean("aviso99", aviso99)
             .putBoolean("bolinha", bolinha)
             .putBoolean("telaDividida", telaDividida)
+            .putBoolean("alertaMercado", alertaMercado)
+            .putString("mercadosProprios", mercadosProprios)
             .putFloat("verdeEconomico", verdeEconomico.toFloat())
             .putFloat("amareloEconomico", amareloEconomico.toFloat())
             .putFloat("verdeConforto", verdeConforto.toFloat())
@@ -215,6 +221,8 @@ data class Config(
                 aviso99 = p.getBoolean("aviso99", d.aviso99),
                 bolinha = p.getBoolean("bolinha", d.bolinha),
                 telaDividida = p.getBoolean("telaDividida", d.telaDividida),
+                alertaMercado = p.getBoolean("alertaMercado", d.alertaMercado),
+                mercadosProprios = p.getString("mercadosProprios", d.mercadosProprios) ?: "",
                 verdeEconomico = real("verdeEconomico", d.verdeEconomico),
                 amareloEconomico = real("amareloEconomico", d.amareloEconomico),
                 verdeConforto = real("verdeConforto", d.verdeConforto),
