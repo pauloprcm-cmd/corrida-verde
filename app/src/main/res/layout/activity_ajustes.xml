@@ -151,6 +151,12 @@
 
         <Button android:id="@+id/testar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Testar o aviso" />
 
+        <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tablet / tela dividida" />
+
+        <CheckBox android:id="@+id/telaDividida" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Uso a Uber e a 99 com a tela dividida" />
+
+        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Para tablet (ou celular com a tela dividida). Cada app é lido no seu pedaço da tela e ganha o próprio aviso em cima dele: se a Uber e a 99 tocarem juntas, aparecem os dois avisos. Com um app só na tela, o aviso fica onde está marcado acima. No celular comum, deixe desmarcado." />
+
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Alerta de radar" />
 
         <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Funciona só navegando pelo Waze ou pela 99: quando eles avisam de um radar, a tela ganha uma borda amarela e aparece a placa do limite com a distância. No Google Maps e na navegação da Uber não funciona, porque eles não escrevem a distância até o radar." />

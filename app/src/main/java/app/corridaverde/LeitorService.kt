@@ -83,6 +83,12 @@ class LeitorService : AccessibilityService() {
     /** Cada destino consultado, a distância e quanto demorou, para o motorista conferir no diagnóstico. */
     private val consultasCasa = ConcurrentLinkedDeque<String>()
     private var chaveAtual: String? = null
+    /**
+     * Tela dividida ([Config.telaDividida]): um aviso para cada app (Uber e 99 podem tocar juntas) e a chave da oferta
+     * de cada um, por [UltimaOferta.UBER] e [UltimaOferta.NOVENTA_E_NOVE]. Os avisos só mudam na tela.
+     */
+    private lateinit var popupsDivididos: Map<String, Popup>
+    private val chavesDivididas = ConcurrentHashMap<String, String>()
 
     // Só usados na linha de trabalho.
     private var noOferta: AccessibilityNodeInfo? = null
@@ -188,7 +194,7 @@ class LeitorService : AccessibilityService() {
             val oferta = runCatching { if (no.refresh()) LeitorOferta.ler(textosDo(no)) else null }.getOrNull()
             if (oferta == null) {
                 noOferta = null
-                handler.post(esconder)
+                handler.post { esconderOferta(UltimaOferta.UBER, null) }
                 return
             }
             mostrar(oferta)
@@ -199,7 +205,7 @@ class LeitorService : AccessibilityService() {
     /** Em segundo plano só dá para atualizar sem perguntar a partir do Android 12. */
     private val buscarAtualizacao = object : Runnable {
         override fun run() {
-            if (chaveAtual == null && Build.VERSION.SDK_INT >= 31) Atualizador.verificar(this@LeitorService, perguntar = false)
+            if (chaveAtual == null && chavesDivididas.isEmpty() && Build.VERSION.SDK_INT >= 31) Atualizador.verificar(this@LeitorService, perguntar = false)
             handler.postDelayed(this, 6 * 60 * 60_000L)
         }
     }
@@ -218,6 +224,7 @@ class LeitorService : AccessibilityService() {
 
     override fun onServiceConnected() {
         popup = Popup(this)
+        popupsDivididos = mapOf(UltimaOferta.UBER to Popup(this), UltimaOferta.NOVENTA_E_NOVE to Popup(this))
         radarPopup = RadarPopup(this)
         bolinha = Bolinha(this, aoTocar = {
             esconderBolinha()
@@ -262,6 +269,7 @@ class LeitorService : AccessibilityService() {
         if (::bolinha.isInitialized) bolinha.esconder()
         if (::painel.isInitialized) painel.esconder()
         if (::popup.isInitialized) popup.esconder()
+        if (::popupsDivididos.isInitialized) popupsDivididos.values.forEach { it.esconder() }
         if (::radarPopup.isInitialized) radarPopup.esconder()
         reconhecedor?.close()
         filaUber.removeCallbacksAndMessages(null)
@@ -489,11 +497,12 @@ class LeitorService : AccessibilityService() {
         fundo.removeCallbacks(lerCartao99)
         val chave = chave99 ?: return
         chave99 = null
-        handler.post { if (chaveAtual == chave) esconder.run() }
+        handler.post { esconderOferta(UltimaOferta.NOVENTA_E_NOVE, chave) }
     }
 
     @TargetApi(30)
     private fun tirarPrint99() {
+        val area = if (Config.carregar(this).telaDividida) runCatching { areaDoApp(NOVENTA_E_NOVE) }.getOrNull() else null
         takeScreenshot(Display.DEFAULT_DISPLAY, noFundo, object : TakeScreenshotCallback {
             override fun onSuccess(r: ScreenshotResult) {
                 val hora = LocalTime.now().withNano(0)
@@ -507,9 +516,7 @@ class LeitorService : AccessibilityService() {
                         }
                         anotar99("$hora print ${tela.width}x${tela.height}${if (quasePreto(tela)) " · SAIU PRETO" else ""}")
                     }
-                    // O cartão fica na metade de baixo, preso ao rodapé: o OCR lê só daí para baixo.
-                    val topo = tela.height * 35 / 100
-                    val cartao = Bitmap.createBitmap(tela, 0, topo, tela.width, tela.height - topo)
+                    val cartao = recorteDoCartao(tela, area)
                     tela.recycle()
                     lerTexto99(cartao, hora)
                 }.onFailure { anotar99("$hora print falhou: ${it.message}") }
@@ -710,8 +717,11 @@ class LeitorService : AccessibilityService() {
         // A Uber manda evento mesmo por trás de outro app: o print é só com a Uber ou a 99 na frente (o cartão da Uber
         // pode subir por cima da 99), ou com o cartão flutuante da Uber por cima de outro app (Waze, Chrome, Play:
         // visto em 30/10/2026). O cartão da 99 é lido pelo print dela.
-        val frente = appNaFrente()
-        if (ofertaNa99 || (frente != null && frente !in APPS_DA_BOLINHA && !cartaoFlutuanteDaUber()))
+        // Tela dividida com a Uber num pedaço da tela: o recorte é só esse pedaço, então a 99 ou o Waze do lado não
+        // atrapalham. Com a Uber ocupando a tela toda (ou atrás de outro app), vale a regra de sempre.
+        val area = if (Config.carregar(this).telaDividida) runCatching { areaDoApp(UBER) }.getOrNull() else null
+        val frente = if (area == null) appNaFrente() else null
+        if (area == null && (ofertaNa99 || (frente != null && frente !in APPS_DA_BOLINHA && !cartaoFlutuanteDaUber())))
             return tratarPrintUber(null, cartaoNaTela = false)
         // Print do próprio celular: a miniatura e a barra cobrem o cartão, e o OCR lia o aviso de dentro da miniatura
         // (30/10/2026: o aviso pulou entre 3%, 95% e 21%). Fica o aviso que está na tela até ela sair.
@@ -729,8 +739,7 @@ class LeitorService : AccessibilityService() {
                     val tela = hw.copy(Bitmap.Config.ARGB_8888, false)
                     hw.recycle()
                     // O cartão fica na metade de baixo, preso ao rodapé (por cima da Uber ou da 99).
-                    val topo = tela.height * 35 / 100
-                    val cartao = Bitmap.createBitmap(tela, 0, topo, tela.width, tela.height - topo)
+                    val cartao = recorteDoCartao(tela, area)
                     printsDaUber++
                     val fundoLiso = fundoDeCartao(cartao)
                     // Sem o fundo branco (ou preto) do cartão é só o mapa: nem passa pelo OCR, que é o que gasta bateria.
@@ -839,7 +848,7 @@ class LeitorService : AccessibilityService() {
             }
             chaveUber = null
             ofertaUber = null
-            handler.post { if (chaveAtual == chave) esconder.run() }
+            handler.post { esconderOferta(UltimaOferta.UBER, chave) }
             return
         }
         filaUber.removeCallbacks(lerCartaoUber)
@@ -899,6 +908,7 @@ class LeitorService : AccessibilityService() {
 
     private fun mostrar(oferta: Oferta, app: String = UltimaOferta.UBER) {
         val cfg = Config.carregar(this)
+        if (cfg.telaDividida) return mostrarDividida(oferta, app, cfg)
         handler.post {
             if (oferta.chave != chaveAtual) {
                 chaveAtual = oferta.chave
@@ -914,10 +924,68 @@ class LeitorService : AccessibilityService() {
         }
     }
 
+    /**
+     * Tela dividida: cada app tem o seu aviso, no alto do pedaço da tela dele; a oferta de um não apaga o aviso do
+     * outro. Fora da linha da tela (a consulta das janelas é lenta); a mesma oferta de novo nem consulta.
+     */
+    private fun mostrarDividida(oferta: Oferta, app: String, cfg: Config) {
+        if (chavesDivididas[app] == oferta.chave) return
+        val pacote = if (app == UltimaOferta.NOVENTA_E_NOVE) NOVENTA_E_NOVE else UBER
+        val area = runCatching { areaDoApp(pacote) }.getOrNull()
+        handler.post {
+            if (chavesDivididas[app] == oferta.chave) return@post
+            chavesDivididas[app] = oferta.chave
+            UltimaOferta.guardar(this, app, oferta)
+            ultimaOlhadaBolinha = 0L
+            conferirBolinha()
+            val p = popupsDivididos.getValue(app)
+            p.mostrar(Avaliador.avaliar(oferta, cfg), cfg, area)
+            if (cfg.indoPraCasa) calcularCasa(oferta, cfg, p) { chavesDivididas[app] == oferta.chave }
+            GravacaoService.avisarSeGravando(this, "Chegou uma oferta de corrida")
+        }
+    }
+
+    /**
+     * Só na linha da tela. Esconde o aviso desta oferta ([chave]) do app, ou qualquer aviso dele sem chave. Serve
+     * para os dois jeitos: o aviso único de sempre ([chaveAtual]) e o de cada app na tela dividida.
+     */
+    private fun esconderOferta(app: String, chave: String?) {
+        val dividida = chavesDivididas[app]
+        if (dividida != null && (chave == null || dividida == chave)) {
+            chavesDivididas.remove(app)
+            popupsDivididos.getValue(app).esconder()
+        }
+        if (chave == null || chaveAtual == chave) esconder.run()
+    }
+
+    /**
+     * Tela dividida: o pedaço da tela onde está o app. Nulo se ele não está à mostra ou se ocupa a tela toda (aí fica
+     * tudo como no celular: o aviso no lugar dos Ajustes e o recorte de sempre).
+     */
+    private fun areaDoApp(pacote: String): Rect? {
+        val w = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.root?.packageName?.toString() == pacote }
+            ?: return null
+        val r = Rect().also { w.getBoundsInScreen(it) }
+        val m = resources.displayMetrics
+        if (r.isEmpty || (r.width() >= m.widthPixels * 9 / 10 && r.height() >= m.heightPixels * 8 / 10)) return null
+        return r
+    }
+
+    /**
+     * O cartão fica na metade de baixo, preso ao rodapé: o OCR lê só daí para baixo. Com a tela dividida ([area]),
+     * só no pedaço do app, para não misturar o cartão da Uber com o da 99.
+     */
+    private fun recorteDoCartao(tela: Bitmap, area: Rect?): Bitmap {
+        val r = area?.let { Rect(it) }?.takeIf { it.intersect(0, 0, tela.width, tela.height) && it.height() > 10 }
+            ?: Rect(0, 0, tela.width, tela.height)
+        val topo = r.top + r.height() * 35 / 100
+        return Bitmap.createBitmap(tela, r.left, topo, r.width(), r.bottom - topo)
+    }
+
     /** Só na linha da tela. A conta corre em [fundoCasa]; a linha entra no popup se ele ainda for desta oferta. */
-    private fun calcularCasa(oferta: Oferta, cfg: Config) {
+    private fun calcularCasa(oferta: Oferta, cfg: Config, p: Popup = popup, vale: () -> Boolean = { chaveAtual == oferta.chave }) {
         val casa = cfg.casa ?: return
-        val destino = oferta.destino ?: return popup.linhaCasa("distância de casa: destino não lido", false)
+        val destino = oferta.destino ?: return p.linhaCasa("distância de casa: destino não lido", false)
         fundoCasa.post {
             val inicio = System.currentTimeMillis()
             val ponto = runCatching { Enderecos.destino(this, destino, casa) }.getOrNull()
@@ -926,9 +994,9 @@ class LeitorService : AccessibilityService() {
                 (km?.let { String.format(Locale("pt", "BR"), "%.1f km", it) } ?: "não achou") + " em ${System.currentTimeMillis() - inicio} ms")
             while (consultasCasa.size > 30) consultasCasa.pollFirst()
             handler.post {
-                if (chaveAtual != oferta.chave) return@post
-                if (km == null) popup.linhaCasa("distância de casa: sem sinal", false)
-                else popup.linhaCasa(Casa.texto(km, cfg.raioCasaKm), Casa.perto(km, cfg.raioCasaKm))
+                if (!vale()) return@post
+                if (km == null) p.linhaCasa("distância de casa: sem sinal", false)
+                else p.linhaCasa(Casa.texto(km, cfg.raioCasaKm), Casa.perto(km, cfg.raioCasaKm))
             }
         }
     }

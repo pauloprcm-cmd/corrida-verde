@@ -34,6 +34,11 @@ data class Config(
     /** Bolinha Falar por cima da Uber e da 99. */
     val bolinha: Boolean = true,
     /**
+     * Tablet / tela dividida: a Uber e a 99 lado a lado (ou uma em cima da outra), cada uma lida no seu pedaço da
+     * tela e com o próprio aviso em cima dele. Desligado, o leitor faz exatamente o que fazia antes (07/11/2026).
+     */
+    val telaDividida: Boolean = false,
+    /**
      * Perfil de motorista de app: R$/km (busca + viagem) a partir do qual a oferta fica verde e amarela, por grupo.
      * Padrões provisórios (pesquisa de 01/10/2026; média do GigU de R$ 1,72/km), a conferir no teste com motoristas.
      */
@@ -90,6 +95,7 @@ data class Config(
             .putBoolean("radarSom", radarSom)
             .putBoolean("aviso99", aviso99)
             .putBoolean("bolinha", bolinha)
+            .putBoolean("telaDividida", telaDividida)
             .putFloat("verdeEconomico", verdeEconomico.toFloat())
             .putFloat("amareloEconomico", amareloEconomico.toFloat())
             .putFloat("verdeConforto", verdeConforto.toFloat())
@@ -208,6 +214,7 @@ data class Config(
                 radarSom = p.getBoolean("radarSom", d.radarSom),
                 aviso99 = p.getBoolean("aviso99", d.aviso99),
                 bolinha = p.getBoolean("bolinha", d.bolinha),
+                telaDividida = p.getBoolean("telaDividida", d.telaDividida),
                 verdeEconomico = real("verdeEconomico", d.verdeEconomico),
                 amareloEconomico = real("amareloEconomico", d.amareloEconomico),
                 verdeConforto = real("verdeConforto", d.verdeConforto),
