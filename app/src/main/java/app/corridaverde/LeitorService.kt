@@ -1000,6 +1000,7 @@ class LeitorService : AccessibilityService() {
                 chaveAtual = oferta.chave
                 // Fica para o painel Última oferta, e a aba aparece já (a oferta de antes pode ter sido dispensada).
                 UltimaOferta.guardar(this, app, oferta)
+                painel.atualizar()
                 ultimaOlhadaBolinha = 0L
                 conferirBolinha()
                 popup.mostrar(Avaliador.avaliar(oferta, cfg), cfg)
@@ -1022,6 +1023,7 @@ class LeitorService : AccessibilityService() {
             if (chavesDivididas[app] == oferta.chave) return@post
             chavesDivididas[app] = oferta.chave
             UltimaOferta.guardar(this, app, oferta)
+            painel.atualizar()
             ultimaOlhadaBolinha = 0L
             conferirBolinha()
             val p = popupsDivididos.getValue(app)

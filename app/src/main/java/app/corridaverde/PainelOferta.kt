@@ -39,6 +39,8 @@ class PainelOferta(
     private var view: View? = null
     /** No meio da animação de abrir ou fechar: toques a mais não fazem nada. */
     private var animando = false
+    /** As colunas da Uber e da 99 do painel aberto; null com a aba recolhida. */
+    private var colunasAbertas: LinearLayout? = null
 
     val visivel get() = view != null
 
@@ -53,7 +55,20 @@ class PainelOferta(
             runCatching { wm.removeView(v) }
         }
         view = null
+        colunasAbertas = null
         animando = false
+    }
+
+    /**
+     * Chegou oferta nova com o painel aberto: troca as colunas pelas novas e dá uma piscada, para ver que mudou.
+     * Antes o painel ficava com a oferta de quando foi aberto (Paulo, 10/11/2026). Só na linha da tela.
+     */
+    fun atualizar() {
+        val c = colunasAbertas ?: return
+        c.removeAllViews()
+        preencher(c)
+        c.alpha = 0.15f
+        c.animate().alpha(1f).setDuration(450).start()
     }
 
     // ---------- A aba recolhida ----------
@@ -167,14 +182,7 @@ class PainelOferta(
         caixa.addView(topo)
 
         val colunas = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        colunas.addView(coluna(UltimaOferta.UBER, "UBER", Color.WHITE), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        // Divisória: linha neon fina com tracinhos no meio.
-        colunas.addView(FrameLayout(ctx).apply {
-            addView(View(ctx).apply { setBackgroundColor(Color.argb(110, 0x3D, 0xF5, 0xA8)) },
-                FrameLayout.LayoutParams(dp(1), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER_HORIZONTAL))
-            addView(View(ctx).apply { background = Tracinhos() }, FrameLayout.LayoutParams(dp(3), dp(30), Gravity.CENTER))
-        }, LinearLayout.LayoutParams(dp(5), ViewGroup.LayoutParams.MATCH_PARENT).apply { setMargins(dp(10), dp(6), dp(10), dp(6)) })
-        colunas.addView(coluna(UltimaOferta.NOVENTA_E_NOVE, "99", AMARELO_99), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        preencher(colunas)
         caixa.addView(colunas, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) })
 
         caixa.addView(texto("Esconder até a próxima oferta", 13f, CINZA).apply {
@@ -205,6 +213,7 @@ class PainelOferta(
         caixa.alpha = 0.3f
         runCatching { wm.addView(caixa, p) }.onSuccess {
             view = caixa
+            colunasAbertas = colunas
             animando = true
             caixa.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(ABRIR_MS).setInterpolator(DecelerateInterpolator(1.6f))
                 .withEndAction { animando = false }.start()
@@ -231,6 +240,18 @@ class PainelOferta(
                 v.visibility = View.INVISIBLE
                 v.postDelayed({ if (view === v) mostrarAba() }, 40)
             }.start()
+    }
+
+    /** A coluna da Uber, a divisória e a coluna da 99. */
+    private fun preencher(colunas: LinearLayout) {
+        colunas.addView(coluna(UltimaOferta.UBER, "UBER", Color.WHITE), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        // Divisória: linha neon fina com tracinhos no meio.
+        colunas.addView(FrameLayout(ctx).apply {
+            addView(View(ctx).apply { setBackgroundColor(Color.argb(110, 0x3D, 0xF5, 0xA8)) },
+                FrameLayout.LayoutParams(dp(1), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER_HORIZONTAL))
+            addView(View(ctx).apply { background = Tracinhos() }, FrameLayout.LayoutParams(dp(3), dp(30), Gravity.CENTER))
+        }, LinearLayout.LayoutParams(dp(5), ViewGroup.LayoutParams.MATCH_PARENT).apply { setMargins(dp(10), dp(6), dp(10), dp(6)) })
+        colunas.addView(coluna(UltimaOferta.NOVENTA_E_NOVE, "99", AMARELO_99), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
     }
 
     /** Altura do meio da aba na tela: o painel cresce dali e volta para lá. */
