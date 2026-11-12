@@ -23,7 +23,8 @@ import kotlin.math.hypot
 class Bolinha(private val ctx: Context, private val aoTocar: () -> Unit, private val aoDescartar: () -> Unit) {
     private val wm = ctx.getSystemService(WindowManager::class.java)
     private val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    private val tamanho = dp(58)
+    /** Lido dos Ajustes a cada vez que aparece (Pequena, Média ou Grande). */
+    private var tamanho = dp(Config.BOLINHA_MEDIA)
     /** Distância da borda da tela. */
     private val margem = dp(6)
     private var view: View? = null
@@ -34,6 +35,7 @@ class Bolinha(private val ctx: Context, private val aoTocar: () -> Unit, private
 
     fun mostrar() {
         if (view != null) return
+        tamanho = dp(Config.carregar(ctx).bolinhaTamanho)
         val (largura, altura) = tela()
         val bola = FrameLayout(ctx).apply {
             background = GradientDrawable().apply {
@@ -44,7 +46,7 @@ class Bolinha(private val ctx: Context, private val aoTocar: () -> Unit, private
             elevation = dp(6).toFloat()
             contentDescription = "Falar ganho ou gasto"
             addView(ImageView(ctx).apply { setImageResource(R.drawable.ic_voz) },
-                FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER))
+                FrameLayout.LayoutParams(tamanho * 30 / 58, tamanho * 30 / 58, Gravity.CENTER))
         }
         val p = WindowManager.LayoutParams(
             tamanho, tamanho,

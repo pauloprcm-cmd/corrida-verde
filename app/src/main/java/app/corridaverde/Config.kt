@@ -29,10 +29,15 @@ data class Config(
     val gravar: Boolean = false,
     val radar: Boolean = true,
     val radarSom: Boolean = true,
-    /** Aviso também nas ofertas da 99 (lidas por imagem). */
+    /**
+     * Aviso também nas ofertas da 99 (lidas por imagem). Desde 12/11/2026 sempre ligado, igual à Uber (a opção saiu dos
+     * Ajustes): quem tinha desmarcado volta a ter a 99. Continua valendo o limite do Android 11 ([Celular.semAviso99]).
+     */
     val aviso99: Boolean = true,
     /** Bolinha Falar por cima da Uber e da 99. */
     val bolinha: Boolean = true,
+    /** Tamanho da bolinha em dp: [BOLINHA_PEQUENA], [BOLINHA_MEDIA] (padrão, o de sempre) ou [BOLINHA_GRANDE]. */
+    val bolinhaTamanho: Int = BOLINHA_MEDIA,
     /**
      * Tablet / tela dividida: a Uber e a 99 lado a lado (ou uma em cima da outra), cada uma lida no seu pedaço da
      * tela e com o próprio aviso em cima dele. Desligado, o leitor faz exatamente o que fazia antes (07/11/2026).
@@ -59,7 +64,8 @@ data class Config(
     /** Casa do motorista, para o modo "Indo pra casa". */
     val casaEndereco: String = "",
     val casa: Ponto? = null,
-    val raioCasaKm: Double = 3.0,
+    /** Padrão de 6 km desde 12/11/2026 (com 3 km quase nenhuma corrida mostrava a casinha). */
+    val raioCasaKm: Double = 6.0,
     /** Dia em que o modo "Indo pra casa" foi ligado: ele desliga sozinho no dia seguinte. */
     val indoPraCasaDia: String = "",
 ) {
@@ -103,6 +109,7 @@ data class Config(
             .putBoolean("radarSom", radarSom)
             .putBoolean("aviso99", aviso99)
             .putBoolean("bolinha", bolinha)
+            .putInt("bolinhaTamanho", bolinhaTamanho)
             .putBoolean("telaDividida", telaDividida)
             .putInt("abaLargura", abaLargura)
             .putInt("abaTransparencia", abaTransparencia)
@@ -117,6 +124,7 @@ data class Config(
             .putString("casaEndereco", casaEndereco)
             .putString("casa", casa?.let { "${it.lat};${it.lon}" } ?: "")
             .putFloat("raioCasaKm", raioCasaKm.toFloat())
+            .putBoolean(RAIO_NOVO, true)
             .putString("indoPraCasaDia", indoPraCasaDia)
             .apply()
     }
@@ -133,6 +141,14 @@ data class Config(
         const val ABA_MEDIA = 14
         const val ABA_FINA = 9
         const val ABA_PASSO_TRANSPARENCIA = 5
+        const val BOLINHA_PEQUENA = 46
+        const val BOLINHA_MEDIA = 58
+        const val BOLINHA_GRANDE = 72
+        /**
+         * Gravado junto com o raio desde o padrão de 6 km. Sem ele, os 3 km guardados são o padrão antigo (a tela de
+         * Ajustes grava tudo ao sair, então 3 km guardado não quer dizer que a pessoa escolheu): vira 6 km.
+         */
+        private const val RAIO_NOVO = "raioCasa6"
 
         /**
          * Altura da aba arrastada, em fração da tela. Fora do [Config] de propósito: a tela de Ajustes grava o
@@ -238,8 +254,9 @@ data class Config(
                 gravar = BuildConfig.GRAVACAO && p.getBoolean("gravar", d.gravar),
                 radar = p.getBoolean("radar", d.radar),
                 radarSom = p.getBoolean("radarSom", d.radarSom),
-                aviso99 = p.getBoolean("aviso99", d.aviso99),
+                aviso99 = true,
                 bolinha = p.getBoolean("bolinha", d.bolinha),
+                bolinhaTamanho = p.getInt("bolinhaTamanho", d.bolinhaTamanho),
                 telaDividida = p.getBoolean("telaDividida", d.telaDividida),
                 abaLargura = p.getInt("abaLargura", d.abaLargura),
                 abaTransparencia = p.getInt("abaTransparencia", d.abaTransparencia),
@@ -257,7 +274,7 @@ data class Config(
                     val lon = b.toDoubleOrNull()
                     if (lat != null && lon != null) Ponto(lat, lon) else null
                 },
-                raioCasaKm = real("raioCasaKm", d.raioCasaKm),
+                raioCasaKm = real("raioCasaKm", d.raioCasaKm).let { if (!p.contains(RAIO_NOVO) && it == 3.0) d.raioCasaKm else it },
                 indoPraCasaDia = p.getString("indoPraCasaDia", "") ?: "",
             )
         }

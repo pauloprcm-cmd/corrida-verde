@@ -120,10 +120,6 @@
 
         <EditText android:id="@+id/viagemLonga" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="numberDecimal" />
 
-        <CheckBox android:id="@+id/aviso99" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Mostrar o aviso também nas ofertas da 99" />
-
-        <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="A 99 não deixa ler o texto da oferta: o app tira uma foto da tela só quando ela chega, lê o valor e os km e apaga a foto na hora. Na 99 o valor pode subir no fim da corrida (taxímetro, trânsito, pedágio), então o aviso mostra o mínimo. Precisa do Android 11 ou mais novo." />
-
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Onde o aviso aparece" />
 
         <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Lado da tela" />
@@ -218,6 +214,21 @@
 
         <CheckBox android:id="@+id/bolinha" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Bolinha Falar em cima da Uber e da 99" />
 
+        <TextView style="@style/Rotulo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tamanho da bolinha" />
+
+        <RadioGroup
+            android:id="@+id/bolinhaTamanho"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton android:id="@+id/bolinhaPequena" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Pequena" />
+
+            <RadioButton android:id="@+id/bolinhaMedia" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Média" />
+
+            <RadioButton android:id="@+id/bolinhaGrande" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Grande" />
+        </RadioGroup>
+
         <TextView style="@style/Apoio" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Uma bolinha verde com o microfone, como a da 99: um toque e você fala um ganho ou gasto sem sair da Uber ou da 99. Arraste para onde quiser; ela gruda na borda. Não aparece no Waze, para não atrapalhar a navegação. Para tirar, arraste até o X embaixo da tela ou desmarque aqui." />
 
         <TextView android:id="@+id/gravarTitulo" style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gravação da corrida" />
@@ -239,8 +250,6 @@
         <Button android:id="@+id/restaurarCopia" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Restaurar de uma cópia" />
 
         <TextView style="@style/Secao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="40dp" android:text="Avançado" />
-
-        <Button android:id="@+id/ativar" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Abrir a tela de Acessibilidade" />
 
         <CheckBox android:id="@+id/diagnostico" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Modo diagnóstico (guarda os textos lidos)" />
 

@@ -412,6 +412,26 @@ class LeitorService : AccessibilityService() {
         }
     }
 
+    /**
+     * Ajustes › Tamanho da bolinha: mostra a bolinha de verdade por alguns segundos, já no tamanho novo, por cima da
+     * tela de Ajustes. Depois volta ao normal (só aparece na Uber e na 99).
+     */
+    fun previaBolinha() {
+        handler.post {
+            if (bolinha.visivel) bolinha.esconder()
+            bolinha.mostrar()
+            bolinhaNaTela = true
+            handler.removeCallbacks(fimPreviaBolinha)
+            handler.postDelayed(fimPreviaBolinha, 4_000)
+        }
+    }
+
+    private val fimPreviaBolinha = Runnable {
+        bolinha.esconder()
+        bolinhaNaTela = painel.visivel
+        fundoBolinha.post(olharBolinha)
+    }
+
     private fun esconderBolinha() {
         bolinha.esconder()
         bolinhaNaTela = painel.visivel

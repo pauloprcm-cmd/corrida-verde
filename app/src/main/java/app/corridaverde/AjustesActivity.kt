@@ -4,7 +4,6 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.ClipData
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -60,14 +59,20 @@ class AjustesActivity : Activity() {
         if (!BuildConfig.GRAVACAO) listOf(R.id.gravarTitulo, R.id.gravar, R.id.gravarApoio).forEach { findViewById<View>(it).visibility = View.GONE }
         campo(R.id.radar, CheckBox::class.java).isChecked = cfg.radar
         campo(R.id.radarSom, CheckBox::class.java).isChecked = cfg.radarSom
-        campo(R.id.aviso99, CheckBox::class.java).apply {
-            isChecked = cfg.aviso99
-            if (Build.VERSION.SDK_INT < 30) {
-                isEnabled = false
-                text = Celular.semAviso99
+        campo(R.id.bolinha, CheckBox::class.java).isChecked = cfg.bolinha
+        // O tamanho da bolinha grava na hora e mostra a bolinha de verdade por cima desta tela, para conferir.
+        campo(R.id.bolinhaTamanho, RadioGroup::class.java).apply {
+            check(when (cfg.bolinhaTamanho) {
+                Config.BOLINHA_PEQUENA -> R.id.bolinhaPequena
+                Config.BOLINHA_GRANDE -> R.id.bolinhaGrande
+                else -> R.id.bolinhaMedia
+            })
+            setOnCheckedChangeListener { _, id ->
+                Config.carregar(this@AjustesActivity).copy(bolinhaTamanho = tamanhoBolinha(id)).salvar(this@AjustesActivity)
+                LeitorService.instancia?.previaBolinha()
+                    ?: Toast.makeText(this@AjustesActivity, "Ligue a leitura primeiro (tela inicial) para ver a bolinha", Toast.LENGTH_LONG).show()
             }
         }
-        campo(R.id.bolinha, CheckBox::class.java).isChecked = cfg.bolinha
         campo(R.id.telaDividida, CheckBox::class.java).isChecked = cfg.telaDividida
         // A aba grava na hora, sem o Salvar. Só estes campos: um número pela metade em outro campo não atrapalha.
         campo(R.id.abaTamanho, RadioGroup::class.java).apply {
@@ -104,7 +109,6 @@ class AjustesActivity : Activity() {
         campo(R.id.raioCasa, EditText::class.java).setText(cfg.raioCasaKm.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString().replace('.', ',') })
         campo(R.id.salvarCasa, Button::class.java).setOnClickListener { salvarCasa() }
 
-        campo(R.id.ativar, Button::class.java).setOnClickListener { AvisoLeitura.ligar(this) }
         campo(R.id.salvar, Button::class.java).setOnClickListener {
             lerCampos()?.let {
                 it.salvar(this)
@@ -338,8 +342,8 @@ class AjustesActivity : Activity() {
             gravar = campo(R.id.gravar, CheckBox::class.java).isChecked,
             radar = campo(R.id.radar, CheckBox::class.java).isChecked,
             radarSom = campo(R.id.radarSom, CheckBox::class.java).isChecked,
-            aviso99 = campo(R.id.aviso99, CheckBox::class.java).isChecked,
             bolinha = campo(R.id.bolinha, CheckBox::class.java).isChecked,
+            bolinhaTamanho = tamanhoBolinha(campo(R.id.bolinhaTamanho, RadioGroup::class.java).checkedRadioButtonId),
             telaDividida = campo(R.id.telaDividida, CheckBox::class.java).isChecked,
             abaLargura = when (campo(R.id.abaTamanho, RadioGroup::class.java).checkedRadioButtonId) {
                 R.id.abaLarga -> Config.ABA_LARGA
@@ -357,6 +361,12 @@ class AjustesActivity : Activity() {
             verdePremium = porKm[4]!!,
             amareloPremium = porKm[5]!!,
         )
+    }
+
+    private fun tamanhoBolinha(id: Int) = when (id) {
+        R.id.bolinhaPequena -> Config.BOLINHA_PEQUENA
+        R.id.bolinhaGrande -> Config.BOLINHA_GRANDE
+        else -> Config.BOLINHA_MEDIA
     }
 
     private fun <T : android.view.View> campo(id: Int, tipo: Class<T>): T = tipo.cast(findViewById(id))!!
