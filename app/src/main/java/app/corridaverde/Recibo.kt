@@ -232,7 +232,27 @@ object Recibos {
         return if (f.exists()) f.readLines().mapNotNull { deLinha(it) } else emptyList()
     }
 
-    fun proximoNumero(ctx: Context) = (todos(ctx).maxOfOrNull { it.numero } ?: 0) + 1
+    /** O maior número já emitido neste celular (0 sem recibo). */
+    fun maiorEmitido(ctx: Context) = todos(ctx).maxOfOrNull { it.numero } ?: 0
+
+    /**
+     * O maior emitido + 1, ou o número que o motorista escolheu em Personalizar recibo para continuar a numeração
+     * que já tinha antes do app (pedido do Marcio, 11/11/2026), o que for maior: nunca repete um número.
+     */
+    fun proximoNumero(ctx: Context) = maxOf(maiorEmitido(ctx) + 1, numeroEscolhido(ctx))
+
+    /** Fica no "recibo_estilo", que vai no backup e na cópia dos dados. */
+    private const val PREFS = "recibo_estilo"
+    private const val PROXIMO = "proximoNumero"
+
+    private fun numeroEscolhido(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(PROXIMO, 0)
+
+    /** Só aceita número maior que o maior já emitido; devolve false se não serve. */
+    fun escolherProximo(ctx: Context, numero: Int): Boolean {
+        if (numero <= maiorEmitido(ctx)) return false
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(PROXIMO, numero).apply()
+        return true
+    }
 
     /** Dá o próximo número ao recibo e guarda. */
     fun emitir(ctx: Context, r: Recibo): Recibo {

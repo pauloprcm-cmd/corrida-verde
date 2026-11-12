@@ -40,6 +40,8 @@ class PersonalizarReciboActivity : Activity() {
     private lateinit var previa: ImageView
     private val botoesModelo = mutableMapOf<Modelo, Button>()
     private val bolinhas = mutableMapOf<Int, View>()
+    /** O "Próximo recibo" digitado (a prévia mostra esse número); null se o campo está vazio ou não é número. */
+    private var proximo: Int? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,6 +104,12 @@ class PersonalizarReciboActivity : Activity() {
             }
         })
 
+        tela.addView(rotulo("Número do recibo"))
+        tela.addView(texto("Se você já fazia recibos antes, coloque aqui o número que vem depois do seu último.", 15f, cor = CINZA))
+        proximo = Recibos.proximoNumero(this)
+        tela.addView(texto("Próximo recibo:", 16f))
+        tela.addView(campo(String.format("%04d", proximo), InputType.TYPE_CLASS_NUMBER) { proximo = it.toIntOrNull()?.takeIf { n -> n > 0 } })
+
         tela.addView(rotulo("Logo ou foto (não aparece no Simples)"))
         tela.addView(botao("Escolher imagem") {
             startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*"), PEGAR_LOGO)
@@ -128,6 +136,12 @@ class PersonalizarReciboActivity : Activity() {
         }.apply { hint = "Ex.: Obrigado pela preferência! Corridas: (11) 99999-9999" })
 
         tela.addView(botao("Salvar") {
+            val n = proximo
+            if (n != null && n != Recibos.proximoNumero(this) && !Recibos.escolherProximo(this, n)) {
+                val maior = Recibos.maiorEmitido(this)
+                Toast.makeText(this, "Já existe o recibo nº $maior no app. Use um número maior que $maior.", Toast.LENGTH_LONG).show()
+                return@botao
+            }
             estilo.salvar(this)
             Toast.makeText(this, "Recibo personalizado salvo", Toast.LENGTH_SHORT).show()
             finish()
@@ -139,7 +153,7 @@ class PersonalizarReciboActivity : Activity() {
     /** Redesenha a prévia e marca o modelo e a cor escolhidos. */
     private fun atualizar() {
         val m = Motorista.carregar(this).let { if (it.nome.isBlank()) it.copy(nome = "Seu nome", placa = "ABC1D23") else it }
-        val exemplo = Recibo(42, LocalDateTime.now().withSecond(0).withNano(0), 50.0, "Maria Souza", "Avenida Paulista", "Vila Mariana", "Pix")
+        val exemplo = Recibo(proximo ?: 42, LocalDateTime.now().withSecond(0).withNano(0), 50.0, "Maria Souza", "Avenida Paulista", "Vila Mariana", "Pix")
         previa.setImageBitmap(DesenhoRecibo.imagem(DesenhoRecibo.folha(this, exemplo, m, estilo), larguraPx = 900))
         botoesModelo.forEach { (modelo, b) ->
             b.setTypeface(null, if (modelo == estilo.modelo) Typeface.BOLD else Typeface.NORMAL)
