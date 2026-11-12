@@ -2,6 +2,7 @@ package app.corridaverde
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.view.ContextThemeWrapper
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
@@ -106,22 +107,24 @@ class GastoActivity : Activity() {
             ?: daFala?.let { d -> naLista.firstOrNull { it === d } }
             ?: l.tipo?.takeIf { it != Tipo.OUTRO }
             ?: Tipo.OUTRO
-        val caixa = LinearLayout(this).apply {
+        // As views com o tema do diálogo (claro): com o da tela (escuro) o texto saía branco no branco (11/11/2026).
+        val tema = ContextThemeWrapper(this, android.R.style.Theme_Material_Light_Dialog_Alert)
+        val caixa = LinearLayout(tema).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
         }
-        fun rotulo(texto: String) = TextView(this).apply { text = texto; setPadding(0, dp(10), 0, 0) }.also { caixa.addView(it) }
-        fun campo(valor: String, tipoTeclado: Int) = EditText(this).apply {
+        fun rotulo(texto: String) = TextView(tema).apply { text = texto; setPadding(0, dp(10), 0, 0) }.also { caixa.addView(it) }
+        fun campo(valor: String, tipoTeclado: Int) = EditText(tema).apply {
             setText(valor)
             inputType = tipoTeclado
             if (ehDecimal(tipoTeclado)) aceitarVirgula()
         }.also { caixa.addView(it) }
         val decimal = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
 
-        if (fala != null) caixa.addView(TextView(this).apply { text = "Você disse: “$fala”"; setTypeface(typeface, android.graphics.Typeface.ITALIC) })
-        val ehGasto = RadioButton(this).apply { text = "Gasto"; id = View.generateViewId() }
-        val ehGanho = RadioButton(this).apply { text = "Ganho"; id = View.generateViewId() }
-        caixa.addView(RadioGroup(this).apply {
+        if (fala != null) caixa.addView(TextView(tema).apply { text = "Você disse: “$fala”"; setTypeface(typeface, android.graphics.Typeface.ITALIC) })
+        val ehGasto = RadioButton(tema).apply { text = "Gasto"; id = View.generateViewId() }
+        val ehGanho = RadioButton(tema).apply { text = "Ganho"; id = View.generateViewId() }
+        caixa.addView(RadioGroup(tema).apply {
             orientation = RadioGroup.HORIZONTAL
             addView(ehGasto)
             addView(ehGanho)
@@ -130,30 +133,30 @@ class GastoActivity : Activity() {
         })
         if (hora != null) {
             val quando = "${String.format(PT, "%02d/%02d", hora.dayOfMonth, hora.monthValue)} às ${hora.toLocalTime().toString().take(5)}"
-            caixa.addView(TextView(this).apply { text = (if (editando is Gasto) "Gasto" else "Ganho") + " de $quando"; textSize = 16f })
+            caixa.addView(TextView(tema).apply { text = (if (editando is Gasto) "Gasto" else "Ganho") + " de $quando"; textSize = 16f })
         }
 
         // Ganho: app, valor e se é o total do dia.
         val apps = (LeitorFala.APPS + listOfNotNull(g.app)).distinct()
         val rotuloApp = rotulo("App")
-        val app = Spinner(this).apply {
-            adapter = ArrayAdapter(this@GastoActivity, android.R.layout.simple_spinner_dropdown_item, apps)
+        val app = Spinner(tema).apply {
+            adapter = ArrayAdapter(tema, android.R.layout.simple_spinner_dropdown_item, apps)
             // Sem o nome do app é passageiro de rua.
             setSelection(apps.indexOf(g.app ?: "Táxi"))
         }
         caixa.addView(app)
         val rotuloValorGanho = rotulo("Valor (R$)")
         val valorGanho = campo(g.valor?.let { Popup.br(it) } ?: "", decimal)
-        val total = CheckBox(this).apply {
-            text = "É o total do dia deste app (substitui o que já tinha)"
+        val total = CheckBox(tema).apply {
+            text = "É o total do dia deste app (troca o anterior)"
             isChecked = g.total
         }
         caixa.addView(total)
         val soGanho = listOf(rotuloApp, app, rotuloValorGanho, valorGanho, total)
 
         val rotuloTipo = rotulo("Tipo")
-        val tipo = Spinner(this).apply {
-            adapter = ArrayAdapter(this@GastoActivity, android.R.layout.simple_spinner_dropdown_item, opcoes.map {
+        val tipo = Spinner(tema).apply {
+            adapter = ArrayAdapter(tema, android.R.layout.simple_spinner_dropdown_item, opcoes.map {
                 when (it) {
                     is TipoProprio -> if (it.pessoal) "${it.nome} (pessoal)" else it.nome
                     Tipo.OUTRO -> "Outro (escrever qual)"
@@ -165,14 +168,14 @@ class GastoActivity : Activity() {
         caixa.addView(tipo)
         // "Outro": o nome do gasto, que vira um tipo dele para as próximas vezes.
         val rotuloNome = rotulo("Qual gasto? (ex.: Supermercado, Dentista)")
-        val nomeNovo = AutoCompleteTextView(this).apply {
-            setAdapter(ArrayAdapter(this@GastoActivity, android.R.layout.simple_dropdown_item_1line, proprios.map { it.nome }))
+        val nomeNovo = AutoCompleteTextView(tema).apply {
+            setAdapter(ArrayAdapter(tema, android.R.layout.simple_dropdown_item_1line, proprios.map { it.nome }))
             threshold = 1
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             setText(if (editando == null && daFala == null && l.tipo == null) fala?.let { TiposGasto.sugerirNome(it) } ?: "" else "")
         }
         caixa.addView(nomeNovo)
-        val pessoal = CheckBox(this).apply { text = "É gasto pessoal (casa, família): fica fora do Sobrou do trabalho" }
+        val pessoal = CheckBox(tema).apply { text = "É gasto pessoal (casa, família): fica fora do Sobrou do trabalho" }
         caixa.addView(pessoal)
         // Escreveu o nome de um tipo que já existe: marca como ele é. Nome novo de casa (mercado, dentista): já vem pessoal.
         fun marcarPessoal(nome: String) {
@@ -191,7 +194,7 @@ class GastoActivity : Activity() {
         val litros = campo(l.litros?.let { String.format(PT, "%.2f", it) } ?: "", decimal)
         val rotuloKm = rotulo("Quilometragem do painel (opcional)")
         val km = campo(l.km?.toString() ?: "", InputType.TYPE_CLASS_NUMBER)
-        val cheio = CheckBox(this).apply { text = "Tanque cheio"; isChecked = l.tanqueCheio }
+        val cheio = CheckBox(tema).apply { text = "Tanque cheio"; isChecked = l.tanqueCheio }
         caixa.addView(cheio)
 
         val soCombustivel = listOf(rotuloLitros, litros, rotuloKm, km, cheio)
@@ -217,7 +220,7 @@ class GastoActivity : Activity() {
 
         val dialogo = AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
             .setTitle(if (editando != null) "Corrigir lançamento" else "Confere?")
-            .setView(ScrollView(this).apply { addView(caixa) })
+            .setView(ScrollView(tema).apply { addView(caixa) })
             .setPositiveButton("Salvar", null)
             .apply {
                 if (editando != null) setNeutralButton("Apagar") { _, _ -> apagar(editando) }
@@ -237,9 +240,22 @@ class GastoActivity : Activity() {
                     valorGanho.error = "Informe o valor"
                     return@setOnClickListener
                 }
-                dialogo.setOnCancelListener(null)
-                dialogo.dismiss()
-                salvarGanho(apps[app.selectedItemPosition], v, total.isChecked, hora, editando)
+                val nomeApp = apps[app.selectedItemPosition]
+                fun seguir() {
+                    dialogo.setOnCancelListener(null)
+                    dialogo.dismiss()
+                    salvarGanho(nomeApp, v, total.isChecked, hora, editando)
+                }
+                // O mesmo valor do mesmo app já lançado hoje: quase sempre é o total do dia falado de novo, e somaria duas vezes.
+                if (editando == null && !total.isChecked && jaLancadoHoje(nomeApp, v)) {
+                    AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
+                        .setMessage("Você já lançou R$ ${Popup.br(v)} da $nomeApp hoje. Lançar de novo vai somar mais R$ ${Popup.br(v)}.")
+                        .setPositiveButton("Lançar de novo") { _, _ -> seguir() }
+                        .setNegativeButton("Não lançar", null)
+                        .show()
+                    return@setOnClickListener
+                }
+                seguir()
                 return@setOnClickListener
             }
             val escolhido = opcoes[tipo.selectedItemPosition]
@@ -269,6 +285,13 @@ class GastoActivity : Activity() {
             dialogo.dismiss()
             salvar(gasto, editando as? Gasto)
         }
+    }
+
+    /** Já tem hoje um ganho (avulso ou total do dia) deste app com este valor. */
+    private fun jaLancadoHoje(app: String, valor: Double): Boolean {
+        val hoje = java.time.LocalDate.now()
+        return Totais.todos(this).any { it.hora.toLocalDate() == hoje && it.app == app && kotlin.math.abs(it.valor - valor) < 0.01 } ||
+            Corridas.todas(this).any { it.hora.toLocalDate() == hoje && it.app == app && kotlin.math.abs(it.valor - valor) < 0.01 }
     }
 
     private fun apagar(item: Any) {
