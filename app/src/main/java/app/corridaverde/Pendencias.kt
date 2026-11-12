@@ -41,9 +41,9 @@ object Pendencias {
         val m = PEDIDO.find(t) ?: return null
         val destino = area(m.groupValues[2]) ?: return null
         val inicio = m.groupValues[1]
-        val chave = chave(inicio)
+        val comeco = chave(inicio)
         // O código do PA pode ter espaço ("3A PTO", "STA A"): vale o mais comprido que bate com o começo.
-        val codigo = CODIGOS.filter { chave == it || chave.startsWith("$it ") }.maxByOrNull { it.length }
+        val codigo = CODIGOS.filter { comeco == it || comeco.startsWith("$it ") }.maxByOrNull { it.length }
         val resto = if (codigo == null) inicio else inicio.drop(codigo.length).trim()
         val lugar = QTR.replace(resto, "").trim()
         // "MELIA IBIRAPUERA - AVENIDA IBIRAPUERA, 2534": para o mapa vale a parte da rua.
