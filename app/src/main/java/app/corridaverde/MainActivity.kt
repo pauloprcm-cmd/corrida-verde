@@ -15,6 +15,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 
 /**
  * Tela inicial curta, como no desenho aprovado: o estado da leitura (verde LIGADO ou vermelho
@@ -93,9 +94,30 @@ class MainActivity : Activity() {
             CidadeActivity.abrir(this)
         }
         montar()
+        perguntarTablet()
         Notificacao.atualizar(this)
         tirarIconeFalar()
         Atualizador.verificar(this, perguntar = true) { runOnUiThread { versao?.text = it } }
+    }
+
+    /**
+     * Tela grande (tablet): pergunta uma vez se a Uber e a 99 ficam com a tela dividida (pedido do Paulo, 07/11/2026).
+     * Sim liga a opção dos Ajustes; Não (ou fechar) não pergunta mais. No celular nunca aparece.
+     */
+    private fun perguntarTablet() {
+        if (resources.configuration.smallestScreenWidthDp < 600 || pronto != null) return
+        val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(PERGUNTOU_TABLET, false) || Config.carregar(this).telaDividida) return
+        prefs.edit().putBoolean(PERGUNTOU_TABLET, true).apply()
+        AlertDialog.Builder(this)
+            .setTitle("Parece que você está num tablet")
+            .setMessage("Usa a Uber e a 99 com a tela dividida? Assim cada uma tem o seu aviso, no pedaço da tela dela. Dá para mudar depois em Ajustes › Tablet / tela dividida.")
+            .setPositiveButton("Sim") { _, _ ->
+                Config.carregar(this).copy(telaDividida = true).salvar(this)
+                Toast.makeText(this, "Tela dividida ligada", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Não", null)
+            .show()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -289,5 +311,6 @@ class MainActivity : Activity() {
         const val BATERIA = "bateria"
         private const val PREFS = "inicio"
         private const val JA_LIGOU = "ja_ligou"
+        private const val PERGUNTOU_TABLET = "perguntou_tablet"
     }
 }
