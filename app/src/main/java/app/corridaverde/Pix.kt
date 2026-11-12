@@ -97,8 +97,10 @@ object LeitorPix {
     private val QR = Regex("""\bq\s?r\b|\bqr ?code\b|\bqrcode\b|\bcuar ?code\b|\bcu erre\b""")
     /** Pedidos, não relatos: "cobrar 70 no Pix" gera o QR; "cobrei 70 no Pix" é ganho e não gera. */
     private val PEDIDO = Regex("""\b(gera|gerar|gere|cria|criar|crie|faz|fazer|faca|mostra|mostrar|mostre|cobra|cobrar|cobranca|manda|mandar|passa|passar|monta|montar)\b""")
-    private val PIX = Regex("""\bpix\b|\bpics\b|\bpicks\b""")
-    private val COMECA_PIX = Regex("""^\s*(?:um\s+)?pix\s+de\s+\d""")
+    /** O Google escreve "Pix" de vários jeitos: "gerar um piques de 70 reais" (Paulo, 10/11/2026). */
+    private val PIX = Regex("""\b(?:pix|pics|picks|piques|pique|pixe|piks)\b""")
+    /** "Pix de 70" e "Pix de R$ 70" (o reconhecimento de voz escreve o R$; antes caía em ganho). */
+    private val COMECA_PIX = Regex("""^\s*(?:um\s+)?(?:pix|pics|picks|piques|pique|pixe|piks)\s+de\s+(?:r\$\s*)?\d""")
 
     fun ehPix(fala: String): Boolean {
         val t = LeitorGasto.semAcento(fala.lowercase(Locale.ROOT)).replace(' ', ' ')

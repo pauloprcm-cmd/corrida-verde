@@ -75,16 +75,19 @@ class PixActivity : Activity() {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, codigo), "Mandar o Pix"))
         }
         tela.addView(texto("O app não vê a sua conta: confira no app do seu banco se o Pix caiu.", 15f, cor = CINZA).apply { setPadding(0, dp(14), 0, dp(4)) })
-        val lancar = botao("✅ Caiu: lançar R$ ${Popup.br(valor)} como ganho de Táxi") {}
+        // Taxista lança como Táxi e pode fazer o recibo; motorista de app lança como Particular, sem recibo (10/11/2026).
+        val app = Config.carregar(this).motoristaDeApp
+        val categoria = if (app) "Particular" else "Táxi"
+        val lancar = botao("✅ Caiu: lançar R$ ${Popup.br(valor)} como ganho de $categoria") {}
         lancar.setOnClickListener {
-            if (!jaLancado(valor)) {
-                Corridas.guardar(this, Corrida(LocalDateTime.now().withSecond(0).withNano(0), "Táxi", valor))
+            if (!jaLancado(valor, categoria)) {
+                Corridas.guardar(this, Corrida(LocalDateTime.now().withSecond(0).withNano(0), categoria, valor))
                 Notificacao.atualizar(this)
             }
             lancar.isEnabled = false
             lancar.text = "Ganho lançado"
         }
-        botao("Fazer recibo desta corrida") {
+        if (!app) botao("Fazer recibo desta corrida") {
             startActivity(ReciboActivity.daFala(this, "recibo de ${Popup.br(valor)} reais no pix"))
             finish()
         }
@@ -139,8 +142,8 @@ class PixActivity : Activity() {
         }
     }
 
-    private fun jaLancado(valor: Double) =
-        Corridas.todas(this).any { it.hora.toLocalDate() == LocalDate.now() && it.app == "Táxi" && abs(it.valor - valor) < 0.01 }
+    private fun jaLancado(valor: Double, categoria: String) =
+        Corridas.todas(this).any { it.hora.toLocalDate() == LocalDate.now() && it.app == categoria && abs(it.valor - valor) < 0.01 }
 
     private fun qr(codigo: String, lado: Int): Bitmap {
         val m = QRCodeWriter().encode(codigo, BarcodeFormat.QR_CODE, lado, lado,

@@ -41,7 +41,7 @@ class VerificarActivity : Activity() {
         val itens = conferir()
         val problemas = itens.count { !it.ok }
         tela.addView(v.texto(
-            if (problemas == 0) "Tudo certo. O Corrida Verde está pronto para as ofertas da Uber."
+            if (problemas == 0) "Tudo certo. O Corrida Verde está pronto para as ofertas da Uber e da 99."
             else if (problemas == 1) "Achei 1 coisa para resolver." else "Achei $problemas coisas para resolver.",
             19f, negrito = true, cor = if (problemas == 0) v.verde else v.texto,
         ).apply { setPadding(0, 0, 0, v.dp(6)) })

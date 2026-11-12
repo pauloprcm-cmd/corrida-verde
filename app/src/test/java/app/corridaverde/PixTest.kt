@@ -45,5 +45,10 @@ class PixTest {
             .forEach { assertFalse(it, LeitorPix.ehPix(it)) }
         assertEquals(70.0, LeitorPix.valor("gera um pix de 70 reais")!!, 0.001)
         assertEquals(45.5, LeitorPix.valor("faz um Pix de 45 e 50")!!, 0.001)
+        // Do jeito que o Google escreve (10/11/2026): "R$" no meio e "piques" no lugar de Pix.
+        listOf("Pix de R$ 70", "pix de r$70", "gerar um piques de 70 reais", "gera um pixe de 70", "piques de 70")
+            .forEach { assertTrue(it, LeitorPix.ehPix(it)) }
+        assertEquals(70.0, LeitorPix.valor("Pix de R$ 70")!!, 0.001)
+        assertEquals(70.0, LeitorPix.valor("gerar um piques de 70 reais")!!, 0.001)
     }
 }

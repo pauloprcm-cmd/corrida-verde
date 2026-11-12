@@ -26,7 +26,7 @@ class AjudaActivity : Activity() {
 
         pergunta(tela, "Como ligar a leitura?", PASSO_A_PASSO) {
             addView(v.botaoPrincipal("Ir para Acessibilidade") { AvisoLeitura.ligar(this@AjudaActivity) }, cheio())
-            addView(v.botao("Liberar configuração restrita") { liberar(this@AjudaActivity) }, cheio())
+            if (FORA_DA_PLAY) addView(v.botao("Liberar configuração restrita") { liberar(this@AjudaActivity) }, cheio())
         }
         pergunta(tela, "O aviso parou de aparecer no meio do dia. Por quê?",
             "Quase sempre é a economia de bateria do celular: para poupar bateria, ele fecha o Corrida Verde sem avisar. " +
@@ -46,15 +46,13 @@ class AjudaActivity : Activity() {
                 "Verde: a partir do mínimo verde do grupo. Amarelo: entre o amarelo e o verde. Vermelho: abaixo do amarelo.\n\n" +
                 "Se a busca até o passageiro passar de ${Popup.br(cfg.buscaMaxKm).removeSuffix(",00")} km, a cor cai um nível. " +
                 "Dá para mudar os mínimos em Ajustes.\n\n" +
-                "Na 99, o valor pode subir no fim da corrida (trânsito, pedágio): o aviso mostra o mínimo. " +
-                "Para não ver o aviso na 99, desmarque em Ajustes › Avisos na oferta.")
+                "Na 99, o valor pode subir no fim da corrida (trânsito, pedágio): o aviso mostra o mínimo. ")
         else pergunta(tela, "O que o aviso colorido quer dizer?",
             "O número grande é quanto a oferta da Uber ou da 99 paga perto do que o taxímetro daria na mesma viagem.\n\n" +
                 "Verde: ${cfg.limiteVerde}% ou mais.\nAmarelo: de ${cfg.limiteAmarelo}% a ${cfg.limiteVerde - 1}%.\nVermelho: abaixo de ${cfg.limiteAmarelo}%.\n\n" +
                 "Se a busca até o passageiro passar de ${Popup.br(cfg.buscaMaxKm).removeSuffix(",00")} km, a cor cai um nível. " +
                 "Dá para mudar esses números em Ajustes.\n\n" +
-                "Na 99, o valor pode subir no fim da corrida (taxímetro, trânsito, pedágio): o aviso mostra o mínimo. " +
-                "Para não ver o aviso na 99, desmarque em Ajustes › Avisos na oferta.")
+                "Na 99, o valor pode subir no fim da corrida (taxímetro, trânsito, pedágio): o aviso mostra o mínimo. ")
         pergunta(tela, "Como registro ganhos e gastos falando?",
             "Toque em Falar ganho ou gasto, na tela principal ou no Meu dia. Com a Uber ou a 99 aberta, toque na bolinha verde do microfone (dá para arrastar; para tirar, arraste até o X ou desmarque em Ajustes › Botão de falar). Também dá pelo 🎤 Falar da notificação do Corrida Verde.\n\n" +
                 "Ganhos: fale o total que a tela do app mostra, como “ganhei 346 na 99”. Ele substitui o que você já tinha falado da 99 hoje. " +
@@ -62,7 +60,7 @@ class AjudaActivity : Activity() {
                 "Gastos: “abasteci 120 reais de etanol, 22 litros, tanque cheio, quilometragem 45.320”.\n\n" +
                 "Errou? Em Meu dia › Dia, semana e mês, escolha o dia e toque no lançamento para corrigir ou apagar.")
         pergunta(tela, "Como cobro no Pix com QR Code?",
-            "O passageiro perguntou se aceita Pix? Fale “gera um Pix de 70 reais” ou toque em Cobrar no Pix, no Meu dia. " +
+            "O passageiro perguntou se aceita Pix? Fale “gera um QR Code de 70 reais” ou toque em Cobrar no Pix, no Meu dia. " +
                 "Na primeira vez o app pede a sua chave Pix. Depois mostra o QR Code com o valor para o passageiro pagar pelo app do banco.\n\n" +
                 "O app não vê a sua conta: confira no app do seu banco se o Pix caiu.")
         if (!cfg.motoristaDeApp) pergunta(tela, "Como faço um recibo?",
@@ -90,7 +88,7 @@ class AjudaActivity : Activity() {
             addView(v.botao("Abrir Ajustes") { startActivity(Intent(this@AjudaActivity, AjustesActivity::class.java)) }, cheio())
         }
         pergunta(tela, "O app aceita ou recusa corrida sozinho?",
-            "Não. O Corrida Verde só lê a tela e mostra o aviso. Quem aceita ou recusa é sempre você, no app da Uber.")
+            "Não. O Corrida Verde só lê a tela e mostra o aviso. Quem aceita ou recusa é sempre você, no app da Uber ou da 99.")
         pergunta(tela, "Termos de uso e privacidade",
             "As regras de uso do app e o que ele faz com os seus dados. Resumo: ganhos, gastos, recibos e clientes ficam só no seu celular.") {
             addView(v.botao("Termos de uso") { Termos.abrir(this@AjudaActivity, "termos") }, cheio())
@@ -127,13 +125,16 @@ class AjudaActivity : Activity() {
     private fun cheio() = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, v.dp(60)).apply { topMargin = v.dp(12) }
 
     companion object {
-        private const val PASSO_A_PASSO =
+        /** Só o APK de fora da Play passa pela "Configuração restrita" do Android: na Play o trecho e o botão somem. */
+        private val FORA_DA_PLAY = BuildConfig.FLAVOR == "github"
+
+        private val PASSO_A_PASSO =
             "1. Toque em Ligar a leitura (tela inicial) e depois em Abrir as configurações. Abre a tela Acessibilidade do Android.\n\n" +
                 "2. Procure Aplicativos instalados, no fim da lista (em alguns celulares: Apps instalados, Serviços instalados ou Aplicativos baixados).\n\n" +
                 "3. Toque em Corrida Verde e ligue a chave.\n\n" +
                 "4. O Android avisa que o app pode ver a tela. Toque em Permitir. O Corrida Verde só lê a oferta e o aviso de radar: não toca em nada.\n\n" +
-                "5. O Corrida Verde volta sozinho e mostra Pronto! (se não voltar, abra o app). No topo deve aparecer LIGADO, em verde.\n\n" +
-                "Apareceu “Configuração restrita” e a chave não liga? Isso acontece com apps instalados fora da Play Store. " +
+                "5. O Corrida Verde volta sozinho e mostra Pronto! (se não voltar, abra o app). No topo deve aparecer LIGADO, em verde." +
+                if (!FORA_DA_PLAY) "" else "\n\nApareceu “Configuração restrita” e a chave não liga? Isso acontece com apps instalados fora da Play Store. " +
                 "Toque em Liberar configuração restrita, depois no ⋮ (canto de cima, à direita) e em Permitir configurações restritas. " +
                 "Confirme com o PIN ou a digital e repita os passos de 1 a 4."
 
@@ -149,8 +150,8 @@ class AjudaActivity : Activity() {
                 .setTitle(if (jaLigou) "Por que a leitura desligou?" else "Como ligar a leitura")
                 .setMessage(if (jaLigou) POR_QUE_DESLIGA + "\n\n" + PASSO_A_PASSO else PASSO_A_PASSO)
                 .setPositiveButton("Ir para Acessibilidade") { _, _ -> AvisoLeitura.ligar(a) }
-                .setNeutralButton("Liberar configuração") { _, _ -> liberar(a) }
                 .setNegativeButton("Fechar", null)
+                .apply { if (FORA_DA_PLAY) setNeutralButton("Liberar configuração") { _, _ -> liberar(a) } }
                 .show()
         }
 
