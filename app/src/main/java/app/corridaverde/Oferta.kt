@@ -64,13 +64,13 @@ object LeitorOferta {
     private class Trecho(val m: MatchResult, val km: Double, val min: Int)
 
     /** Lê os textos da tela (na ordem da árvore). Devolve null se não houver oferta. */
-    fun ler(textos: List<String>): Oferta? = ler(textos, doPrint = false, totalJaSaiu = false)
+    fun ler(textos: List<String>): Oferta? = ler(textos, doPrint = false, totalJaSaiu = false, estDoTotal = null)
 
     /**
      * [doPrint]: texto do OCR, que às vezes perde o ponto do km ("7.2 km" vira "72 km": 6 ofertas em 30/10/2026).
-     * [totalJaSaiu]: a linha do total com "Est. de R$/km" já foi tirada antes.
+     * [totalJaSaiu]: a linha do total com "Est. de R$/km" já foi tirada antes; [estDoTotal] é o R$/km dela.
      */
-    private fun ler(textos: List<String>, doPrint: Boolean, totalJaSaiu: Boolean): Oferta? {
+    private fun ler(textos: List<String>, doPrint: Boolean, totalJaSaiu: Boolean, estDoTotal: Double?): Oferta? {
         val tela = textos.joinToString("\n").replace(' ', ' ').replace(' ', ' ')
 
         // Trechos "8 min (1.4 km)" ou "8 min • 1.4 km": o primeiro é a busca, os demais são a viagem (com paradas).
@@ -103,8 +103,13 @@ object LeitorOferta {
             !POR_UNIDADE.containsMatchIn(depois) && !INCLUIDO.containsMatchIn(depois) &&
                 !tela.substring(0, it.range.first).trimEnd().endsWith('+')
         }.toList()
-        val valor = faixa?.let { dinheiro(it.groupValues[1]) } ?: (valores.lastOrNull { it.range.first < trechos[0].m.range.first } ?: valores.firstOrNull())
-            ?.let { dinheiro(it.groupValues[1]) } ?: return null
+        // Sem centavos ("R$ 25" no Black, 11/11/2026): só o valor logo acima do total, conferido pelo "Est. de R$/km".
+        val est = estDoTotal ?: EST_POR_KM.find(tela)?.let { dinheiro(it.groupValues[1]) }
+        val valor = faixa?.let { dinheiro(it.groupValues[1]) }
+            ?: valores.lastOrNull { it.range.first < trechos[0].m.range.first }?.let { dinheiro(it.groupValues[1]) }
+            // Valor redondo logo acima do total que não fecha com o "Est. de": sem aviso, nunca outro R$ do cartão.
+            ?: acimaDoTotal(tela, lidos[0])?.let { redondo(it, comTotal?.get(0)?.km ?: trechos.sumOf { t -> t.km }, est, doPrint) ?: return null }
+            ?: valores.firstOrNull()?.let { dinheiro(it.groupValues[1]) } ?: return null
 
         val busca = trechos[0]
         val viagem = trechos.drop(1)
@@ -125,6 +130,35 @@ object LeitorOferta {
             // A categoria vem antes da busca; o endereço do destino pode ter "Black" ou "Comfort" no nome.
             grupo = Grupo.da(tela.substring(0, busca.m.range.first)),
         )
+    }
+
+    /**
+     * O valor sem centavos ("R$ 25"). Travas combinadas com o Paulo em 11/11/2026: (1) só o valor logo acima da
+     * primeira linha de tempo e km (o total), nunca outro "R$" redondo do cartão, como o "valor extra de R$ 4"; (2) com
+     * o "Est. de R$/km" lido, o valor dividido pelo km do total tem que dar ele; (3) no print, "R$ 125" pode ser R$ 125
+     * ou R$ 1,25 sem a vírgula: sem o "Est. de" para decidir, não avisa em vez de chutar.
+     */
+    private fun redondo(m: MatchResult, kmTotal: Double, est: Double?, doPrint: Boolean): Double? {
+        val digitos = m.groupValues[1].replace(".", "")
+        val n = digitos.toDouble()
+        val candidatos = if (doPrint && digitos.length == 3) listOf(n, n / 100) else listOf(n)
+        if (est == null) return candidatos.singleOrNull()
+        return candidatos.firstOrNull { fecha(it, kmTotal, est) }
+    }
+
+    /** O "R$" sem centavos logo acima do primeiro trecho (no print, com sobras do mapa de até 3 letras no meio). */
+    private fun acimaDoTotal(tela: String, primeiro: Trecho): MatchResult? {
+        val antes = tela.substring(0, primeiro.m.range.first)
+        val m = REDONDO.findAll(antes).lastOrNull() ?: return null
+        if (!antes.substring(m.range.last + 1).lines().all { it.trim().length <= 3 }) return null
+        if (antes.substring(0, m.range.first).trimEnd().endsWith('+')) return null
+        return m
+    }
+
+    /** O R$/km do "Est. de" bate com o valor e o km do total (a Uber arredonda o km para 0,1 e o R$/km para centavos). */
+    private fun fecha(valor: Double, km: Double, est: Double): Boolean {
+        if (km < 0.3) return false
+        return est in (valor / (km + 0.06) - 0.01)..(valor / (km - 0.06) + 0.01)
     }
 
     /**
@@ -203,6 +237,7 @@ object LeitorOferta {
     fun lerUberDoPrint(linhas: List<String>): Oferta? {
         // A linha do total ("32 min • 8.5 km • Est. de R$2,27/km") sai fora: com um trecho mal lido, a soma não
         // fecha e o total virava a busca.
+        val est = linhas.firstNotNullOfOrNull { l -> EST_POR_KM.find(l.replace(REAL_DO_OCR) { "R\$" })?.let { dinheiro(it.groupValues[1]) } }
         val tela = linhas.filterNot { EST_DO_TOTAL.containsMatchIn(it) }.joinToString("\n")
             .replace(REAL_DO_OCR) { "R\$" }
             .replace(KM_DO_OCR, " km")
@@ -212,7 +247,7 @@ object LeitorOferta {
             .replace(VALOR_COM_LETRA) { m -> m.value.takeUnless { v -> v.any(Char::isDigit) } ?: digitos(m.value) }
             .replace(VALOR_SEM_VIRGULA) { m -> m.groupValues[1].let { "R\$ ${it.dropLast(2)},${it.takeLast(2)}" } }
             .replace(PONTO_DO_OCR) { "${it.groupValues[1]} • " }
-        return ler(listOf(tela), doPrint = true, totalJaSaiu = linhas.any { EST_DO_TOTAL.containsMatchIn(it) })
+        return ler(listOf(tela), doPrint = true, totalJaSaiu = linhas.any { EST_DO_TOTAL.containsMatchIn(it) }, estDoTotal = est)
     }
 
     /** Como está o cartão da Uber no print, além da oferta. */
@@ -262,8 +297,15 @@ object LeitorOferta {
     private val HORA_DO_OCR = Regex("""(?<!\w)([\dlI|]{1,2})\s*h\s*(?:e\s*)?(?=\d+\s*min)""")
     // "1.2 km" sai "1.2 kmn" ou "15.6 kn".
     private val KM_DO_OCR = Regex("""(?<=\d)\s?(?:kmn|krn|kn)\b""", RegexOption.IGNORE_CASE)
-    // "R$ 37,99" sai "R$ 3799": a Uber sempre escreve os centavos no valor da corrida (a faixa do Táxi é que vem sem).
-    private val VALOR_SEM_VIRGULA = Regex("""(?<![-–—]\s{0,2})R\$\s*(\d{3,5})(?![\d.,])(?!\s*[-–—])""")
+    /**
+     * "R$ 37,99" sai "R$ 3799". Com 3 algarismos não dá para saber ("R$ 125" ou "R$ 1,25": o Black pode vir sem
+     * centavos, 11/11/2026): fica como está e o [redondo] decide pelo "Est. de R$/km".
+     */
+    private val VALOR_SEM_VIRGULA = Regex("""(?<![-–—]\s{0,2})R\$\s*(\d{4,5})(?![\d.,])(?!\s*[-–—])""")
+    /** O valor sem centavos: "R$ 25", "R$ 125", "R$ 1.250". */
+    private val REDONDO = Regex("""R\$\s*(\d{1,3}(?:\.\d{3})?)(?![\d.,])""")
+    /** O R$/km da linha do total: "Est. de R$3,57/km". */
+    private val EST_POR_KM = Regex("""\bEst\.?\s*de\s*R\$\s*(\d{1,3},\d{2})\s*/\s*km""", RegexOption.IGNORE_CASE)
     private val PONTO_DO_OCR = Regex("""(min(?:utos?)?)\s*[.\-·*°+]?\s*(?=\d+(?:[.,]\d+)?\s*k?m\b)""", RegexOption.IGNORE_CASE)
 
     /**

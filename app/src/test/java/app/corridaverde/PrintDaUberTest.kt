@@ -218,4 +218,18 @@ class PrintDaUberTest {
         assertEquals(37.99, ler("Táxi Promo | RS 3799 | 38 min•9.0 km | 6 min •1.2 km | Rua A, São Paulo | " +
             "32 minutos•7.8 km | Rua B, 10, São Paulo | Tenho interesse")!!.valor, 0.001)
     }
+
+    @Test
+    fun valorRedondoNoPrintSoComOEstParaDecidir() {
+        // "R$ 25": dois algarismos, sem dúvida; o "Est. de" confere.
+        val black = ler("Black | R$ 25 | 27 min • 7.0 km • Est. de R$3,57/km | 5 min (0.9 km) | Rua A, São Paulo | " +
+            "22 minutos (6.1 km) | Rua B, 10, São Paulo | Tenho interesse")!!
+        assertEquals(25.0, black.valor, 0.001)
+        // "R$ 125" pode ser R$ 125 ou R$ 1,25 sem a vírgula: o "Est. de R$3,57/km" com 35 km diz que é 125.
+        val longa = ler("Black | R$ 125 | 40 min • 35.0 km • Est. de R$3,57/km | 5 min (1.0 km) | Rua A, São Paulo | " +
+            "35 minutos (34.0 km) | Rua B, 10, São Paulo | Tenho interesse")!!
+        assertEquals(125.0, longa.valor, 0.001)
+        // Sem o "Est. de" para decidir, não chuta.
+        assertNull(ler("Black | R$ 125 | 5 min (1.0 km) | Rua A, São Paulo | 35 minutos (34.0 km) | Rua B, 10, São Paulo | Tenho interesse"))
+    }
 }

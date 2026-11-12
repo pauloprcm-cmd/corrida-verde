@@ -487,4 +487,18 @@ class LeitorOfertaTest {
             "4,84 (732)", "Verificado", "7 minutos • 1.5 km", "Avenida Brigadeiro Faria Lima, 4440, Itaim Bibi, São Paulo",
         ))!!.embarque)
     }
+
+    @Test
+    fun blackComValorSemCentavos() {
+        // 11/11/2026, foto do irmão do Paulo: o Black veio "R$ 25" e o aviso não apareceu.
+        val textos = listOf("Black", "R$ 25", "27 min • 7.0 km • Est. de R$3,57/km", "5 min (0.9 km)", "Rua A, São Paulo",
+            "22 minutos (6.1 km)", "Rua B, 10, São Paulo", "Tenho interesse")
+        val o = LeitorOferta.ler(textos)!!
+        assertEquals(25.0, o.valor, 0.001)
+        assertEquals(0.9, o.buscaKm, 0.001)
+        assertEquals(6.1, o.viagemKm, 0.001)
+        assertEquals(Grupo.PREMIUM, o.grupo)
+        // O "Est. de" não fecha com o valor: é leitura errada, sem aviso.
+        assertNull(LeitorOferta.ler(textos.map { it.replace("R$3,57/km", "R$2,10/km") }))
+    }
 }
