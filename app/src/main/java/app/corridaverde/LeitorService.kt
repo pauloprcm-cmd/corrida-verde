@@ -82,6 +82,17 @@ class LeitorService : AccessibilityService() {
     private val fundoCasa = Handler(trabalhoCasa.looper)
     /** Cada destino consultado, a distância e quanto demorou, para o motorista conferir no diagnóstico. */
     private val consultasCasa = ConcurrentLinkedDeque<String>()
+    /** Lista de Pendências da cooperativa ([Pendencias]): linha própria, para não atrasar a oferta da Uber e da 99. */
+    private val trabalhoPendencias = HandlerThread("pendencias").apply { start() }
+    private val fundoPendencias = Handler(trabalhoPendencias.looper)
+    private lateinit var etiquetasPendencias: EtiquetasPendencias
+    /** Endereço do embarque → ponto no mapa (null: o mapa não achou). Só na linha das pendências. */
+    private val embarques = HashMap<String, Ponto?>()
+    private val buscandoEmbarque = mutableSetOf<String>()
+    private val olharPendencias = Runnable { runCatching { lerPendencias() } }
+    /** Para o diagnóstico: cada leitura diferente da lista (as etiquetas, ou os primeiros textos se não achou pedido). */
+    private val leiturasPendencias = ConcurrentLinkedDeque<String>()
+    private var ultimaLeituraPendencias = ""
     private var chaveAtual: String? = null
     /**
      * Tela dividida ([Config.telaDividida]): um aviso para cada app (Uber e 99 podem tocar juntas) e a chave da oferta
@@ -226,6 +237,7 @@ class LeitorService : AccessibilityService() {
         popup = Popup(this)
         popupsDivididos = mapOf(UltimaOferta.UBER to Popup(this), UltimaOferta.NOVENTA_E_NOVE to Popup(this))
         radarPopup = RadarPopup(this)
+        etiquetasPendencias = EtiquetasPendencias(this)
         bolinha = Bolinha(this, aoTocar = {
             esconderBolinha()
             startActivity(Intent(this, GastoActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -263,6 +275,9 @@ class LeitorService : AccessibilityService() {
         trabalhoRadar.quitSafely()
         fundoCasa.removeCallbacksAndMessages(null)
         trabalhoCasa.quitSafely()
+        fundoPendencias.removeCallbacksAndMessages(null)
+        trabalhoPendencias.quitSafely()
+        if (::etiquetasPendencias.isInitialized) etiquetasPendencias.esconder()
         bolinhaNaTela = false
         fundoBolinha.removeCallbacksAndMessages(null)
         trabalhoBolinha.quitSafely()
@@ -283,6 +298,7 @@ class LeitorService : AccessibilityService() {
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         val app = e.packageName?.toString() ?: return
         if (e.eventType == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) return notificacao(app, e)
+        if (app == Pendencias.PACOTE) return agendarPendencias()
         agendarRadar(app)
         if (app == UBER || app == NOVENTA_E_NOVE) conferirBolinha()
         if (app in NAVEGADORES) return
@@ -296,6 +312,55 @@ class LeitorService : AccessibilityService() {
         val tipo = e.eventType
         val classe = e.className?.toString()
         fundo.post { runCatching { processar(textos, fonte, tipo, classe) } }
+    }
+
+    /** A lista do app da cooperativa se atualiza a cada segundo: junta os eventos e lê uma vez só. */
+    private fun agendarPendencias() {
+        fundoPendencias.removeCallbacks(olharPendencias)
+        fundoPendencias.postDelayed(olharPendencias, 150)
+    }
+
+    /** Só na linha das pendências. Acha cada pedido na tela e põe a etiqueta com o destino e os km. */
+    private fun lerPendencias() {
+        val itens = mutableListOf<Pair<Rect, String>>()
+        val raizes = windows.mapNotNull { w -> w.root?.takeIf { it.packageName?.toString() == Pendencias.PACOTE } }
+        raizes.forEach { procurarPedidos(it, itens, IntArray(1)) }
+        val leitura = if (itens.isNotEmpty()) "${itens.size} pedidos: " + itens.joinToString(" | ") { it.second }
+            else raizes.flatMap { runCatching { textosDo(it, 60) }.getOrDefault(emptyList()) }.take(4).joinToString(" | ").take(200)
+        if (leitura != ultimaLeituraPendencias) {
+            ultimaLeituraPendencias = leitura
+            leiturasPendencias.addLast("${LocalTime.now().withNano(0)} $leitura")
+            while (leiturasPendencias.size > 15) leiturasPendencias.removeFirst()
+        }
+        handler.post { if (itens.isNotEmpty() || etiquetasPendencias.visivel) etiquetasPendencias.mostrar(itens) }
+        // A lista some sem mandar evento (fechou, trocou de app): enquanto houver etiqueta, confere a cada segundo.
+        fundoPendencias.removeCallbacks(olharPendencias)
+        if (itens.isNotEmpty()) fundoPendencias.postDelayed(olharPendencias, 1_000)
+    }
+
+    private fun procurarPedidos(n: AccessibilityNodeInfo, itens: MutableList<Pair<Rect, String>>, visitados: IntArray) {
+        if (!n.isVisibleToUser || ++visitados[0] > LIMITE_NOS) return
+        val pedido = (n.text ?: n.contentDescription)?.toString()?.let { Pendencias.ler(it) }
+        if (pedido != null) {
+            itens += Rect().also { n.getBoundsInScreen(it) } to Pendencias.etiqueta(pedido, embarque(pedido))
+            return
+        }
+        for (i in 0 until n.childCount) n.getChild(i)?.let { procurarPedidos(it, itens, visitados) }
+    }
+
+    /** O ponto do endereço do embarque, se já achou. Senão pede ao mapa (na linha do Indo pra casa) e lê a lista de novo. */
+    private fun embarque(p: Pendencias.Pedido): Ponto? {
+        val e = p.endereco ?: return null
+        if (e in embarques) return embarques[e]
+        if (buscandoEmbarque.add(e)) fundoCasa.post {
+            val ponto = runCatching { Pendencias.pontoDoEmbarque(this, p) }.getOrNull()
+            fundoPendencias.post {
+                embarques[e] = ponto
+                buscandoEmbarque.remove(e)
+                agendarPendencias()
+            }
+        }
+        return null
     }
 
     /** Chega evento da Uber ou da 99: vê se é hora de mostrar a bolinha (no máximo a cada meio segundo). */
@@ -1090,6 +1155,8 @@ class LeitorService : AccessibilityService() {
             consultasCasa.forEach { appendLine(it) }
             appendLine("--- textos com R$ (com o de antes e o de depois) ---")
             textosComValor.values.forEach { appendLine(it) }
+            appendLine("--- lista de pendências (cooperativa) ---")
+            leiturasPendencias.forEach { appendLine(it) }
             appendLine("--- notificações da Uber e da 99 ---")
             notificacoes.forEach { appendLine(it) }
             appendLine("--- estrutura das janelas da 99 (cada formato novo) ---")
@@ -1118,6 +1185,7 @@ class LeitorService : AccessibilityService() {
     fun limparDiagnostico() {
         textosDeRadar.clear()
         eventosDosNavegadores.clear()
+        leiturasPendencias.clear()
         fundo.post {
             eventosDaUber = 0
             eventosDa99 = 0
