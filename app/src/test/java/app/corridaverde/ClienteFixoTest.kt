@@ -45,6 +45,39 @@ class ClienteFixoTest {
     }
 
     @Test
+    fun observacaoDaCorridaEInformacoesAdicionaisVaoEVoltamDoArquivo() {
+        val r = recibo.copy(
+            corridas = listOf(
+                CorridaRecibo(LocalDate.of(2026, 11, 10), ida, "Espera de 20 min"),
+                CorridaRecibo(LocalDate.of(2026, 11, 11), santaCasa),
+            ),
+            info = "Motorista: Diego",
+        )
+        assertEquals(r, Recibos.deLinha(Recibos.paraLinha(r)))
+        val t = Recibos.texto(r, Motorista("Diego", "ABC1D23"))
+        assertTrue("• 10/11/2026 – (Ida) Residência → Aeroporto de Congonhas – Espera de 20 min – R$ 130,00" in t)
+        assertTrue("Motorista: Diego" in t)
+    }
+
+    @Test
+    fun observacoesDoTrajetoEDaCorridaSeJuntam() {
+        assertEquals("Pedágios incluídos · Espera de 20 min", CorridaRecibo(LocalDate.of(2026, 11, 10), santaCasa, "Espera de 20 min").observacao)
+        assertEquals("Pedágios incluídos", CorridaRecibo(LocalDate.of(2026, 11, 10), santaCasa).observacao)
+        assertEquals("", CorridaRecibo(LocalDate.of(2026, 11, 10), ida).observacao)
+    }
+
+    @Test
+    fun reciboDeClienteFixoAntigoSemObservacaoNemInformacoes() {
+        // Linha gravada antes de 14/11/2026: corridas com 6 campos (sem a observação) e sem a coluna das informações.
+        val corridasAntigas = Lista.juntar(recibo.corridas.map { listOf(it.dia.toString()) + Lista.trajeto(it.trajeto) })
+        val colunas = Recibos.paraLinha(recibo).split('\t').take(11) + corridasAntigas
+        val r = Recibos.deLinha(colunas.joinToString("\t"))!!
+        assertEquals("", r.info)
+        assertEquals("", r.corridas[0].obs)
+        assertEquals(ida, r.corridas[0].trajeto)
+    }
+
+    @Test
     fun descricaoDoTrajeto() {
         assertEquals("(Ida) Residência → Aeroporto de Congonhas", ida.descricao)
         assertEquals("Aeroporto", Trajeto("", "", "Aeroporto", 10.0).descricao)

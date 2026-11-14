@@ -133,6 +133,11 @@ class ReciboActivity : Activity() {
         titulo(if (substitui != null) "Corrigir recibo" else "Recibo")
         substitui?.let { aviso("Correção do recibo nº ${numero(it)}: sai um recibo novo, com outro número, e o antigo fica marcado como substituído.") }
         fala?.let { aviso("Você disse: “$it”") }
+        // O Diego (14/11/2026) montou um recibo de ida e volta aqui sem saber do recibo de cliente fixo.
+        if (substitui == null) tela.addView(Button(this).apply {
+            text = "Várias corridas do mesmo passageiro? Use o Recibo de cliente fixo"
+            setOnClickListener { startActivity(Intent(this@ReciboActivity, ClientesActivity::class.java)); finish() }
+        })
 
         val valor = campo("Valor (R$)", if (r.valor > 0) Popup.br(r.valor) else "", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL)
         val data = campo("Data", r.quando.format(DATA), InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_DATE)

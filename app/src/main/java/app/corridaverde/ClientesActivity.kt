@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
+import android.text.InputFilter
 import android.text.InputType
 import android.text.TextWatcher
 import android.view.Gravity
@@ -28,6 +29,10 @@ import java.time.format.DateTimeFormatter
  * Recibo de cliente fixo: o taxista cadastra o passageiro uma vez, com os trajetos que ele costuma fazer, e
  * depois junta as corridas da semana num recibo só (até [Recibo.MAX_CORRIDAS]), cada uma com a sua data. A
  * data do recibo é a do pagamento. A prévia, a assinatura e o envio são os do recibo por voz ([ReciboActivity]).
+ *
+ * Desde 14/11/2026, no jeito do app que o Diego já usava: os trajetos de recibos anteriores aparecem para
+ * escolher com um toque, cada corrida do recibo tem Duplicar (abre a cópia no dia seguinte), observação própria
+ * ("espera de 20 min") e o recibo tem informações adicionais ("Motorista: Diego"), que o próximo já traz.
  */
 class ClientesActivity : Activity() {
     private lateinit var v: Visual
@@ -42,6 +47,7 @@ class ClientesActivity : Activity() {
     private val corridas = mutableListOf<CorridaRecibo>()
     private var substitui: Int? = null
     private var lancarGanho = true
+    private var info = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -203,6 +209,7 @@ class ClientesActivity : Activity() {
         corridas.clear()
         substitui = null
         lancarGanho = true
+        info = Recibos.infoPadrao(this)
         telaRecibo()
     }
 
@@ -216,6 +223,7 @@ class ClientesActivity : Activity() {
         corridas += r.corridas
         substitui = if (r.numero > 0) r.numero else r.substitui
         lancarGanho = substitui == null && intent.getBooleanExtra(EXTRA_LANCAR, true)
+        info = r.info
         telaRecibo()
     }
 
@@ -239,9 +247,30 @@ class ClientesActivity : Activity() {
 
         tela.addView(v.secao("Corridas (${corridas.size} de ${Recibo.MAX_CORRIDAS})"))
         if (corridas.isEmpty()) tela.addView(v.texto("Toque em Adicionar corrida e escolha o dia e o trajeto.", 15f, cor = v.texto2))
-        corridas.forEachIndexed { i, cr -> v.por(tela, cartaoCorrida(cr) { telaCorrida(i) }, espaco = 8) }
+        corridas.forEachIndexed { i, cr ->
+            v.por(tela, cartaoCorrida(cr) { telaCorrida(i) }, espaco = 8)
+            // Duplicar: a mesma corrida no dia seguinte, para conferir antes de entrar no recibo.
+            if (corridas.size < Recibo.MAX_CORRIDAS) {
+                val linha = LinearLayout(this).apply { gravity = Gravity.END }
+                linha.addView(v.botao("⧉ Duplicar") { telaCorrida(null, base = cr) },
+                    LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, v.dp(44)))
+                v.por(tela, linha, espaco = 4)
+            }
+        }
         if (corridas.size < Recibo.MAX_CORRIDAS) v.por(tela, v.botao("+ Adicionar corrida") { telaCorrida(null) })
         else tela.addView(v.texto("Chegou a ${Recibo.MAX_CORRIDAS} corridas, o que cabe na folha. As outras vão em outro recibo.", 15f, cor = v.texto2))
+
+        tela.addView(v.secao("Informações adicionais"))
+        campo(null, info, InputType.TYPE_TEXT_FLAG_CAP_SENTENCES).apply {
+            hint = "Opcional, ex.: Motorista: Diego"
+            filters = arrayOf(InputFilter.LengthFilter(MAX_INFO))
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                override fun afterTextChanged(s: Editable?) { info = s?.toString().orEmpty() }
+            })
+        }
+        tela.addView(v.texto("Sai no recibo. O próximo recibo já começa com este texto.", 14f, cor = v.texto2))
 
         val total = totalCorridas()
         val linhaTotal = LinearLayout(this).apply {
@@ -276,7 +305,9 @@ class ClientesActivity : Activity() {
                 substitui = substitui,
                 documento = c.documento,
                 corridas = corridas.toList(),
+                info = info.trim(),
             )
+            Recibos.guardarInfo(this, info.trim())
             startActivity(ReciboActivity.pronto(this, r, lancarGanho && substitui == null))
             finish()
         }, espaco = 16)
@@ -290,15 +321,23 @@ class ClientesActivity : Activity() {
         return minOf(ultima.plusDays(1), maxOf(diaPagamento, ultima))
     }
 
-    /** Adiciona uma corrida ([indice] nulo) ou muda o dia, o trajeto e o valor de uma que já está no recibo. */
-    private fun telaCorrida(indice: Int?) {
+    /**
+     * Adiciona uma corrida ([indice] nulo), muda o dia, o trajeto e o valor de uma que já está no recibo, ou
+     * duplica [base]: a cópia abre no dia seguinte e só entra no recibo ao tocar em Adicionar.
+     */
+    private fun telaCorrida(indice: Int?, base: CorridaRecibo? = null) {
         var c = cliente ?: return telaLista()
         val editando = indice?.let { corridas[it] }
-        var dia = editando?.dia ?: proximoDia()
-        // Trajeto escolhido da lista do cliente; nulo = "Outro trajeto", digitado.
-        var escolhido: Trajeto? = editando?.trajeto?.let { e -> c.trajetos.firstOrNull { mesmoTrajeto(it, e) } }
-            ?: if (editando == null) c.trajetos.firstOrNull() else null
-        novaTela(if (editando == null) "Adicionar corrida" else "Corrida") { telaRecibo() }
+        val modelo = editando ?: base
+        var dia = editando?.dia ?: base?.dia?.plusDays(1) ?: proximoDia()
+        val antes = usadosAntes(c)
+        // Trajeto escolhido da lista do cliente ou dos recibos anteriores; nulo = "Outro trajeto", digitado.
+        var escolhido: Trajeto? = modelo?.trajeto?.let { e -> (c.trajetos + antes).firstOrNull { mesmoTrajeto(it, e) } }
+            ?: if (modelo == null) (c.trajetos + antes).firstOrNull() else null
+        novaTela(when { editando != null -> "Corrida"; base != null -> "Duplicar corrida"; else -> "Adicionar corrida" }) { telaRecibo() }
+        base?.let {
+            tela.addView(v.texto("Cópia da corrida de ${it.dia.format(DIA_MES)}. Confira o dia e toque em Adicionar.", 15f, cor = v.texto2))
+        }
 
         tela.addView(v.secao("Dia da corrida"))
         v.por(tela, seletorDia(dia) { dia = it }, espaco = 0)
@@ -311,7 +350,7 @@ class ClientesActivity : Activity() {
             cartoes.forEach { (cartao, t) -> cartao.background = v.toque(v.forma(v.cartao, if (t == escolhido) v.verde else v.borda, 16, if (t == escolhido) 2 else 1)) }
             outro.visibility = if (escolhido == null) View.VISIBLE else View.GONE
         }
-        c.trajetos.forEach { t ->
+        fun opcao(t: Trajeto) {
             val cartao = cartaoTrajeto(t) {
                 escolhido = t
                 valor.setText(Popup.br(t.valor))
@@ -320,21 +359,28 @@ class ClientesActivity : Activity() {
             cartoes += cartao to t
             v.por(tela, cartao, espaco = 8)
         }
-        if (c.trajetos.isEmpty()) tela.addView(v.texto("${primeiroNome(c.nome)} ainda não tem trajetos guardados. Digite o trajeto abaixo.", 15f, cor = v.texto2))
+        c.trajetos.forEach { opcao(it) }
+        if (antes.isNotEmpty()) {
+            tela.addView(v.texto("Usados em recibos anteriores", 15f, negrito = true, cor = v.texto2).apply { setPadding(v.dp(4), v.dp(16), 0, 0) })
+            antes.forEach { opcao(it) }
+        }
+        if (c.trajetos.isEmpty() && antes.isEmpty()) tela.addView(v.texto("${primeiroNome(c.nome)} ainda não tem trajetos guardados. Digite o trajeto abaixo.", 15f, cor = v.texto2))
         else v.por(tela, v.botao("+ Outro trajeto (digitar)") { escolhido = null; marcar() })
 
         // Trajeto digitado, com a opção de guardar no cadastro do cliente.
         v.por(tela, outro, espaco = 0)
-        val digitado = camposDeTrajeto(editando?.trajeto?.takeIf { escolhido == null } ?: Trajeto(Trajeto.TIPOS[0], "", "", 0.0), outro, comValor = false)
+        val digitado = camposDeTrajeto(modelo?.trajeto?.takeIf { escolhido == null } ?: Trajeto(Trajeto.TIPOS[0], "", "", 0.0), outro, comValor = false)
         val guardar = CheckBox(this, null, 0, R.style.Caixa).apply {
             text = "Guardar nos trajetos de ${primeiroNome(c.nome)}"
             isChecked = true
         }
         v.por(outro, guardar)
 
-        valor = campo("Valor desta corrida (R$)", (editando?.trajeto ?: escolhido)?.valor?.let { Popup.br(it) } ?: "",
+        valor = campo("Valor desta corrida (R$)", (modelo?.trajeto ?: escolhido)?.valor?.let { Popup.br(it) } ?: "",
             InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL)
         tela.addView(v.texto("Mudar o valor aqui vale só para este recibo (ex.: teve espera).", 14f, cor = v.texto2))
+        val obsCorrida = campo("Observação desta corrida (opcional), ex.: espera de 20 min", modelo?.obs.orEmpty(), InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
+        tela.addView(v.texto("Sai no recibo embaixo do trajeto, só nesta corrida.", 14f, cor = v.texto2))
         marcar()
 
         v.por(tela, v.botaoPrincipal(if (editando == null) "Adicionar" else "Salvar corrida") {
@@ -349,12 +395,27 @@ class ClientesActivity : Activity() {
                 }
                 novo
             }
-            val corrida = CorridaRecibo(dia, t)
+            val corrida = CorridaRecibo(dia, t, obsCorrida.text.toString().trim())
             if (indice == null) corridas += corrida else corridas[indice] = corrida
             corridas.sortBy { it.dia }
             telaRecibo()
         }, espaco = 20)
         if (indice != null) v.por(tela, v.botao("Tirar do recibo") { corridas.removeAt(indice); telaRecibo() })
+    }
+
+    /**
+     * Trajetos dos recibos anteriores deste cliente que não estão no cadastro dele (digitados sem guardar, ou
+     * apagados depois), do mais recente para o mais antigo: um toque e a corrida vem preenchida.
+     */
+    private fun usadosAntes(c: Cliente): List<Trajeto> {
+        val achados = mutableListOf<Trajeto>()
+        Recibos.todos(this).filter { it.varias && it.passageiro == c.nome }.sortedByDescending { it.quando }
+            .flatMap { r -> r.corridas.sortedByDescending { it.dia } }
+            .forEach { cr ->
+                val t = cr.trajeto
+                if (c.trajetos.none { mesmoTrajeto(it, t) } && achados.none { mesmoTrajeto(it, t) }) achados += t
+            }
+        return achados.take(MAX_ANTES)
     }
 
     /** O mesmo trajeto, mesmo que o valor tenha sido mudado só naquele recibo. */
@@ -418,7 +479,7 @@ class ClientesActivity : Activity() {
         addView(v.texto(cr.dia.format(DIA_MES), 17f, negrito = true, cor = v.verde), LinearLayout.LayoutParams(v.dp(62), LinearLayout.LayoutParams.WRAP_CONTENT))
         val textos = LinearLayout(this@ClientesActivity).apply { orientation = LinearLayout.VERTICAL }
         textos.addView(v.texto(listOf(cr.trajeto.de, cr.trajeto.ate).filter { it.isNotBlank() }.joinToString(" → "), 16f, negrito = true))
-        textos.addView(v.texto(listOf(cr.trajeto.tipo, cr.trajeto.obs).filter { it.isNotBlank() }.joinToString(" · "), 14f, cor = v.texto2))
+        textos.addView(v.texto(listOf(cr.trajeto.tipo, cr.observacao).filter { it.isNotBlank() }.joinToString(" · "), 14f, cor = v.texto2))
         addView(textos, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         addView(v.texto(Popup.br(cr.trajeto.valor), 17f, negrito = true).apply { setPadding(v.dp(10), 0, 0, 0) })
     }
@@ -430,6 +491,10 @@ class ClientesActivity : Activity() {
     companion object {
         private const val EXTRA_RECIBO = "recibo"
         private const val EXTRA_LANCAR = "lancar"
+        /** Informações adicionais: uma linha no recibo. */
+        private const val MAX_INFO = 70
+        /** Quantos trajetos de recibos anteriores aparecem para escolher. */
+        private const val MAX_ANTES = 6
         private val DIA_MES = DateTimeFormatter.ofPattern("dd/MM")
         private val DIA_SEMANA = DateTimeFormatter.ofPattern("EEE, dd/MM/yyyy", java.util.Locale("pt", "BR"))
 

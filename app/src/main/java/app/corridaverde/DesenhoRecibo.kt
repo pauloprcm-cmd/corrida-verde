@@ -83,10 +83,12 @@ object DesenhoRecibo {
         y = paragrafo(c, Recibos.frase(f.r), pincel(corpo), y, largura) + 10f
         if (f.r.varias) {
             // Entre a tabela e a assinatura ainda vêm o pagamento, a correção e a cidade com a data.
-            val depois = 34f + (if (f.r.pagamento.isNotBlank()) 22f else 0f) + (if (f.r.substitui != null) 18f else 0f)
+            val depois = 34f + (if (f.r.pagamento.isNotBlank()) 22f else 0f) + (if (f.r.substitui != null) 18f else 0f) +
+                (if (f.r.info.isNotBlank()) 22f else 0f)
             y = tabelaCorridas(c, f, MARGEM, LARGURA - MARGEM, y, topoAssinatura(f, pe) - depois, CLARO, if (simples) PRETO else f.e.cor) + 12f
         }
         if (f.r.pagamento.isNotBlank()) y = paragrafo(c, "Forma de pagamento: ${f.r.pagamento}.", pincel(corpo), y, largura) + 6f
+        if (f.r.info.isNotBlank()) y = paragrafo(c, f.r.info, pincel(corpo), y, largura) + 6f
         f.r.substitui?.let {
             y = paragrafo(c, "Este recibo substitui o nº ${String.format(Locale.ROOT, "%04d", it)}.", pincel(11f, cor = CINZA), y, largura) + 6f
         }
@@ -170,7 +172,7 @@ object DesenhoRecibo {
         val valor = "R$ ${Popup.br(f.r.valor)}"
         if (f.r.varias) {
             // Embaixo da tabela vêm o total e até quatro linhas de texto, e depois a assinatura.
-            y = tabelaCorridas(c, f, m, w - m, y, linhaAssin - 46f - 72f, CLARO, f.e.cor)
+            y = tabelaCorridas(c, f, m, w - m, y, linhaAssin - 46f - 72f - (if (f.r.info.isNotBlank()) 14f else 0f), CLARO, f.e.cor)
         } else {
             // Tabela da corrida: DESCRIÇÃO | VALOR | QTD | TOTAL.
             val col = floatArrayOf(m, m + (w - 2 * m) * 0.42f, m + (w - 2 * m) * 0.62f, m + (w - 2 * m) * 0.78f, w - m)
@@ -210,6 +212,7 @@ object DesenhoRecibo {
         y = paragrafo(c, "Confirmamos o recebimento total do serviço descrito neste recibo.", pincel(10f), y, larguraTexto, m) + 5f
         y = paragrafo(c, marcado("**Condições de pagamento:** À vista"), pincel(10f), y, larguraTexto, m) + 1f
         if (f.r.pagamento.isNotBlank()) y = paragrafo(c, marcado("**Forma de pagamento:** ${f.r.pagamento}"), pincel(10f), y, larguraTexto, m) + 1f
+        if (f.r.info.isNotBlank()) y = paragrafo(c, f.r.info, pincel(10f), y, larguraTexto, m) + 1f
         f.r.substitui?.let { paragrafo(c, "Este recibo substitui o nº ${String.format(Locale.ROOT, "%04d", it)}.", pincel(9.5f, cor = CINZA), y + 5f, larguraTexto, m) }
 
         // Acima do pé, as assinaturas (passageiro à esquerda, motorista à direita).
@@ -281,7 +284,8 @@ object DesenhoRecibo {
         val valor = "R$ ${Popup.br(f.r.valor)}"
         if (f.r.varias) {
             // Embaixo da tabela: subtotal, total, pagamento e a data em cima da assinatura.
-            val depois = 92f + 62f + (if (f.r.pagamento.isNotBlank()) 48f else 0f) + (if (f.r.substitui != null) 14f else 0f)
+            val depois = 92f + 62f + (if (f.r.pagamento.isNotBlank()) 48f else 0f) + (if (f.r.substitui != null) 14f else 0f) +
+                (if (f.r.info.isNotBlank()) 48f else 0f)
             y = tabelaCorridas(c, f, m, w - m, y, linhaAssin - depois, f.e.cor, Color.WHITE) + 18f
         } else {
             // Cabeçalho da tabela na cor escolhida, letras brancas.
@@ -306,7 +310,8 @@ object DesenhoRecibo {
             c.drawText(valor, x[4], linha, pincel(8.5f).apply { textAlign = Paint.Align.RIGHT })
             y += alto + 18f
             // Uma corrida só: o total desce para perto da assinatura e o meio da folha fica livre para a logo.
-            val bloco = 74f + (if (f.r.pagamento.isNotBlank()) 48f else 0f) + (if (f.r.substitui != null) 14f else 0f)
+            val bloco = 74f + (if (f.r.pagamento.isNotBlank()) 48f else 0f) + (if (f.r.substitui != null) 14f else 0f) +
+                (if (f.r.info.isNotBlank()) 48f else 0f)
             y = maxOf(y, linhaAssin - 66f - bloco)
         }
 
@@ -328,6 +333,12 @@ object DesenhoRecibo {
             c.drawRect(m, y, w - m, y + 22f, Paint().apply { color = Color.rgb(0xF6, 0xF6, 0xF6) })
             c.drawText("Forma de pagamento", m + 6f, y + 15f, pincel(10.5f, negrito = true))
             c.drawText(f.r.pagamento, m + 6f, y + 36f, pincel(9.5f))
+            y += 48f
+        }
+        if (f.r.info.isNotBlank()) {
+            c.drawRect(m, y, w - m, y + 22f, Paint().apply { color = Color.rgb(0xF6, 0xF6, 0xF6) })
+            c.drawText("Informações adicionais", m + 6f, y + 15f, pincel(10.5f, negrito = true))
+            c.drawText(TextUtils.ellipsize(f.r.info, pincel(9.5f), w - 2 * m - 12f, TextUtils.TruncateAt.END).toString(), m + 6f, y + 36f, pincel(9.5f))
             y += 48f
         }
         f.r.substitui?.let { c.drawText("Este recibo substitui o nº ${String.format(Locale.ROOT, "%04d", it)}.", m + 6f, y, pincel(9f, cor = CINZA)) }
@@ -459,7 +470,7 @@ object DesenhoRecibo {
             val larguraData = pincel(fonte).measureText("00/00/0000")
             val larguraValor = pincel(fonte).measureText("R$ 0.000,00")
             val larguraTrajeto = (x1 - x0 - 24f - larguraData - larguraValor).toInt()
-            linhas = f.r.corridas.map { trajetoNaTabela(it.trajeto, fonte, larguraTrajeto, if (fonte > 8f) 4 else 2) }
+            linhas = f.r.corridas.map { trajetoNaTabela(it.trajeto.copy(obs = it.observacao), fonte, larguraTrajeto, if (fonte > 8f) 4 else 2) }
             val altura = cabeca + linhas.sumOf { (it.height + fonte).toDouble() }.toFloat()
             if (topo + altura <= limite || fonte <= 7f) break
             fonte -= 0.5f

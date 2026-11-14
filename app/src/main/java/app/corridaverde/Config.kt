@@ -109,7 +109,7 @@ data class Config(
             .putBoolean("radarSom", radarSom)
             .putBoolean("aviso99", aviso99)
             .putBoolean("bolinha", bolinha)
-            .putInt("bolinhaTamanho", bolinhaTamanho)
+            .putInt(BOLINHA_CHAVE, bolinhaTamanho)
             .putBoolean("telaDividida", telaDividida)
             .putInt("abaLargura", abaLargura)
             .putInt("abaTransparencia", abaTransparencia)
@@ -141,9 +141,25 @@ data class Config(
         const val ABA_MEDIA = 14
         const val ABA_FINA = 9
         const val ABA_PASSO_TRANSPARENCIA = 5
-        const val BOLINHA_PEQUENA = 46
-        const val BOLINHA_MEDIA = 58
-        const val BOLINHA_GRANDE = 72
+        /**
+         * Tamanhos menores desde 14/11/2026 (pedido do Paulo): a Grande ficou do tamanho da antiga Média, a Média do
+         * da antiga Pequena e a Pequena ainda menor. Gravados em [BOLINHA_CHAVE]; a escolha antiga (46/58/72 em
+         * "bolinhaTamanho") vira o mesmo nome no tamanho novo, sem a bolinha de ninguém crescer.
+         */
+        const val BOLINHA_PEQUENA = 38
+        const val BOLINHA_MEDIA = 46
+        const val BOLINHA_GRANDE = 58
+        private const val BOLINHA_CHAVE = "bolinhaTam"
+
+        private fun bolinhaGuardada(p: android.content.SharedPreferences, padrao: Int): Int = when {
+            p.contains(BOLINHA_CHAVE) -> p.getInt(BOLINHA_CHAVE, padrao)
+            !p.contains("bolinhaTamanho") -> padrao
+            else -> when (p.getInt("bolinhaTamanho", 58)) {
+                46 -> BOLINHA_PEQUENA
+                72 -> BOLINHA_GRANDE
+                else -> BOLINHA_MEDIA
+            }
+        }
         /**
          * Gravado junto com o raio desde o padrão de 6 km. Sem ele, os 3 km guardados são o padrão antigo (a tela de
          * Ajustes grava tudo ao sair, então 3 km guardado não quer dizer que a pessoa escolheu): vira 6 km.
@@ -256,7 +272,7 @@ data class Config(
                 radarSom = p.getBoolean("radarSom", d.radarSom),
                 aviso99 = true,
                 bolinha = p.getBoolean("bolinha", d.bolinha),
-                bolinhaTamanho = p.getInt("bolinhaTamanho", d.bolinhaTamanho),
+                bolinhaTamanho = bolinhaGuardada(p, d.bolinhaTamanho),
                 telaDividida = p.getBoolean("telaDividida", d.telaDividida),
                 abaLargura = p.getInt("abaLargura", d.abaLargura),
                 abaTransparencia = p.getInt("abaTransparencia", d.abaTransparencia),

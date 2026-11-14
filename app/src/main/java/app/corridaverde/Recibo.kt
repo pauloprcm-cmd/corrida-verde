@@ -64,6 +64,8 @@ data class Recibo(
     val documento: String = "",
     /** Recibo de cliente fixo: as corridas pagas de uma vez. Vazio = recibo de uma corrida só (de, até, quando). */
     val corridas: List<CorridaRecibo> = emptyList(),
+    /** Informações adicionais que saem no recibo ("Motorista: Diego"), pedido do Diego em 14/11/2026. */
+    val info: String = "",
 ) {
     val numeroTexto get() = String.format(Locale.ROOT, "%04d", numero)
 
@@ -89,8 +91,14 @@ data class Trajeto(val tipo: String, val de: String, val ate: String, val valor:
     }
 }
 
-/** Uma corrida do recibo de cliente fixo: o trajeto e o dia em que foi feito. */
-data class CorridaRecibo(val dia: LocalDate, val trajeto: Trajeto)
+/**
+ * Uma corrida do recibo de cliente fixo: o trajeto, o dia em que foi feito e a observação só desta corrida
+ * ("espera de 20 min"), que se soma à do trajeto ("Pedágios incluídos").
+ */
+data class CorridaRecibo(val dia: LocalDate, val trajeto: Trajeto, val obs: String = "") {
+    /** As observações do trajeto e da corrida juntas, como saem no recibo. */
+    val observacao get() = listOf(trajeto.obs, obs).filter { it.isNotBlank() }.joinToString(" · ")
+}
 
 /**
  * Listas dentro de uma coluna do .tsv: os campos se separam por U+001F e os itens por U+001E, caracteres que
@@ -110,9 +118,10 @@ object Lista {
 
     fun trajeto(c: List<String>) = Trajeto(c[0], c[1], c[2], c[3].toDouble(), c.getOrElse(4) { "" })
 
-    fun corridas(cs: List<CorridaRecibo>) = juntar(cs.map { listOf(it.dia.toString()) + trajeto(it.trajeto) })
+    /** Dia, os cinco campos do trajeto e, desde 14/11/2026, a observação da corrida (antes não existia). */
+    fun corridas(cs: List<CorridaRecibo>) = juntar(cs.map { listOf(it.dia.toString()) + trajeto(it.trajeto) + it.obs })
 
-    fun corridas(texto: String) = separar(texto).map { CorridaRecibo(LocalDate.parse(it[0]), trajeto(it.drop(1))) }
+    fun corridas(texto: String) = separar(texto).map { CorridaRecibo(LocalDate.parse(it[0]), trajeto(it.drop(1)), it.getOrElse(6) { "" }) }
 }
 
 /** O que o motorista falou: "recibo de 50 reais, da Avenida Paulista até a Vila Mariana, no Pix". */
@@ -245,6 +254,15 @@ object Recibos {
     private const val PREFS = "recibo_estilo"
     private const val PROXIMO = "proximoNumero"
 
+    private const val INFO = "infoAdicional"
+
+    /** As informações adicionais do último recibo de cliente fixo: o próximo já começa com elas. */
+    fun infoPadrao(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(INFO, "") ?: ""
+
+    fun guardarInfo(ctx: Context, info: String) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(INFO, info).apply()
+    }
+
     private fun numeroEscolhido(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(PROXIMO, 0)
 
     /** Só aceita número maior que o maior já emitido; devolve false se não serve. */
@@ -266,15 +284,15 @@ object Recibos {
 
     fun paraLinha(r: Recibo) = listOf(
         r.numero, r.quando, r.valor, r.passageiro, r.de, r.ate, r.pagamento, r.telefone, r.email, r.substitui ?: "",
-        r.documento, Lista.corridas(r.corridas),
+        r.documento, Lista.corridas(r.corridas), r.info,
     ).joinToString("\t") { it.toString().replace(Regex("""[\t\n\r]"""), " ") }
 
-    /** As duas últimas colunas (documento e corridas) só existem desde o recibo de cliente fixo. */
+    /** Documento e corridas existem desde o recibo de cliente fixo; as informações adicionais, desde 14/11/2026. */
     fun deLinha(l: String): Recibo? = runCatching {
         val c = l.split('\t')
         Recibo(
             c[0].toInt(), LocalDateTime.parse(c[1]), c[2].toDouble(), c[3], c[4], c[5], c[6], c[7], c[8], c[9].toIntOrNull(),
-            c.getOrElse(10) { "" }, Lista.corridas(c.getOrElse(11) { "" }),
+            c.getOrElse(10) { "" }, Lista.corridas(c.getOrElse(11) { "" }), c.getOrElse(12) { "" },
         )
     }.getOrNull()
 
@@ -284,7 +302,7 @@ object Recibos {
 
     /** Uma corrida do recibo de cliente fixo em uma linha: "29/09/2026 – (Ida) Casa → Congonhas – R$ 130,00". */
     fun linha(c: CorridaRecibo): String =
-        listOf(data(c), c.trajeto.descricao, c.trajeto.obs, "R$ ${Popup.br(c.trajeto.valor)}").filter { it.isNotBlank() }.joinToString(" – ")
+        listOf(data(c), c.trajeto.descricao, c.observacao, "R$ ${Popup.br(c.trajeto.valor)}").filter { it.isNotBlank() }.joinToString(" – ")
 
     fun hora(r: Recibo): String = r.quando.format(HORA)
 
@@ -331,6 +349,7 @@ object Recibos {
         r.corridas.forEach { appendLine("• ${linha(it)}") }
         if (r.varias) appendLine("Total: R$ ${Popup.br(r.valor)}")
         if (r.pagamento.isNotBlank()) appendLine("Pagamento: ${r.pagamento}.")
+        if (r.info.isNotBlank()) appendLine(r.info)
         r.substitui?.let { appendLine("Este recibo substitui o nº ${String.format(Locale.ROOT, "%04d", it)}.") }
         appendLine()
         dadosDoMotorista(m).forEach { appendLine(it) }
